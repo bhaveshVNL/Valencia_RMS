@@ -1,0 +1,627 @@
+/* =========================================================
+   ADMINISTRATOR USERS PAGE
+   Complete replacement stylesheet
+========================================================= */
+
+.users-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  margin: 0;
+  padding: 0 30px 35px 0;
+
+  color: #111827;
+
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.users-page *,
+.users-page *::before,
+.users-page *::after {
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   PAGE HEADER
+========================================================= */
+
+.users-page .administrator-users-header {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  margin: 8px 0 24px;
+  padding: 0;
+
+  overflow: visible;
+}
+
+.users-page .administrator-users-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.users-page .administrator-users-heading h1 {
+  margin: 0;
+
+  color: #111827;
+
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.users-page .administrator-users-heading p {
+  margin: 8px 0 0;
+
+  color: #64748b;
+
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* =========================================================
+   TOP-RIGHT ACTION BUTTONS
+========================================================= */
+
+.users-page .administrator-users-header-actions {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+
+  gap: 8px;
+
+  width: auto;
+  min-width: 0;
+  max-width: calc(100% - 340px);
+
+  margin: 0;
+  padding: 0 2px 0 0;
+
+  overflow: visible;
+}
+
+.users-page button.administrator-users-header-btn {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+
+  height: 36px !important;
+  min-height: 36px !important;
+
+  flex: 0 0 auto !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 6px !important;
+
+  margin: 0 !important;
+  padding: 0 12px !important;
+
+  border: 1px solid #ff5733 !important;
+  border-radius: 9px !important;
+
+  background: #ff5733 !important;
+  color: #ffffff !important;
+
+  font-family: Arial, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+
+  overflow: visible !important;
+  text-overflow: clip !important;
+
+  cursor: pointer !important;
+}
+
+.users-page button.administrator-users-header-btn span {
+  display: inline-block !important;
+
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+
+  color: inherit !important;
+
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.users-page button.administrator-users-header-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+
+  flex: 0 0 14px !important;
+
+  overflow: visible !important;
+}
+
+.users-page button.administrator-users-header-btn:hover {
+  border-color: #e94b2d !important;
+  background: #e94b2d !important;
+}
+
+.users-page button.administrator-users-header-btn:disabled {
+  opacity: 0.65 !important;
+  cursor: not-allowed !important;
+}
+
+/* =========================================================
+   EXISTING MESSAGE
+========================================================= */
+
+.users-page .projects-message {
+  width: 100%;
+  max-width: 100%;
+
+  margin-bottom: 18px;
+}
+
+/* =========================================================
+   ADD USER CARD
+   Keeps your existing design and dimensions
+========================================================= */
+
+.users-page .user-form-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  box-sizing: border-box;
+}
+
+.users-page .section-title-row {
+  width: 100%;
+  max-width: 100%;
+}
+
+.users-page .user-form-grid {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.users-page .user-form-grid > * {
+  min-width: 0;
+}
+
+.users-page .form-field,
+.users-page .form-submit-field {
+  min-width: 0;
+}
+
+.users-page .form-field input,
+.users-page .form-field select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  box-sizing: border-box;
+}
+
+.users-page .form-submit-field .primary-action-btn {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* =========================================================
+   SEARCH SECTION
+========================================================= */
+
+.users-page .projects-toolbar {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.users-page .projects-search {
+  width: min(780px, 100%);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.users-page .projects-search input {
+  width: 100%;
+  min-width: 0;
+}
+
+/* =========================================================
+   TABLE CARD
+   Vertical scrolling only
+========================================================= */
+
+.users-page .administrator-users-table-card {
+  position: relative;
+
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+
+  height: 560px;
+
+  margin: 0;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  border-radius: 18px;
+
+  background: #ffffff;
+}
+
+/* =========================================================
+   USERS TABLE
+========================================================= */
+
+.users-page table.administrator-users-table {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+
+  table-layout: fixed !important;
+
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+
+  margin: 0 !important;
+}
+
+/* =========================================================
+   STICKY TABLE HEADER
+========================================================= */
+
+.users-page .administrator-users-table thead {
+  position: relative;
+  z-index: 10;
+}
+
+.users-page .administrator-users-table th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+
+  min-width: 0 !important;
+
+  padding: 17px 18px !important;
+
+  border-bottom: 1px solid #e5e7eb !important;
+
+  background: #ffffff !important;
+  color: #64748b !important;
+
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+
+  text-align: left !important;
+  vertical-align: middle !important;
+
+  white-space: nowrap !important;
+
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04);
+}
+
+/* =========================================================
+   TABLE BODY
+========================================================= */
+
+.users-page .administrator-users-table td {
+  min-width: 0 !important;
+
+  padding: 18px !important;
+
+  border-bottom: 1px solid #eef2f7 !important;
+
+  background: #ffffff;
+  color: #111827;
+
+  font-size: 13px;
+  line-height: 1.4;
+
+  vertical-align: middle;
+
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.users-page .administrator-users-table tbody tr:hover td {
+  background: #fff8f5;
+}
+
+.users-page .administrator-users-table tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* =========================================================
+   FOUR TABLE COLUMNS
+========================================================= */
+
+.users-page .administrator-users-table th:nth-child(1),
+.users-page .administrator-users-table td:nth-child(1) {
+  width: 44% !important;
+}
+
+.users-page .administrator-users-table th:nth-child(2),
+.users-page .administrator-users-table td:nth-child(2) {
+  width: 18% !important;
+}
+
+.users-page .administrator-users-table th:nth-child(3),
+.users-page .administrator-users-table td:nth-child(3) {
+  width: 19% !important;
+}
+
+.users-page .administrator-users-table th:nth-child(4),
+.users-page .administrator-users-table td:nth-child(4) {
+  width: 19% !important;
+}
+
+/* =========================================================
+   USER INFORMATION CELL
+========================================================= */
+
+.users-page .administrator-users-table .user-name-cell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 13px;
+}
+
+.users-page
+  .administrator-users-table
+  .user-name-cell
+  > div:last-child {
+  flex: 1 1 auto;
+
+  width: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.users-page .administrator-users-table .user-name-cell strong {
+  display: block;
+
+  width: 100%;
+  max-width: 100%;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.users-page .administrator-users-table .user-name-cell p {
+  display: block;
+
+  width: 100%;
+  max-width: 100%;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.users-page .administrator-users-table .user-avatar-small {
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   ROLE BADGE
+========================================================= */
+
+.users-page .administrator-users-table .role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  max-width: 100%;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================================================
+   TABLE SCROLLBAR
+========================================================= */
+
+.users-page .administrator-users-table-card::-webkit-scrollbar {
+  width: 7px;
+  height: 0;
+}
+
+.users-page .administrator-users-table-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.users-page .administrator-users-table-card::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background: #d2d8e0;
+}
+
+.users-page .administrator-users-table-card::-webkit-scrollbar-thumb:hover {
+  background: #b8c0ca;
+}
+
+/* =========================================================
+   DIALOG SAFETY
+========================================================= */
+
+.users-page .user-dialog-backdrop {
+  max-width: none;
+}
+
+.users-page .user-dialog {
+  max-width: 760px;
+}
+
+.users-page .dialog-field {
+  min-width: 0;
+}
+
+.users-page .dialog-field input,
+.users-page .dialog-field select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* =========================================================
+   LAPTOP WIDTH
+========================================================= */
+
+@media (max-width: 1250px) {
+  .users-page {
+    padding-right: 22px;
+  }
+
+  .users-page .administrator-users-header {
+    gap: 14px;
+  }
+
+  .users-page .administrator-users-header-actions {
+    max-width: calc(100% - 290px);
+    gap: 6px;
+  }
+
+  .users-page button.administrator-users-header-btn {
+    height: 34px !important;
+    min-height: 34px !important;
+
+    padding: 0 9px !important;
+
+    font-size: 10.5px !important;
+  }
+
+  .users-page button.administrator-users-header-btn svg {
+    width: 13px !important;
+    height: 13px !important;
+    min-width: 13px !important;
+
+    flex-basis: 13px !important;
+  }
+}
+
+/* =========================================================
+   SMALL LAPTOP / TABLET
+========================================================= */
+
+@media (max-width: 1050px) {
+  .users-page .administrator-users-header {
+    flex-direction: column;
+    align-items: flex-start;
+
+    gap: 14px;
+  }
+
+  .users-page .administrator-users-header-actions {
+    width: 100%;
+    max-width: 100%;
+
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .users-page button.administrator-users-header-btn {
+    min-width: 110px !important;
+  }
+
+  .users-page .administrator-users-table th,
+  .users-page .administrator-users-table td {
+    padding-left: 10px !important;
+    padding-right: 8px !important;
+  }
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 650px) {
+  .users-page {
+    padding-right: 8px;
+  }
+
+  .users-page .administrator-users-heading h1 {
+    font-size: 28px;
+  }
+
+  .users-page .administrator-users-heading p {
+    font-size: 13px;
+  }
+
+  .users-page .administrator-users-header-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+
+    width: 100%;
+  }
+
+  .users-page button.administrator-users-header-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .users-page .administrator-users-table-card {
+    height: 500px;
+  }
+
+  .users-page .administrator-users-table th,
+  .users-page .administrator-users-table td {
+    padding: 11px 5px !important;
+    font-size: 9px !important;
+  }
+
+  .users-page .administrator-users-table .user-avatar-small {
+    display: none;
+  }
+}
+
+
+
+
+/* Hide table scrollbar but keep vertical scrolling working */
+
+.users-page .administrator-users-table-card {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.users-page .administrator-users-table-card::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}

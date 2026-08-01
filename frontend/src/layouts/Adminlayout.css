@@ -1,0 +1,3135 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  background: #f6f7fb;
+  color: #111827;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* =========================
+   ADMIN LAYOUT
+========================= */
+
+.admin-dashboard-shell {
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  background: #f6f7fb;
+  overflow: hidden;
+  transition: grid-template-columns 0.25s ease;
+}
+
+.admin-dashboard-shell.sidebar-collapsed {
+  grid-template-columns: 94px minmax(0, 1fr);
+}
+
+.admin-sidebar {
+  height: 100vh;
+  position: relative;
+  background: #ffffff;
+  border-right: 1px solid #eeeeee;
+  padding: 28px 22px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.admin-main {
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 40px;
+  background: #f6f7fb;
+}
+
+.admin-main > div {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+/* =========================
+   SIDEBAR COLLAPSE BUTTON
+========================= */
+
+.admin-sidebar-toggle {
+  position: absolute;
+  top: 22px;
+  right: -14px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 30;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.admin-sidebar-toggle:hover {
+  background: #ff5733;
+  color: #ffffff;
+  border-color: #ff5733;
+}
+
+/* =========================
+   SIDEBAR
+========================= */
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 42px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.admin-brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #ff5733;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.admin-brand-text {
+  min-width: 0;
+  transition: opacity 0.2s ease, width 0.2s ease;
+}
+
+.admin-brand h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.admin-brand p {
+  margin: 8px 0 0;
+  color: #667085;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.admin-nav {
+  display: grid;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+}
+
+.admin-nav a {
+  text-decoration: none;
+  color: #344054;
+  background: transparent;
+  padding: 16px 18px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 900;
+  transition: 0.2s ease;
+  min-width: 0;
+}
+
+.admin-nav a svg {
+  flex-shrink: 0;
+}
+
+.admin-nav a span {
+  white-space: nowrap;
+  transition: opacity 0.2s ease, width 0.2s ease;
+}
+
+.admin-nav a:hover,
+.admin-nav a.active {
+  color: #ffffff;
+  background: #ff5733;
+  box-shadow: 0 14px 28px rgba(255, 87, 51, 0.22);
+}
+
+.admin-sidebar-bottom {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 18px;
+  margin-top: 18px;
+  flex-shrink: 0;
+}
+
+.admin-user-card {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.admin-user-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.admin-user-info {
+  min-width: 0;
+  transition: opacity 0.2s ease, width 0.2s ease;
+}
+
+.admin-user-card strong {
+  display: block;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-card p {
+  margin: 4px 0 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.admin-user-card span {
+  display: block;
+  margin-top: 5px;
+  color: #ff5733;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.admin-logout-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 14px;
+  padding: 13px 16px;
+  background: #111827;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.admin-logout-btn:hover {
+  background: #000000;
+}
+
+.admin-logout-btn svg {
+  flex-shrink: 0;
+}
+
+.admin-logout-btn span {
+  white-space: nowrap;
+}
+
+/* =========================
+   COLLAPSED SIDEBAR MODE
+========================= */
+
+.sidebar-collapsed .admin-sidebar {
+  padding: 28px 16px;
+}
+
+.sidebar-collapsed .admin-brand {
+  justify-content: center;
+  margin-bottom: 42px;
+}
+
+.sidebar-collapsed .admin-brand-logo {
+  width: 52px;
+  height: 52px;
+}
+
+.sidebar-collapsed .admin-brand-text {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.sidebar-collapsed .admin-nav {
+  padding-right: 0;
+}
+
+.sidebar-collapsed .admin-nav a {
+  justify-content: center;
+  padding: 16px 0;
+  gap: 0;
+}
+
+.sidebar-collapsed .admin-nav a span {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.sidebar-collapsed .admin-user-card {
+  justify-content: center;
+  padding: 12px;
+}
+
+.sidebar-collapsed .admin-user-info {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.sidebar-collapsed .admin-logout-btn {
+  padding: 13px 0;
+}
+
+.sidebar-collapsed .admin-logout-btn span {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* =========================
+   PAGE WRAPPERS
+========================= */
+
+.admin-overview-page,
+.admin-projects-page,
+.admin-tasks-page,
+.admin-users-page,
+.admin-profile-page,
+.admin-attendance-page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+/* =========================
+   COMMON TEXT
+========================= */
+
+.admin-main h1 {
+  margin: 0 0 10px;
+  color: #111827;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.admin-main h2 {
+  margin: 0 0 10px;
+  color: #111827;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.admin-main h3 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.admin-main h4 {
+  margin: 0;
+  color: #111827;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.admin-main p {
+  margin: 0;
+  color: #667085;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.admin-main strong {
+  color: #111827;
+  font-weight: 900;
+}
+
+/* =========================
+   COMMON CARDS
+========================= */
+
+.admin-projects-header-card,
+.admin-project-form-card,
+.admin-tasks-header-card,
+.admin-task-card,
+.admin-users-header-card,
+.admin-users-toolbar,
+.admin-users-table-card,
+.admin-users-message-card,
+.admin-users-error-card,
+.admin-profile-header-card,
+.admin-profile-card,
+.admin-attendance-header-card,
+.admin-attendance-controls,
+.admin-attendance-table-card,
+.admin-attendance-employee-card,
+.admin-attendance-message {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #eeeeee;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.045);
+}
+
+.admin-projects-header-card,
+.admin-tasks-header-card,
+.admin-users-header-card,
+.admin-profile-header-card,
+.admin-attendance-header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+
+.admin-main button,
+.admin-refresh-btn,
+.admin-create-project-btn {
+  border: 0;
+  border-radius: 14px;
+  padding: 13px 18px;
+  background: #ff5733;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.admin-main button:hover,
+.admin-refresh-btn:hover,
+.admin-create-project-btn:hover {
+  background: #ec4424;
+}
+
+.admin-main button:disabled,
+.admin-create-project-btn:disabled {
+  background: #ff9b84;
+  cursor: not-allowed;
+}
+
+/* =========================
+   FORM INPUTS
+========================= */
+
+.admin-main label {
+  display: block;
+  margin-bottom: 8px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.admin-main input,
+.admin-main select,
+.admin-main textarea {
+  width: 100%;
+  border: 1px solid #d0d5dd;
+  border-radius: 16px;
+  padding: 15px 17px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
+  outline: none;
+}
+
+.admin-main textarea {
+  min-height: 128px;
+  resize: vertical;
+}
+
+.admin-main input:focus,
+.admin-main select:focus,
+.admin-main textarea:focus {
+  border-color: #ff5733;
+  box-shadow: 0 0 0 4px rgba(255, 87, 51, 0.12);
+}
+
+.admin-main input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  padding: 0;
+  accent-color: #ff5733;
+  box-shadow: none;
+}
+
+.admin-main input[type="date"] {
+  max-width: 100%;
+}
+
+/* =========================
+   ADMIN PROJECTS PAGE
+========================= */
+
+.admin-projects-header-card {
+  margin-bottom: 28px;
+}
+
+.admin-project-form-card {
+  display: grid;
+  gap: 28px;
+}
+
+.admin-project-form-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.admin-form-group {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-form-group input,
+.admin-form-group textarea {
+  max-width: 100%;
+}
+
+.admin-date-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 22px;
+}
+
+.admin-assignee-section {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+  padding: 24px;
+}
+
+.admin-assignee-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.admin-selected-count {
+  background: #111827;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-assignee-search {
+  max-width: 100%;
+  margin-bottom: 18px;
+}
+
+.admin-assignee-list {
+  display: grid;
+  gap: 12px;
+  max-height: 460px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+.admin-assignee-row {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 14px;
+  display: grid !important;
+  grid-template-columns: 20px 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  margin: 0 !important;
+}
+
+.admin-assignee-row.selected {
+  border-color: #ff5733;
+  background: #fff5f2;
+  box-shadow: 0 12px 24px rgba(255, 87, 51, 0.12);
+}
+
+.admin-assignee-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+}
+
+.admin-assignee-info {
+  min-width: 0;
+}
+
+.admin-assignee-name {
+  color: #111827;
+  font-weight: 900;
+  font-size: 15px;
+}
+
+.admin-assignee-meta {
+  color: #667085;
+  font-size: 13px;
+  margin-top: 3px;
+  word-break: break-word;
+}
+
+.admin-assignee-role {
+  background: #eef2ff;
+  color: #344054;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-create-project-btn {
+  width: fit-content;
+  padding-inline: 26px;
+}
+
+/* =========================
+   MESSAGES
+========================= */
+
+.admin-project-success,
+.admin-project-error,
+.admin-project-message,
+.admin-tasks-error,
+.admin-tasks-message,
+.admin-users-error-card,
+.admin-users-message-card,
+.admin-profile-error,
+.admin-attendance-error,
+.admin-attendance-message {
+  border-radius: 16px;
+  padding: 16px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.admin-project-success {
+  background: #ecfdf3;
+  color: #027a48;
+  border: 1px solid #abefc6;
+}
+
+.admin-project-error,
+.admin-tasks-error,
+.admin-users-error-card,
+.admin-profile-error,
+.admin-attendance-error {
+  background: #fff1f0;
+  color: #b42318;
+  border: 1px solid #ffd5d0;
+}
+
+.admin-project-message,
+.admin-tasks-message,
+.admin-users-message-card,
+.admin-attendance-message {
+  background: #ffffff;
+  color: #667085;
+  border: 1px dashed #d0d5dd;
+  text-align: center;
+}
+
+/* =========================
+   ADMIN TASKS PAGE
+========================= */
+
+.admin-task-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.admin-task-stats-grid button {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  padding: 18px;
+  display: block;
+  text-align: left;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.035);
+}
+
+.admin-task-stats-grid button.active {
+  background: #ff5733;
+  color: #ffffff;
+  border-color: #ff5733;
+}
+
+.admin-task-stats-grid button.active.rejected {
+  background: #991b1b;
+  border-color: #991b1b;
+}
+
+.admin-task-stats-grid span {
+  display: block;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.admin-task-stats-grid p {
+  margin: 5px 0 0;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-task-search {
+  max-width: 100%;
+  margin-bottom: 22px;
+}
+
+.admin-tasks-list {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-task-card.rejected {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.admin-task-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.admin-task-status {
+  background: #eef2ff;
+  color: #344054;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-task-status.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.admin-task-project-box {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.admin-task-project-box > div,
+.admin-task-employee-box,
+.admin-task-rejection-box {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.admin-task-project-box span,
+.admin-task-rejection-box span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+
+.admin-task-employee-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.admin-task-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.admin-task-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.admin-task-progress-bar {
+  width: 100%;
+  height: 11px;
+  border-radius: 999px;
+  background: #ffd6cc;
+  overflow: hidden;
+}
+
+.admin-task-progress-bar span {
+  display: block;
+  height: 100%;
+  background: #ff5733;
+  border-radius: 999px;
+}
+
+.admin-task-subtask-summary {
+  color: #667085;
+  font-weight: 800;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.admin-task-subtasks {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-task-subtask-row {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 12px 1fr;
+  gap: 10px;
+}
+
+.admin-task-subtask-row > span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d0d5dd;
+  margin-top: 6px;
+}
+
+.admin-task-subtask-row > span.done {
+  background: #16a34a;
+}
+
+.admin-task-no-subtasks {
+  border: 1px dashed #d0d5dd;
+  border-radius: 14px;
+  padding: 14px;
+  color: #667085;
+  text-align: center;
+  font-weight: 800;
+}
+
+/* =========================
+   ADMIN USERS PAGE
+========================= */
+
+.admin-users-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+
+.admin-users-toolbar input {
+  max-width: 520px;
+}
+
+.admin-users-count {
+  background: #111827;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 10px 15px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-users-table-card,
+.admin-attendance-table-card {
+  overflow-x: auto;
+}
+
+.admin-users-table,
+.admin-attendance-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-users-table th,
+.admin-users-table td,
+.admin-attendance-table th,
+.admin-attendance-table td {
+  text-align: left;
+  padding: 15px 14px;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.admin-users-table th,
+.admin-attendance-table th {
+  background: #f8fafc;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-user-fullname {
+  color: #111827;
+  font-weight: 900;
+}
+
+.admin-user-email-text,
+.admin-user-code-text {
+  color: #667085;
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.admin-role-badge,
+.admin-attendance-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: #eef2ff;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.admin-users-empty,
+.admin-attendance-empty {
+  text-align: center;
+  color: #667085;
+  font-weight: 800;
+  padding: 24px !important;
+}
+
+/* =========================
+   ADMIN PROFILE PAGE
+========================= */
+
+.admin-profile-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.admin-profile-avatar {
+  width: 86px;
+  height: 86px;
+  border-radius: 24px;
+  background: #ff5733;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 34px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.admin-profile-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.admin-profile-row {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.admin-profile-row span {
+  display: block;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 7px;
+}
+
+.admin-profile-row strong {
+  font-size: 17px;
+  font-weight: 900;
+  word-break: break-word;
+}
+
+/* =========================
+   ADMIN ATTENDANCE PAGE
+========================= */
+
+.admin-attendance-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-attendance-stats-grid > div {
+  background: #ffffff;
+  border: 1px solid #eeeeee;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.045);
+}
+
+.admin-attendance-stats-grid span {
+  display: block;
+  color: #111827;
+  font-size: 32px;
+  font-weight: 900;
+}
+
+.admin-attendance-stats-grid p {
+  margin: 6px 0 0;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-attendance-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-attendance-tabs button {
+  background: #ffffff;
+  color: #344054;
+  border: 1px solid #d0d5dd;
+}
+
+.admin-attendance-tabs button.active {
+  background: #ff5733;
+  color: #ffffff;
+  border-color: #ff5733;
+}
+
+.admin-attendance-filter-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.admin-attendance-filter-row input {
+  max-width: 520px;
+}
+
+.admin-attendance-filter-row select {
+  max-width: 220px;
+}
+
+.admin-attendance-employee-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.admin-attendance-employee-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.admin-attendance-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.admin-attendance-employee-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.admin-attendance-employee-stats > div {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.admin-attendance-employee-stats span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-attendance-employee-stats strong {
+  display: block;
+  font-size: 22px;
+  margin-top: 4px;
+}
+
+.admin-attendance-latest {
+  margin-top: 14px;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 1100px) {
+  .admin-dashboard-shell {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .admin-dashboard-shell.sidebar-collapsed {
+    grid-template-columns: 94px minmax(0, 1fr);
+  }
+
+  .admin-main {
+    padding: 28px;
+  }
+
+  .admin-task-stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .admin-task-project-box {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-attendance-employee-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 780px) {
+  .admin-dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard-shell.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: relative;
+    height: auto;
+  }
+
+  .admin-main {
+    height: auto;
+    padding: 22px;
+  }
+
+  .admin-date-grid,
+  .admin-profile-info {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-attendance-filter-row,
+  .admin-users-header-card,
+  .admin-profile-header-card,
+  .admin-attendance-header-card,
+  .admin-tasks-header-card,
+  .admin-assignee-section-header,
+  .admin-users-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-task-stats-grid,
+  .admin-attendance-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-assignee-row {
+    grid-template-columns: 20px 42px 1fr;
+  }
+
+  .admin-assignee-role {
+    grid-column: 2 / -1;
+    width: fit-content;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL ADMIN SIDEBAR POSITION FIX
+   Paste this at the VERY BOTTOM of Adminlayout.css
+========================================================= */
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.admin-dashboard-shell {
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  display: flex !important;
+  background: #f6f7fb !important;
+  overflow: hidden !important;
+}
+
+/* OPEN SIDEBAR WIDTH - reduce this if you want it even more left */
+.admin-sidebar {
+  width: 300px !important;
+  min-width: 300px !important;
+  max-width: 300px !important;
+  height: 100vh !important;
+  position: relative !important;
+  top: 0 !important;
+  left: 0 !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+  padding: 28px 22px !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
+  z-index: 10 !important;
+}
+
+/* MAIN DASHBOARD SHOULD START AFTER SIDEBAR, NOT BE CUT */
+.admin-main {
+  flex: 1 !important;
+  width: calc(100vw - 300px) !important;
+  min-width: 0 !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 40px 42px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  background: #f6f7fb !important;
+}
+
+/* Prevent page cards from going behind sidebar */
+.admin-main > div {
+  width: 100% !important;
+  max-width: 1180px !important;
+  margin: 0 auto !important;
+}
+
+/* COLLAPSED SIDEBAR */
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+  width: 92px !important;
+  min-width: 92px !important;
+  max-width: 92px !important;
+  padding: 28px 16px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-main {
+  width: calc(100vw - 92px) !important;
+}
+
+/* COLLAPSED MODE: SHOW ONLY ICONS */
+.admin-dashboard-shell.sidebar-collapsed .admin-brand {
+  justify-content: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-brand-text,
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a span,
+.admin-dashboard-shell.sidebar-collapsed .admin-user-info,
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a {
+  justify-content: center !important;
+  padding: 16px 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-card {
+  justify-content: center !important;
+  padding: 12px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  justify-content: center !important;
+  padding: 13px 0 !important;
+}
+
+/* SIDEBAR TOGGLE BUTTON */
+.admin-sidebar-toggle {
+  position: absolute !important;
+  top: 26px !important;
+  right: -15px !important;
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  z-index: 50 !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12) !important;
+}
+
+.admin-sidebar-toggle:hover {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+}
+
+/* SIDEBAR INTERNAL SCROLL ONLY FOR MENU */
+.admin-nav {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* REMOVE EXTRA HORIZONTAL SCROLL */
+.admin-main *,
+.admin-sidebar * {
+  max-width: 100%;
+}
+
+/* MOBILE */
+@media (max-width: 780px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    overflow: auto;
+  }
+
+  .admin-dashboard-shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .admin-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+  }
+
+  .admin-main {
+    width: 100% !important;
+    height: auto !important;
+    padding: 24px !important;
+    overflow: visible !important;
+  }
+
+  .admin-sidebar-toggle {
+    display: none !important;
+  }
+}
+
+
+
+/* =========================================================
+   FIX SIDEBAR COLLAPSE BUTTON CUTTING
+   Paste at the VERY BOTTOM of Adminlayout.css
+========================================================= */
+
+.admin-sidebar {
+  overflow: hidden !important;
+}
+
+/* Keep the button fully inside the sidebar */
+.admin-sidebar-toggle {
+  position: absolute !important;
+  top: 38px !important;
+  right: 16px !important;
+  left: auto !important;
+
+  width: 36px !important;
+  height: 36px !important;
+
+  border-radius: 50% !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+
+  z-index: 100 !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12) !important;
+}
+
+.admin-sidebar-toggle:hover {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+}
+
+/* When collapsed, keep button centered inside small sidebar */
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-toggle {
+  top: 36px !important;
+  right: 50% !important;
+  transform: translateX(50%) !important;
+}
+
+/* Give brand text enough space so button does not overlap */
+.admin-brand {
+  padding-right: 48px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-brand {
+  padding-right: 0 !important;
+}
+
+/* =========================================================
+   ADMIN SIDEBAR ONLY - MATCH EMPLOYEE SIDEBAR STYLE
+   Paste at bottom. Do not delete existing Adminlayout.css.
+========================================================= */
+
+.admin-dashboard-shell {
+  grid-template-columns: 335px 1fr !important;
+  background: #f5f7fb !important;
+  transition: grid-template-columns 0.25s ease !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed {
+  grid-template-columns: 110px 1fr !important;
+}
+
+/* Sidebar container */
+.admin-sidebar {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 100vh !important;
+  position: sticky !important;
+  top: 0 !important;
+  background: #ffffff !important;
+  border-right: 1px solid #e5e7eb !important;
+  padding: 34px 26px 28px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  z-index: 30 !important;
+}
+
+/* Toggle button */
+.admin-sidebar-toggle {
+  position: absolute !important;
+  top: 48px !important;
+  right: 26px !important;
+  left: auto !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  z-index: 60 !important;
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.admin-sidebar-toggle:hover {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+}
+
+/* Logo area */
+.admin-brand {
+  width: 100% !important;
+  min-height: 92px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  margin-bottom: 28px !important;
+  padding-right: 78px !important;
+  padding-left: 0 !important;
+  gap: 0 !important;
+}
+
+.admin-brand-logo,
+.admin-brand-text {
+  display: none !important;
+}
+
+.admin-brand-logo-img {
+  width: 180px !important;
+  max-width: 180px !important;
+  height: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+/* Navigation */
+.admin-nav {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 18px !important;
+  overflow-y: auto !important;
+  padding-top: 8px !important;
+  padding-right: 0 !important;
+  scrollbar-width: thin !important;
+}
+
+.admin-nav a {
+  min-height: 64px !important;
+  border-radius: 18px !important;
+  padding: 0 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 18px !important;
+  color: #000000 !important;
+  text-decoration: none !important;
+  font-size: 19px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  transition: 0.2s ease !important;
+  background: transparent !important;
+}
+
+.admin-nav a svg {
+  width: 21px !important;
+  height: 21px !important;
+  min-width: 21px !important;
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+.admin-nav a:hover {
+  background: #fff1ec !important;
+  color: #000000 !important;
+}
+
+.admin-nav a:hover svg {
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+.admin-nav a.active {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  box-shadow: 0 18px 34px rgba(255, 87, 51, 0.18) !important;
+}
+
+.admin-nav a.active svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Bottom user card */
+.admin-sidebar-bottom {
+  border-top: 1px solid #d7dde8 !important;
+  padding-top: 26px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 18px !important;
+}
+
+.admin-user-card {
+  background: #f8fafc !important;
+  border: 1px solid #e7ecf4 !important;
+  border-radius: 20px !important;
+  padding: 22px 24px !important;
+  min-height: 116px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  overflow: hidden !important;
+  gap: 0 !important;
+}
+
+.admin-user-avatar {
+  display: none !important;
+}
+
+.admin-user-info {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+}
+
+.admin-user-info strong {
+  color: #000000 !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+
+.admin-user-info p {
+  margin: 0 !important;
+  color: #000000 !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  word-break: break-word !important;
+}
+
+.admin-user-info span {
+  color: #000000 !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  text-transform: capitalize !important;
+}
+
+/* Logout button */
+.admin-logout-btn {
+  height: 58px !important;
+  border: none !important;
+  border-radius: 16px !important;
+  background: #f43f46 !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+}
+
+.admin-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-logout-btn:hover {
+  background: #ef4444 !important;
+}
+
+/* Main content stays normal */
+.admin-main {
+  min-width: 0 !important;
+  background: #f5f7fb !important;
+}
+
+/* =========================================================
+   COLLAPSED ADMIN SIDEBAR
+========================================================= */
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+  padding: 130px 20px 28px !important;
+  align-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-toggle {
+  top: 44px !important;
+  right: 50% !important;
+  left: auto !important;
+  transform: translateX(50%) !important;
+  width: 58px !important;
+  height: 58px !important;
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-brand {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav {
+  width: 100% !important;
+  align-items: center !important;
+  gap: 16px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  border-radius: 15px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a span {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom {
+  width: 100% !important;
+  align-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-card {
+  width: 70px !important;
+  height: 70px !important;
+  min-height: 70px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-avatar {
+  display: grid !important;
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  border-radius: 16px !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+  place-items: center !important;
+  font-size: 20px !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-info {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  width: 70px !important;
+  height: 58px !important;
+  padding: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+
+/* =========================================================
+   ADMIN SIDEBAR FINAL FIX ONLY
+   Logo visible, no menu scroll, smaller menu text
+========================================================= */
+
+.admin-sidebar {
+  padding: 30px 26px 24px !important;
+  overflow: hidden !important;
+}
+
+.admin-brand {
+  width: 100% !important;
+  min-height: 82px !important;
+  height: 82px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  margin-bottom: 18px !important;
+  padding-right: 78px !important;
+  padding-left: 0 !important;
+  gap: 0 !important;
+}
+
+.admin-brand-logo,
+.admin-brand-text {
+  display: none !important;
+}
+
+.admin-brand-logo-img {
+  width: 165px !important;
+  max-width: 165px !important;
+  height: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+.admin-sidebar-toggle {
+  top: 42px !important;
+  right: 26px !important;
+  left: auto !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  display: grid !important;
+  place-items: center !important;
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12) !important;
+  z-index: 60 !important;
+}
+
+.admin-nav {
+  flex: 1 !important;
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  padding-top: 4px !important;
+  scrollbar-width: none !important;
+}
+
+.admin-nav::-webkit-scrollbar {
+  display: none !important;
+}
+
+.admin-nav a {
+  min-height: 50px !important;
+  height: 50px !important;
+  border-radius: 16px !important;
+  padding: 0 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  color: #000000 !important;
+  text-decoration: none !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  background: transparent !important;
+}
+
+.admin-nav a svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+.admin-nav a.active {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(255, 87, 51, 0.18) !important;
+}
+
+.admin-nav a.active svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-nav a:hover {
+  background: #fff1ec !important;
+  color: #000000 !important;
+}
+
+.admin-nav a.active:hover {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+}
+
+.admin-sidebar-bottom {
+  border-top: 1px solid #d7dde8 !important;
+  padding-top: 18px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+}
+
+.admin-user-card {
+  min-height: 92px !important;
+  padding: 16px 18px !important;
+  border-radius: 18px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e7ecf4 !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: hidden !important;
+}
+
+.admin-user-avatar {
+  display: none !important;
+}
+
+.admin-user-info {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+.admin-user-info strong {
+  color: #000000 !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+}
+
+.admin-user-info p {
+  margin: 0 !important;
+  color: #000000 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  word-break: break-word !important;
+}
+
+.admin-user-info span {
+  color: #000000 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  text-transform: capitalize !important;
+}
+
+.admin-logout-btn {
+  height: 54px !important;
+  border-radius: 16px !important;
+  background: #f43f46 !important;
+  color: #ffffff !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+}
+
+.admin-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Collapsed admin sidebar */
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+  padding: 130px 20px 24px !important;
+  align-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-brand {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-toggle {
+  top: 44px !important;
+  right: 50% !important;
+  left: auto !important;
+  transform: translateX(50%) !important;
+  width: 58px !important;
+  height: 58px !important;
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav {
+  width: 100% !important;
+  align-items: center !important;
+  gap: 14px !important;
+  overflow: visible !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  border-radius: 15px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a span {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom {
+  width: 100% !important;
+  align-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-card {
+  width: 70px !important;
+  height: 70px !important;
+  min-height: 70px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-avatar {
+  display: grid !important;
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  border-radius: 16px !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+  place-items: center !important;
+  font-size: 20px !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-info {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  width: 70px !important;
+  height: 58px !important;
+  padding: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+
+/* =========================================================
+   ADMIN SIDEBAR FINAL FIX
+   Keep existing Adminlayout.css. Paste this at bottom only.
+   Goal: logo visible, no menu scroll, all menus visible,
+   smaller text, employee-sidebar-style layout.
+========================================================= */
+
+.admin-dashboard-shell {
+  min-height: 100vh !important;
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 335px 1fr !important;
+  background: #f5f7fb !important;
+  transition: grid-template-columns 0.25s ease !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed {
+  grid-template-columns: 110px 1fr !important;
+}
+
+/* Main sidebar */
+.admin-sidebar {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 100vh !important;
+  position: sticky !important;
+  top: 0 !important;
+  background: #ffffff !important;
+  border-right: 1px solid #e5e7eb !important;
+  padding: 28px 26px 24px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  z-index: 30 !important;
+}
+
+/* Toggle button */
+.admin-sidebar-toggle {
+  position: absolute !important;
+  top: 42px !important;
+  right: 26px !important;
+  left: auto !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  z-index: 80 !important;
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.admin-sidebar-toggle:hover {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+}
+
+.admin-sidebar-toggle svg {
+  color: currentColor !important;
+  stroke: currentColor !important;
+}
+
+/* Logo area */
+.admin-brand {
+  width: 100% !important;
+  height: 78px !important;
+  min-height: 78px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  margin: 0 0 16px !important;
+  padding: 0 78px 0 0 !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+}
+
+.admin-brand-logo,
+.admin-brand-text {
+  display: none !important;
+}
+
+.admin-brand-logo-img {
+  width: 165px !important;
+  max-width: 165px !important;
+  height: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+/* Menu - no scroll */
+.admin-nav {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 9px !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  padding: 2px 0 0 !important;
+  margin: 0 !important;
+  scrollbar-width: none !important;
+}
+
+.admin-nav::-webkit-scrollbar {
+  display: none !important;
+}
+
+.admin-nav a {
+  width: 100% !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  border-radius: 16px !important;
+  padding: 0 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 15px !important;
+  color: #000000 !important;
+  text-decoration: none !important;
+  font-size: 15.5px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  transition: 0.2s ease !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.admin-nav a span {
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: 1 !important;
+}
+
+.admin-nav a svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+.admin-nav a:hover {
+  background: #fff1ec !important;
+  color: #000000 !important;
+}
+
+.admin-nav a:hover svg {
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+.admin-nav a.active {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(255, 87, 51, 0.18) !important;
+}
+
+.admin-nav a.active svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-nav a.active:hover {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+}
+
+.admin-nav a.active:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Bottom user card */
+.admin-sidebar-bottom {
+  border-top: 1px solid #d7dde8 !important;
+  padding-top: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 13px !important;
+  margin-top: 14px !important;
+}
+
+.admin-user-card {
+  width: 100% !important;
+  min-height: 88px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e7ecf4 !important;
+  border-radius: 18px !important;
+  padding: 15px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  overflow: hidden !important;
+  gap: 0 !important;
+}
+
+.admin-user-avatar {
+  display: none !important;
+}
+
+.admin-user-info {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+.admin-user-info strong {
+  margin: 0 !important;
+  color: #000000 !important;
+  font-size: 15.5px !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.admin-user-info p {
+  margin: 0 !important;
+  color: #000000 !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  word-break: break-word !important;
+}
+
+.admin-user-info span {
+  color: #000000 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1.2 !important;
+  text-transform: capitalize !important;
+}
+
+/* Logout button */
+.admin-logout-btn {
+  width: 100% !important;
+  height: 52px !important;
+  border: none !important;
+  border-radius: 16px !important;
+  background: #f43f46 !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.admin-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-logout-btn:hover {
+  background: #ef4444 !important;
+}
+
+/* Keep page area normal */
+.admin-main {
+  min-width: 0 !important;
+  background: #f5f7fb !important;
+}
+
+/* =========================================================
+   COLLAPSED ADMIN SIDEBAR
+========================================================= */
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+  padding: 124px 20px 24px !important;
+  align-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-toggle {
+  top: 44px !important;
+  right: 50% !important;
+  left: auto !important;
+  transform: translateX(50%) !important;
+  width: 58px !important;
+  height: 58px !important;
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-brand {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav {
+  width: 100% !important;
+  align-items: center !important;
+  gap: 13px !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  border-radius: 15px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a span {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom {
+  width: 100% !important;
+  align-items: center !important;
+  margin-top: 12px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-card {
+  width: 70px !important;
+  height: 70px !important;
+  min-height: 70px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-avatar {
+  display: grid !important;
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  border-radius: 16px !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+  place-items: center !important;
+  font-size: 20px !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-info {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  width: 70px !important;
+  height: 58px !important;
+  padding: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+
+
+/* =========================================================
+   ADMIN COLLAPSED SIDEBAR LOGOUT VISIBILITY FIX
+   Paste at bottom only.
+========================================================= */
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+  padding: 112px 20px 20px !important;
+  position: sticky !important;
+  overflow: hidden !important;
+}
+
+/* Keep menu compact so footer has enough space */
+.admin-dashboard-shell.sidebar-collapsed .admin-nav {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  align-items: center !important;
+  gap: 11px !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a {
+  width: 52px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  border-radius: 15px !important;
+}
+
+/* Fix bottom section so avatar + logout always remain visible */
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom {
+  position: absolute !important;
+  left: 20px !important;
+  right: 20px !important;
+  bottom: 20px !important;
+  width: auto !important;
+  border-top: 1px solid #d7dde8 !important;
+  padding-top: 14px !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: #ffffff !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-card {
+  width: 62px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 18px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-avatar {
+  display: grid !important;
+  width: 54px !important;
+  height: 54px !important;
+  min-width: 54px !important;
+  border-radius: 15px !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+  place-items: center !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-info {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  width: 62px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 !important;
+  border-radius: 15px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn svg {
+  width: 21px !important;
+  height: 21px !important;
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   ADMIN PROJECT SEARCH BOX FIX
+   Removes inner input border and focuses only the outer box
+========================================================= */
+
+.admin-project-search-shell {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.admin-project-search-shell:focus-within {
+  border-color: #ff5733 !important;
+  box-shadow: 0 0 0 4px rgba(255, 87, 51, 0.12) !important;
+}
+
+.admin-project-search-input,
+.admin-project-search-input:focus,
+.admin-project-search-input:focus-visible,
+.admin-project-search-input:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.admin-project-search-input {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+
+/* =========================================================
+   ADMIN SIDEBAR MENU SIZE FIX
+   Bigger menu text, better spacing, no menu scroll
+========================================================= */
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-nav {
+  gap: 12px !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-nav a {
+  height: 54px !important;
+  min-height: 54px !important;
+  border-radius: 16px !important;
+  padding: 0 20px !important;
+  gap: 16px !important;
+  font-size: 17px !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-nav a svg {
+  width: 21px !important;
+  height: 21px !important;
+  min-width: 21px !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-brand {
+  height: 72px !important;
+  min-height: 72px !important;
+  margin-bottom: 18px !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-sidebar-bottom {
+  margin-top: auto !important;
+}
+
+
+/* =========================================================
+   ADMIN PAGE LEFT GAP FIX
+   Removes the extra blank space between sidebar and page
+========================================================= */
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-main {
+  padding-left: 28px !important;
+  padding-right: 28px !important;
+  padding-top: 48px !important;
+  padding-bottom: 48px !important;
+  margin-left: 0 !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) {
+  column-gap: 0 !important;
+  gap: 0 !important;
+}
+
+/* When sidebar is closed, keep enough breathing space */
+.admin-dashboard-shell.sidebar-collapsed .admin-main {
+  padding-left: 36px !important;
+  padding-right: 36px !important;
+  padding-top: 48px !important;
+  padding-bottom: 48px !important;
+  margin-left: 0 !important;
+}
+
+
+/* =========================================================
+   ADMIN LEFT BLANK SPACE REDUCE FIX
+   Reduces grey gap between sidebar and admin page content
+========================================================= */
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-main {
+  padding-left: 12px !important;
+  padding-right: 28px !important;
+  padding-top: 48px !important;
+  padding-bottom: 48px !important;
+  margin-left: 0 !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) {
+  gap: 0 !important;
+  column-gap: 0 !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-main > * {
+  margin-left: 0 !important;
+}
+
+/* Closed sidebar spacing */
+.admin-dashboard-shell.sidebar-collapsed .admin-main {
+  padding-left: 18px !important;
+  padding-right: 32px !important;
+  padding-top: 48px !important;
+  padding-bottom: 48px !important;
+  margin-left: 0 !important;
+}
+
+
+
+/* =========================================================
+   ADMIN LEFT GAP MINIMUM FIX
+   Reduces the blank grey space even more
+========================================================= */
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-main {
+  padding-left: 0px !important;
+  padding-right: 22px !important;
+  padding-top: 42px !important;
+  padding-bottom: 42px !important;
+  margin-left: 0 !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-main > * {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Closed sidebar spacing */
+.admin-dashboard-shell.sidebar-collapsed .admin-main {
+  padding-left: 8px !important;
+  padding-right: 26px !important;
+  padding-top: 42px !important;
+  padding-bottom: 42px !important;
+  margin-left: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-main > * {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+
+/* Fix Admin Tasks page search bar double-border issue */
+input[placeholder="Search mini task, employee, date, designation..."],
+input[placeholder="Search mini task, employee, date, designation..."]:focus,
+input[placeholder="Search mini task, employee, date, designation..."]:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: #111827 !important;
+}
+
+/* Make the full outer search bar selected, not the input inside */
+div:has(> svg + input[placeholder="Search mini task, employee, date, designation..."]) {
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 22px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  outline: none !important;
+  overflow: hidden !important;
+}
+
+div:has(> svg + input[placeholder="Search mini task, employee, date, designation..."]:focus) {
+  border: 1px solid #ff5733 !important;
+  box-shadow: 0 0 0 4px rgba(255, 87, 51, 0.12) !important;
+}
+
+
+/* Admin Tasks Mini Task Search Bar - rectangular, thick, single border */
+div:has(> svg + input[placeholder="Search mini task, employee, date, designation..."]) {
+  height: 64px !important;
+  min-height: 64px !important;
+  width: 100% !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  outline: none !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 0 22px !important;
+}
+
+/* Focus should apply to the full outer rectangular box only */
+div:has(> svg + input[placeholder="Search mini task, employee, date, designation..."]:focus) {
+  border: 1.5px solid #ff5733 !important;
+  box-shadow: 0 0 0 4px rgba(255, 87, 51, 0.12) !important;
+  border-radius: 18px !important;
+}
+
+/* Remove the inner input box completely */
+input[placeholder="Search mini task, employee, date, designation..."],
+input[placeholder="Search mini task, employee, date, designation..."]:focus,
+input[placeholder="Search mini task, employee, date, designation..."]:active {
+  height: 100% !important;
+  width: 100% !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: #111827 !important;
+  line-height: 64px !important;
+}
+
+/* Keep icon vertically centered */
+div:has(> svg + input[placeholder="Search mini task, employee, date, designation..."]) > svg {
+  flex-shrink: 0 !important;
+}
+
+/* =========================================
+   ADMIN SIDEBAR LOGOUT VISIBILITY FIX
+   Paste at the END of Adminlayout.css
+========================================= */
+
+.admin-sidebar {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.admin-nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 4px !important;
+}
+
+.admin-sidebar-bottom {
+  flex-shrink: 0 !important;
+  margin-top: 14px !important;
+  padding-top: 12px !important;
+  background: #ffffff !important;
+}
+
+.admin-user-card {
+  flex-shrink: 0 !important;
+  margin-bottom: 12px !important;
+}
+
+.admin-logout-btn {
+  width: 100% !important;
+  min-height: 58px !important;
+  height: 58px !important;
+  flex-shrink: 0 !important;
+
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  box-shadow: 0 18px 34px rgba(255, 63, 79, 0.22) !important;
+}
+
+.admin-logout-btn span,
+.admin-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom {
+  align-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  padding: 0 !important;
+  border-radius: 18px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+
+/* =========================================
+   ADMIN LOGOUT VISIBILITY FIX
+   Paste at END of Adminlayout.css
+========================================= */
+
+.admin-sidebar,
+.admin-dashboard-sidebar {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding-bottom: 22px !important;
+}
+
+.admin-nav,
+.admin-sidebar-nav,
+.admin-menu {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 4px !important;
+  margin-bottom: 12px !important;
+}
+
+.admin-sidebar-bottom,
+.admin-bottom,
+.admin-user-section {
+  flex-shrink: 0 !important;
+  margin-top: auto !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  background: #ffffff !important;
+}
+
+.admin-user-card {
+  flex-shrink: 0 !important;
+  margin-bottom: 12px !important;
+}
+
+.admin-logout-btn,
+.admin-logout,
+.admin-logout-button {
+  width: 100% !important;
+  min-height: 58px !important;
+  height: 58px !important;
+  flex-shrink: 0 !important;
+
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  box-shadow: 0 18px 34px rgba(255, 63, 79, 0.22) !important;
+
+  margin-bottom: 8px !important;
+}
+
+.admin-logout-btn span,
+.admin-logout-btn svg,
+.admin-logout span,
+.admin-logout svg,
+.admin-logout-button span,
+.admin-logout-button svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom,
+.admin-dashboard-shell.sidebar-collapsed .admin-bottom,
+.admin-dashboard-shell.sidebar-collapsed .admin-user-section {
+  align-items: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn,
+.admin-dashboard-shell.sidebar-collapsed .admin-logout,
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-button {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  padding: 0 !important;
+  border-radius: 18px !important;
+  margin-bottom: 8px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span,
+.admin-dashboard-shell.sidebar-collapsed .admin-logout span,
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-button span {
+  display: none !important;
+}
+
+
+/* ===============================
+   ADMIN LOGOUT FINAL FIX
+================================ */
+
+.admin-sidebar {
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding-bottom: 26px !important;
+}
+
+.admin-nav {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-bottom: 12px !important;
+}
+
+.admin-sidebar-bottom {
+  margin-top: auto !important;
+  flex-shrink: 0 !important;
+  padding-bottom: 18px !important;
+  background: #ffffff !important;
+}
+
+.admin-logout-btn {
+  width: 100% !important;
+  min-height: 58px !important;
+  height: 58px !important;
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 18px !important;
+  margin-bottom: 12px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.admin-logout-btn span,
+.admin-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+
+/* =========================================================
+   FINAL ADMIN SIDEBAR LOGOUT FIX - CLEAN VERSION
+   Paste at the VERY BOTTOM of Adminlayout.css
+========================================================= */
+
+.admin-sidebar {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding-bottom: 22px !important;
+}
+
+.admin-nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-bottom: 10px !important;
+}
+
+.admin-sidebar-bottom {
+  margin-top: auto !important;
+  flex-shrink: 0 !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  background: #ffffff !important;
+  border-top: 1px solid #d7dde8 !important;
+}
+
+.admin-user-card {
+  min-height: 74px !important;
+  height: 74px !important;
+  padding: 12px 16px !important;
+  margin-bottom: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-user-info strong {
+  font-size: 14.5px !important;
+  line-height: 1.1 !important;
+}
+
+.admin-user-info p {
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+}
+
+.admin-user-info span {
+  font-size: 12px !important;
+  line-height: 1.15 !important;
+}
+
+.admin-logout-btn {
+  width: 100% !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+  box-shadow: 0 18px 34px rgba(255, 63, 79, 0.22) !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+.admin-logout-btn span,
+.admin-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-logout-btn:hover {
+  background: #ef4444 !important;
+}
+
+/* Collapsed admin sidebar */
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom {
+  position: absolute !important;
+  left: 18px !important;
+  right: 18px !important;
+  bottom: 18px !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding-top: 12px !important;
+  padding-bottom: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 12px !important;
+
+  background: #ffffff !important;
+  border-top: 1px solid #d7dde8 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 18px !important;
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn svg {
+  width: 21px !important;
+  height: 21px !important;
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}

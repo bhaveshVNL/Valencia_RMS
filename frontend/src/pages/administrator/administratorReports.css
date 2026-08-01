@@ -1,0 +1,953 @@
+* {
+  box-sizing: border-box;
+}
+
+.administrator-reports-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 20px 35px 0;
+  color: #111827;
+  overflow-x: hidden;
+}
+
+/* =========================
+   PAGE HEADER
+========================= */
+
+.administrator-reports-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 12px;
+}
+
+.administrator-reports-header h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.administrator-reports-header p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.administrator-reports-refresh {
+  height: 34px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #ff5733;
+  border-radius: 10px;
+  background: #ff5733;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.administrator-reports-refresh svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.administrator-reports-refresh:hover {
+  background: #ed4728;
+  border-color: #ed4728;
+}
+
+.administrator-reports-refresh:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: reports-spin 0.8s linear infinite;
+}
+
+@keyframes reports-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================
+   SHARED CARDS
+========================= */
+
+.administrator-report-filter-card,
+.administrator-report-stat-card,
+.administrator-report-overall-card,
+.administrator-report-chart-card {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 7px 22px rgba(15, 23, 42, 0.045);
+}
+
+/* =========================
+   FILTER CARD
+========================= */
+
+.administrator-report-filter-card {
+  width: 100%;
+  padding: 18px 20px 20px;
+  margin-bottom: 18px;
+  border-radius: 18px;
+}
+
+.administrator-report-filter-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-bottom: 16px;
+}
+
+.administrator-report-filter-title > svg {
+  width: 19px;
+  height: 19px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  color: #ff5733;
+}
+
+.administrator-report-filter-title h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.administrator-report-filter-title p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* =========================
+   FILTER GRID
+========================= */
+
+.administrator-report-filter-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1fr)
+    minmax(150px, 1fr)
+    minmax(170px, 1fr)
+    minmax(215px, 1.2fr);
+  column-gap: 14px;
+  row-gap: 13px;
+  align-items: end;
+}
+
+.administrator-report-filter-grid label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+}
+
+.administrator-report-filter-grid label > span {
+  display: block;
+  min-height: 15px;
+  margin: 0 0 6px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 15px;
+}
+
+/* =========================
+   INPUTS AND SELECTS
+========================= */
+
+.administrator-report-filter-grid input,
+.administrator-report-filter-grid select {
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  margin: 0;
+  border: 1px solid #d3dce8;
+  border-radius: 11px;
+  background-color: #ffffff;
+  color: #111827;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: normal;
+  outline: none;
+}
+
+.administrator-report-filter-grid input {
+  padding: 0 13px;
+}
+
+.administrator-report-filter-grid select {
+  display: block;
+  padding: 0 38px 0 13px;
+  color: #111827;
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
+/* Make dropdown text clearly visible */
+.administrator-report-filter-grid select,
+.administrator-report-filter-grid select option {
+  color: #111827;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.administrator-report-filter-grid select option {
+  padding: 8px;
+}
+
+.administrator-report-filter-grid input:hover,
+.administrator-report-filter-grid select:hover {
+  border-color: #b8c4d2;
+}
+
+.administrator-report-filter-grid input:focus,
+.administrator-report-filter-grid select:focus {
+  border-color: #ff5733;
+  box-shadow: 0 0 0 3px rgba(255, 87, 51, 0.1);
+}
+
+/* Date placeholder and calendar icon */
+.administrator-report-filter-grid input[type="date"] {
+  color: #111827;
+}
+
+.administrator-report-filter-grid input[type="date"]::-webkit-datetime-edit {
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.administrator-report-filter-grid
+  input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 1;
+}
+
+/* =========================
+   FILTER BUTTONS
+========================= */
+
+.administrator-report-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: end;
+  gap: 8px;
+  min-width: 0;
+  height: 42px;
+  margin: 0;
+  padding: 0;
+}
+
+.administrator-report-filter-actions button {
+  width: auto;
+  height: 42px;
+  min-height: 42px;
+  margin: 0;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #ff5733;
+  border-radius: 11px;
+  background: #ff5733;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.administrator-report-filter-actions button:first-child {
+  min-width: 126px;
+}
+
+.administrator-report-filter-actions button svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.administrator-report-filter-actions button:hover {
+  background: #ed4728;
+  border-color: #ed4728;
+}
+
+.administrator-report-filter-actions button.reset {
+  min-width: 75px;
+  padding: 0 12px;
+  border-color: #d9e0e9;
+  background: #ffffff;
+  color: #111827;
+}
+
+.administrator-report-filter-actions button.reset:hover {
+  border-color: #ff5733;
+  background: #fff6f3;
+  color: #ff5733;
+}
+
+/* =========================
+   ERROR AND LOADER
+========================= */
+
+.administrator-reports-message {
+  margin-bottom: 18px;
+  padding: 14px 17px;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  background: #fff1f2;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.administrator-reports-loader {
+  min-height: 200px;
+  display: grid;
+  place-items: center;
+  padding: 30px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #64748b;
+  font-weight: 800;
+}
+
+/* =========================
+   SUMMARY CARDS
+========================= */
+
+.administrator-report-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.administrator-report-stat-card {
+  min-width: 0;
+  min-height: 133px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 17px;
+  border-radius: 17px;
+}
+
+.administrator-report-stat-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #fff1ed;
+  color: #ff5733;
+}
+
+.administrator-report-stat-card p {
+  margin: 0 0 7px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.administrator-report-stat-card h2 {
+  margin: 0 0 7px;
+  color: #111827;
+  font-size: 27px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.administrator-report-stat-card span {
+  display: block;
+  color: #94a3b8;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* =========================
+   OVERALL PROGRESS
+========================= */
+
+.administrator-report-overall-card {
+  position: relative;
+  padding: 21px;
+  margin-bottom: 20px;
+  border-radius: 18px;
+}
+
+.administrator-report-overall-card h2,
+.administrator-report-chart-card h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.administrator-report-overall-card p,
+.administrator-report-chart-card > p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.administrator-report-overall-card > strong {
+  position: absolute;
+  top: 21px;
+  right: 21px;
+  color: #ff5733;
+  font-size: 29px;
+  font-weight: 900;
+}
+
+.administrator-report-progress-track {
+  height: 13px;
+  margin-top: 20px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f7;
+}
+
+.administrator-report-progress-track > div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff5733, #ff8268);
+}
+
+.administrator-report-progress-pairs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.administrator-report-progress-pairs span {
+  display: flex;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.administrator-report-progress-pairs strong {
+  color: #111827;
+}
+
+/* =========================
+   CHART CARDS
+========================= */
+
+.administrator-report-two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.administrator-report-chart-card {
+  min-width: 0;
+  padding: 20px;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.administrator-report-full {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.administrator-report-empty {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  margin-top: 15px;
+  border: 1px dashed #d1d5db;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.administrator-report-chart-card .recharts-text {
+  fill: #64748b;
+  font-weight: 600;
+}
+
+/* =========================
+   ATTENTION REQUIRED
+========================= */
+
+.administrator-report-attention {
+  padding: 20px;
+  border: 1px solid #fed7aa;
+  border-radius: 18px;
+  background: #fffaf5;
+}
+
+.administrator-report-attention-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.administrator-report-attention-heading svg {
+  color: #ea580c;
+}
+
+.administrator-report-attention-heading h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.administrator-report-attention-heading p {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.administrator-report-attention-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.administrator-report-attention-grid > div {
+  padding: 15px;
+  border: 1px solid #fed7aa;
+  border-radius: 13px;
+  background: #ffffff;
+}
+
+.administrator-report-attention-grid span {
+  display: block;
+  margin-bottom: 7px;
+  color: #78716c;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.administrator-report-attention-grid strong {
+  color: #111827;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 1450px) {
+  .administrator-report-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .administrator-report-attention-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .administrator-report-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1000px) {
+  .administrator-report-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .administrator-report-two-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .administrator-reports-page {
+    padding: 0 12px 25px 0;
+  }
+
+  .administrator-reports-header {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .administrator-reports-header h1 {
+    font-size: 27px;
+  }
+
+  .administrator-reports-header p {
+    font-size: 12px;
+  }
+
+  .administrator-reports-refresh {
+    flex-shrink: 0;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .administrator-report-filter-card {
+    padding: 15px;
+  }
+
+  .administrator-report-filter-grid,
+  .administrator-report-stat-grid,
+  .administrator-report-progress-pairs,
+  .administrator-report-attention-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .administrator-report-filter-actions {
+    width: 100%;
+    height: auto;
+  }
+
+  .administrator-report-filter-actions button {
+    flex: 1;
+  }
+}
+
+
+
+
+/* ==================================================
+   FINAL REPORTS HEADER AND FILTER FIX
+================================================== */
+
+/* Page title and Refresh button on the same line */
+.administrator-reports-header {
+  width: 100%;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 20px;
+  margin: 0 0 12px !important;
+  padding: 0 !important;
+}
+
+.administrator-reports-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.administrator-reports-heading h1 {
+  margin: 0 !important;
+  color: #111827;
+  font-size: 32px !important;
+  font-weight: 900;
+  line-height: 1.1 !important;
+}
+
+.administrator-reports-heading p {
+  margin: 5px 0 0 !important;
+  color: #64748b;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+/* Compact Refresh button */
+.administrator-reports-refresh {
+  flex: 0 0 auto;
+  width: auto !important;
+  min-width: 90px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 0 13px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  border: 1px solid #ff5733 !important;
+  border-radius: 10px !important;
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.administrator-reports-refresh svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0;
+}
+
+.administrator-reports-refresh span {
+  display: inline-block;
+  line-height: 1 !important;
+}
+
+/* Filter card */
+.administrator-report-filter-card {
+  width: 100%;
+  margin: 0 0 18px !important;
+  padding: 18px 20px 20px !important;
+  border-radius: 18px;
+}
+
+/* Filter heading */
+.administrator-report-filter-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 0 0 17px !important;
+}
+
+.administrator-report-filter-title > svg {
+  width: 19px;
+  height: 19px;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.administrator-report-filter-title h2 {
+  margin: 0 !important;
+  color: #111827;
+  font-size: 22px !important;
+  font-weight: 900;
+  line-height: 1.2 !important;
+}
+
+.administrator-report-filter-title p {
+  margin: 4px 0 0 !important;
+  color: #64748b;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+/* Four-column filter layout */
+.administrator-report-filter-grid {
+  width: 100%;
+  display: grid !important;
+  grid-template-columns:
+    minmax(170px, 1fr)
+    minmax(170px, 1fr)
+    minmax(190px, 1fr)
+    minmax(230px, 1.2fr) !important;
+  column-gap: 20px !important;
+  row-gap: 15px !important;
+  align-items: end !important;
+}
+
+/* Labels */
+.administrator-report-filter-grid label {
+  min-width: 0;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.administrator-report-filter-grid label > span {
+  display: block;
+  margin: 0 0 6px !important;
+  color: #64748b;
+  font-family: Arial, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 16px !important;
+}
+
+/* Date fields */
+.administrator-report-filter-grid input[type="date"] {
+  width: 100% !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 14px !important;
+  border: 1px solid #cfd8e3 !important;
+  border-radius: 13px !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 42px !important;
+  outline: none !important;
+}
+
+/* All dropdowns */
+.administrator-report-filter-grid select {
+  width: 100% !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 38px 0 14px !important;
+  border: 1px solid #cfd8e3 !important;
+  border-radius: 13px !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: normal !important;
+  text-indent: 0 !important;
+  text-align: left !important;
+  outline: none !important;
+  cursor: pointer;
+  overflow: visible !important;
+}
+
+/* Dropdown option text */
+.administrator-report-filter-grid select option {
+  min-height: 32px;
+  padding: 8px 12px;
+  background: #ffffff;
+  color: #111827;
+  font-family: Arial, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+}
+
+/* Focus */
+.administrator-report-filter-grid input:focus,
+.administrator-report-filter-grid select:focus {
+  border-color: #ff5733 !important;
+  box-shadow: 0 0 0 3px rgba(255, 87, 51, 0.12) !important;
+}
+
+/* Apply and Reset container */
+.administrator-report-filter-actions {
+  height: 44px !important;
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  align-self: end !important;
+  gap: 10px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Apply Filters button */
+.administrator-report-filter-actions button {
+  width: auto !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  border: 1px solid #ff5733 !important;
+  border-radius: 12px !important;
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  cursor: pointer;
+}
+
+.administrator-report-filter-actions button:first-child {
+  min-width: 140px !important;
+}
+
+.administrator-report-filter-actions button svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0;
+}
+
+/* Reset button */
+.administrator-report-filter-actions button.reset {
+  min-width: 82px !important;
+  height: 44px !important;
+  padding: 0 12px !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #111827 !important;
+}
+
+.administrator-report-filter-actions button.reset:hover {
+  border-color: #dbe2ea !important;
+  background: #f8fafc !important;
+  color: #ff5733 !important;
+}
+
+/* Medium screens */
+@media (max-width: 1200px) {
+  .administrator-report-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+  .administrator-reports-header {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+  }
+
+  .administrator-reports-heading h1 {
+    font-size: 27px !important;
+  }
+
+  .administrator-reports-heading p {
+    font-size: 12px !important;
+  }
+
+  .administrator-reports-refresh {
+    min-width: 76px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 9px !important;
+    font-size: 11px !important;
+  }
+
+  .administrator-report-filter-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .administrator-report-filter-actions {
+    width: 100%;
+  }
+
+  .administrator-report-filter-actions button {
+    flex: 1;
+  }
+}

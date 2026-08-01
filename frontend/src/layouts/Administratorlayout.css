@@ -1,0 +1,919 @@
+@import "./Adminlayout.css";
+
+/* =========================================================
+   ADMINISTRATOR SIDEBAR FIX
+   Uses same sidebar style as Admin dashboard.
+========================================================= */
+
+.admin-dashboard-shell {
+  min-height: 100vh !important;
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 335px 1fr !important;
+  background: #f5f7fb !important;
+  transition: grid-template-columns 0.25s ease !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed {
+  grid-template-columns: 110px 1fr !important;
+}
+
+.admin-sidebar {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 100vh !important;
+  position: sticky !important;
+  top: 0 !important;
+  background: #ffffff !important;
+  border-right: 1px solid #e5e7eb !important;
+  padding: 28px 26px 24px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  z-index: 30 !important;
+}
+
+.admin-sidebar-toggle {
+  position: absolute !important;
+  top: 42px !important;
+  right: 26px !important;
+  left: auto !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  z-index: 80 !important;
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.admin-sidebar-toggle:hover {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+}
+
+.admin-brand {
+  width: 100% !important;
+  height: 78px !important;
+  min-height: 78px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  margin: 0 0 16px !important;
+  padding: 0 78px 0 0 !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+}
+
+.admin-brand-logo,
+.admin-brand-text {
+  display: none !important;
+}
+
+.admin-brand-logo-img {
+  width: 165px !important;
+  max-width: 165px !important;
+  height: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+.admin-nav {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  padding: 2px 0 0 !important;
+  margin: 0 !important;
+  scrollbar-width: none !important;
+}
+
+.admin-nav::-webkit-scrollbar {
+  display: none !important;
+}
+
+.admin-nav a {
+  width: 100% !important;
+  min-height: 46px !important;
+  height: 46px !important;
+  border-radius: 15px !important;
+  padding: 0 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 15px !important;
+  color: #000000 !important;
+  text-decoration: none !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  transition: 0.2s ease !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.admin-nav a span {
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: 1 !important;
+}
+
+.admin-nav a svg {
+  width: 19px !important;
+  height: 19px !important;
+  min-width: 19px !important;
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+.admin-nav a:hover {
+  background: #fff1ec !important;
+  color: #000000 !important;
+}
+
+.admin-nav a.active {
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(255, 87, 51, 0.18) !important;
+}
+
+.admin-nav a.active svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-sidebar-bottom {
+  border-top: 1px solid #d7dde8 !important;
+  padding-top: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 13px !important;
+  margin-top: 14px !important;
+}
+
+.admin-user-card {
+  width: 100% !important;
+  min-height: 88px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e7ecf4 !important;
+  border-radius: 18px !important;
+  padding: 15px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  overflow: hidden !important;
+  gap: 0 !important;
+}
+
+.admin-user-avatar {
+  display: none !important;
+}
+
+.admin-user-info {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+.admin-user-info strong {
+  margin: 0 !important;
+  color: #000000 !important;
+  font-size: 15.5px !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.admin-user-info p {
+  margin: 0 !important;
+  color: #000000 !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  word-break: break-word !important;
+}
+
+.admin-user-info span {
+  color: #000000 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1.2 !important;
+  text-transform: capitalize !important;
+}
+
+.admin-logout-btn {
+  width: 100% !important;
+  height: 52px !important;
+  border: none !important;
+  border-radius: 16px !important;
+  background: #f43f46 !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.admin-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-main {
+  min-width: 0 !important;
+  background: #f5f7fb !important;
+}
+
+/* Collapsed administrator sidebar */
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+  padding: 112px 20px 20px !important;
+  align-items: center !important;
+  position: sticky !important;
+  overflow: hidden !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-toggle {
+  top: 44px !important;
+  right: 50% !important;
+  left: auto !important;
+  transform: translateX(50%) !important;
+  width: 58px !important;
+  height: 58px !important;
+  background: #ff5733 !important;
+  color: #ffffff !important;
+  border-color: #ff5733 !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-brand {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  align-items: center !important;
+  gap: 9px !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a {
+  width: 50px !important;
+  height: 50px !important;
+  min-height: 50px !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-nav a span {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom {
+  position: absolute !important;
+  left: 20px !important;
+  right: 20px !important;
+  bottom: 20px !important;
+  width: auto !important;
+  border-top: 1px solid #d7dde8 !important;
+  padding-top: 14px !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: #ffffff !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-card {
+  width: 62px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 18px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-avatar {
+  display: grid !important;
+  width: 54px !important;
+  height: 54px !important;
+  min-width: 54px !important;
+  border-radius: 15px !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+  place-items: center !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-user-info {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  width: 62px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 !important;
+  border-radius: 15px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+
+
+/* =========================================================
+   ADMINISTRATOR OPEN SIDEBAR LOGOUT VISIBILITY FIX
+   Paste at bottom only.
+========================================================= */
+
+/* Make the open sidebar fit logo + all menus + user card + logout */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-sidebar {
+  height: 100vh !important;
+  padding: 22px 26px 18px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Reduce logo section height */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-brand {
+  height: 68px !important;
+  min-height: 68px !important;
+  margin-bottom: 10px !important;
+  padding-right: 76px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-brand-logo-img {
+  width: 150px !important;
+  max-width: 150px !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+
+/* Keep toggle aligned */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-sidebar-toggle {
+  top: 36px !important;
+  right: 26px !important;
+  width: 50px !important;
+  height: 50px !important;
+}
+
+/* Make all menus visible without sidebar scroll */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-nav {
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  gap: 6px !important;
+  padding-top: 0 !important;
+  margin: 0 !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-nav a {
+  height: 42px !important;
+  min-height: 42px !important;
+  border-radius: 14px !important;
+  padding: 0 18px !important;
+  font-size: 14px !important;
+  gap: 14px !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-nav a svg {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+}
+
+/* Footer must stay visible inside open sidebar */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-sidebar-bottom {
+  margin-top: auto !important;
+  border-top: 1px solid #d7dde8 !important;
+  padding-top: 12px !important;
+  gap: 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-shrink: 0 !important;
+  background: #ffffff !important;
+}
+
+/* Smaller user card so logout fits */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-user-card {
+  min-height: 76px !important;
+  height: 76px !important;
+  padding: 12px 16px !important;
+  border-radius: 16px !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-user-info strong {
+  font-size: 14.5px !important;
+  line-height: 1.1 !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-user-info p {
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+}
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-user-info span {
+  font-size: 12px !important;
+  line-height: 1.15 !important;
+}
+
+/* Logout visible */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-logout-btn {
+  height: 48px !important;
+  min-height: 48px !important;
+  border-radius: 15px !important;
+  font-size: 15px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+}
+
+/* =========================================
+   ADMINISTRATOR SIDEBAR LOGOUT VISIBILITY FIX
+   Paste at the END of Administratorlayout.css
+========================================= */
+
+.administrator-sidebar {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.administrator-nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 4px !important;
+}
+
+.administrator-sidebar-bottom {
+  flex-shrink: 0 !important;
+  margin-top: 14px !important;
+  padding-top: 12px !important;
+  background: #ffffff !important;
+}
+
+.administrator-user-card {
+  flex-shrink: 0 !important;
+  margin-bottom: 12px !important;
+}
+
+.administrator-logout-btn {
+  width: 100% !important;
+  min-height: 58px !important;
+  height: 58px !important;
+  flex-shrink: 0 !important;
+
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  box-shadow: 0 18px 34px rgba(255, 63, 79, 0.22) !important;
+}
+
+.administrator-logout-btn span,
+.administrator-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.administrator-dashboard-shell.sidebar-collapsed .administrator-sidebar-bottom {
+  align-items: center !important;
+}
+
+.administrator-dashboard-shell.sidebar-collapsed .administrator-logout-btn {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  padding: 0 !important;
+  border-radius: 18px !important;
+}
+
+.administrator-dashboard-shell.sidebar-collapsed .administrator-logout-btn span {
+  display: none !important;
+}
+
+
+/* =========================================
+   ADMINISTRATOR LOGOUT VISIBILITY FIX
+   Paste at END of Administratorlayout.css
+========================================= */
+
+.administrator-sidebar,
+.administrator-dashboard-sidebar,
+.administator-sidebar,
+.sidebar {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding-bottom: 22px !important;
+}
+
+.administrator-nav,
+.administrator-sidebar-nav,
+.administrator-menu,
+.sidebar-nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 4px !important;
+  margin-bottom: 12px !important;
+}
+
+.administrator-sidebar-bottom,
+.administrator-bottom,
+.administrator-user-section,
+.sidebar-bottom {
+  flex-shrink: 0 !important;
+  margin-top: auto !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  background: #ffffff !important;
+}
+
+.administrator-user-card,
+.user-card {
+  flex-shrink: 0 !important;
+  margin-bottom: 12px !important;
+}
+
+.administrator-logout-btn,
+.administrator-logout,
+.administrator-logout-button,
+.logout-btn,
+.logout-button {
+  width: 100% !important;
+  min-height: 58px !important;
+  height: 58px !important;
+  flex-shrink: 0 !important;
+
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  box-shadow: 0 18px 34px rgba(255, 63, 79, 0.22) !important;
+
+  margin-bottom: 8px !important;
+}
+
+.administrator-logout-btn span,
+.administrator-logout-btn svg,
+.administrator-logout span,
+.administrator-logout svg,
+.administrator-logout-button span,
+.administrator-logout-button svg,
+.logout-btn span,
+.logout-btn svg,
+.logout-button span,
+.logout-button svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.administrator-dashboard-shell.sidebar-collapsed .administrator-sidebar-bottom,
+.administrator-dashboard-shell.sidebar-collapsed .administrator-bottom,
+.administrator-dashboard-shell.sidebar-collapsed .administrator-user-section,
+.administrator-dashboard-shell.sidebar-collapsed .sidebar-bottom {
+  align-items: center !important;
+}
+
+.administrator-dashboard-shell.sidebar-collapsed .administrator-logout-btn,
+.administrator-dashboard-shell.sidebar-collapsed .administrator-logout,
+.administrator-dashboard-shell.sidebar-collapsed .administrator-logout-button,
+.administrator-dashboard-shell.sidebar-collapsed .logout-btn,
+.administrator-dashboard-shell.sidebar-collapsed .logout-button {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  padding: 0 !important;
+  border-radius: 18px !important;
+  margin-bottom: 8px !important;
+}
+
+.administrator-dashboard-shell.sidebar-collapsed .administrator-logout-btn span,
+.administrator-dashboard-shell.sidebar-collapsed .administrator-logout span,
+.administrator-dashboard-shell.sidebar-collapsed .administrator-logout-button span,
+.administrator-dashboard-shell.sidebar-collapsed .logout-btn span,
+.administrator-dashboard-shell.sidebar-collapsed .logout-button span {
+  display: none !important;
+}
+
+
+/* ===============================
+   ADMINISTRATOR LOGOUT FINAL FIX
+================================ */
+
+.administrator-sidebar {
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding-bottom: 26px !important;
+}
+
+.administrator-nav {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-bottom: 12px !important;
+}
+
+.administrator-sidebar-bottom {
+  margin-top: auto !important;
+  flex-shrink: 0 !important;
+  padding-bottom: 18px !important;
+  background: #ffffff !important;
+}
+
+.administrator-logout-btn {
+  width: 100% !important;
+  min-height: 58px !important;
+  height: 58px !important;
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 18px !important;
+  margin-bottom: 12px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.administrator-logout-btn span,
+.administrator-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* =========================================================
+   FINAL ADMINISTRATOR SIDEBAR LOGOUT FIX - CLEAN VERSION
+   Paste at the VERY BOTTOM of Administratorlayout.css
+========================================================= */
+
+.admin-sidebar {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding-bottom: 22px !important;
+}
+
+.admin-nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-bottom: 10px !important;
+}
+
+.admin-sidebar-bottom {
+  margin-top: auto !important;
+  flex-shrink: 0 !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  background: #ffffff !important;
+  border-top: 1px solid #d7dde8 !important;
+}
+
+.admin-user-card {
+  min-height: 74px !important;
+  height: 74px !important;
+  padding: 12px 16px !important;
+  margin-bottom: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-user-info strong {
+  font-size: 14.5px !important;
+  line-height: 1.1 !important;
+}
+
+.admin-user-info p {
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+}
+
+.admin-user-info span {
+  font-size: 12px !important;
+  line-height: 1.15 !important;
+}
+
+.admin-logout-btn {
+  width: 100% !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+  box-shadow: 0 18px 34px rgba(255, 63, 79, 0.22) !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+.admin-logout-btn span,
+.admin-logout-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-logout-btn:hover {
+  background: #ef4444 !important;
+}
+
+/* Collapsed administrator sidebar */
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar-bottom {
+  position: absolute !important;
+  left: 18px !important;
+  right: 18px !important;
+  bottom: 18px !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding-top: 12px !important;
+  padding-bottom: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 12px !important;
+
+  background: #ffffff !important;
+  border-top: 1px solid #d7dde8 !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn {
+  width: 58px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 18px !important;
+  background: #ff3f4f !important;
+  color: #ffffff !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn span {
+  display: none !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-logout-btn svg {
+  width: 21px !important;
+  height: 21px !important;
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+
+/* =========================================================
+   FINAL ADMINISTRATOR SIDEBAR SCROLL FIX
+   Open sidebar scrolls vertically, but the scrollbar is hidden.
+========================================================= */
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-sidebar {
+  height: 100vh !important;
+  max-height: 100vh !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  overscroll-behavior: contain !important;
+
+  /* Hide scrollbar in Firefox */
+  scrollbar-width: none !important;
+
+  /* Hide scrollbar in Internet Explorer / old Edge */
+  -ms-overflow-style: none !important;
+}
+
+/* Hide scrollbar in Chrome, Edge and Safari */
+.admin-dashboard-shell:not(.sidebar-collapsed)
+  .admin-sidebar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Let menu use its natural height so the entire sidebar scrolls */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-nav {
+  flex: 0 0 auto !important;
+  min-height: auto !important;
+
+  overflow: visible !important;
+  overflow-y: visible !important;
+  overflow-x: visible !important;
+
+  padding-bottom: 10px !important;
+}
+
+/* Keep user card and logout in normal sidebar flow */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-sidebar-bottom {
+  position: static !important;
+
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+
+  width: 100% !important;
+
+  margin-top: 14px !important;
+  padding-top: 12px !important;
+  padding-bottom: 8px !important;
+
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+
+  background: #ffffff !important;
+  border-top: 1px solid #d7dde8 !important;
+}
+
+/* Keep Logout fully visible after scrolling */
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-logout-btn {
+  flex: 0 0 auto !important;
+  margin: 0 0 10px !important;
+}
+
+/* Collapsed sidebar keeps existing compact layout */
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+  overflow: hidden !important;
+}

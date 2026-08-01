@@ -1,0 +1,442 @@
+/* =========================================================
+   ADMINISTRATOR ATTENDANCE PAGE
+   Only header and attendance table are overridden.
+========================================================= */
+
+.attendance-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  padding-right: 28px;
+
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.attendance-page *,
+.attendance-page *::before,
+.attendance-page *::after {
+  box-sizing: border-box;
+}
+
+/* ================================
+   ATTENDANCE HEADER
+================================ */
+
+.administrator-attendance-header {
+  width: 100%;
+  max-width: 100%;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin: 8px 0 24px;
+  padding: 0 24px 0 0;
+}
+
+.administrator-attendance-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.administrator-attendance-heading h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.administrator-attendance-heading p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 15px;
+}
+
+/* ================================
+   TOP-RIGHT BUTTONS
+================================ */
+
+.administrator-attendance-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+
+  gap: 8px;
+
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.administrator-attendance-action-btn {
+  width: auto !important;
+  min-width: max-content !important;
+
+  height: 34px !important;
+  min-height: 34px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 6px !important;
+
+  margin: 0 !important;
+  padding: 0 11px !important;
+
+  border: none !important;
+  border-radius: 9px !important;
+
+  background: #ff5733 !important;
+  color: #ffffff !important;
+
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+.administrator-attendance-action-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Leave button wrapper */
+
+.administrator-attendance-leave-btn {
+  flex-shrink: 0;
+}
+
+.administrator-attendance-leave-btn > * {
+  width: auto !important;
+  min-width: max-content !important;
+
+  height: 34px !important;
+  min-height: 34px !important;
+
+  margin: 0 !important;
+  padding: 0 11px !important;
+
+  border-radius: 9px !important;
+
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+}
+
+/* ================================
+   RESPONSIVE
+================================ */
+
+@media (max-width: 1200px) {
+  .administrator-attendance-header {
+    flex-direction: column;
+  }
+
+  .administrator-attendance-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* =========================================================
+   ATTENDANCE TABLE CARD
+========================================================= */
+
+.administrator-attendance-table-card {
+  position: relative;
+
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  height: 570px;
+
+  margin: 0;
+
+  overflow-y: auto;
+  overflow-x: auto;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.administrator-attendance-table-card::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* =========================================================
+   ATTENDANCE TABLE
+========================================================= */
+
+.administrator-attendance-table {
+  width: 100%;
+  min-width: 1120px;
+
+  table-layout: fixed;
+
+  border-collapse: separate;
+  border-spacing: 0;
+
+  margin: 0;
+}
+
+/* =========================================================
+   STICKY TABLE HEADER
+========================================================= */
+
+.administrator-attendance-table thead {
+  position: relative;
+  z-index: 20;
+}
+
+.administrator-attendance-table th {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+
+  padding: 17px 18px;
+
+  border-bottom: 1px solid #e5e7eb;
+
+  background: #ffffff;
+  color: #64748b;
+
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+
+  text-align: left;
+  vertical-align: middle;
+
+  white-space: nowrap;
+
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05);
+}
+
+/* =========================================================
+   TABLE BODY
+========================================================= */
+
+.administrator-attendance-table td {
+  padding: 18px;
+
+  border-bottom: 1px solid #eef2f7;
+
+  background: #ffffff;
+  color: #111827;
+
+  font-size: 13px;
+  line-height: 1.4;
+
+  vertical-align: middle;
+}
+
+.administrator-attendance-table tbody tr:hover td {
+  background: #fff8f5;
+}
+
+.administrator-attendance-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* =========================================================
+   COLUMN WIDTHS
+========================================================= */
+
+.administrator-attendance-table th:nth-child(1),
+.administrator-attendance-table td:nth-child(1) {
+  width: 34%;
+}
+
+.administrator-attendance-table th:nth-child(2),
+.administrator-attendance-table td:nth-child(2) {
+  width: 12%;
+}
+
+.administrator-attendance-table th:nth-child(3),
+.administrator-attendance-table td:nth-child(3) {
+  width: 12%;
+}
+
+.administrator-attendance-table th:nth-child(4),
+.administrator-attendance-table td:nth-child(4) {
+  width: 20%;
+}
+
+.administrator-attendance-table th:nth-child(5),
+.administrator-attendance-table td:nth-child(5),
+.administrator-attendance-table th:nth-child(6),
+.administrator-attendance-table td:nth-child(6),
+.administrator-attendance-table th:nth-child(7),
+.administrator-attendance-table td:nth-child(7),
+.administrator-attendance-table th:nth-child(8),
+.administrator-attendance-table td:nth-child(8),
+.administrator-attendance-table th:nth-child(9),
+.administrator-attendance-table td:nth-child(9) {
+  width: 8%;
+}
+
+/* =========================================================
+   EMPLOYEE CELL
+========================================================= */
+
+.administrator-attendance-table .user-name-cell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 13px;
+}
+
+.administrator-attendance-table
+  .user-name-cell
+  > div:last-child {
+  flex: 1 1 auto;
+
+  width: 0;
+  min-width: 0;
+}
+
+.administrator-attendance-table
+  .user-name-cell
+  strong,
+.administrator-attendance-table
+  .user-name-cell
+  p {
+  display: block;
+
+  width: 100%;
+  max-width: 100%;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.administrator-attendance-table
+  .user-avatar-small {
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   ATTENDANCE PERCENTAGE
+========================================================= */
+
+.administrator-attendance-table .attendance-percent-cell {
+  width: 100%;
+  min-width: 0;
+
+  display: inline-flex;
+  align-items: center;
+
+  gap: 0px;
+    margin: 0;
+  padding: 0;
+}
+
+.administrator-attendance-table
+  .table-progress-track {
+  flex: 1 1 auto;
+
+  min-width: 70px;
+  height: 8px;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+
+  background: #ffe1d9;
+}
+
+.administrator-attendance-table
+  .table-progress-fill {
+  height: 100%;
+
+  border-radius: 999px;
+
+  background: #ff5733;
+}
+
+.administrator-attendance-table
+  .attendance-percent-cell
+  strong {
+  flex-shrink: 0;
+
+  color: #ff5733;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 1350px) {
+  .administrator-attendance-header {
+    grid-template-columns: 1fr;
+    row-gap: 14px;
+  }
+
+  .administrator-attendance-actions {
+    min-width: 0;
+
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .attendance-page {
+    padding-right: 8px;
+  }
+
+  .administrator-attendance-heading h1 {
+    font-size: 28px;
+  }
+
+  .administrator-attendance-heading p {
+    font-size: 13px;
+  }
+
+  .administrator-attendance-actions {
+    width: 100%;
+  }
+
+  .administrator-attendance-action-btn,
+  .administrator-attendance-leave-btn {
+    flex: 1 1 auto;
+  }
+
+  .administrator-attendance-action-btn {
+    min-width: 110px !important;
+  }
+
+  .administrator-attendance-leave-btn > * {
+    width: 100% !important;
+  }
+
+  .administrator-attendance-table-card {
+    height: 500px;
+  }
+}
