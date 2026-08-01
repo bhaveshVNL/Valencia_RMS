@@ -4,8 +4,8 @@ import react from "@vitejs/plugin-react";
 export default defineConfig(({ command }) => ({
   plugins: [react()],
 
-  // Local: /
-  // GitHub Pages: /Valencia-RMS/
+  // Local development: /
+  // GitHub Pages production build: /Valencia-RMS/
   base: command === "build" ? "/Valencia-RMS/" : "/",
 
   server: {
