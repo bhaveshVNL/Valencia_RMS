@@ -34,7 +34,11 @@ import SuperadminProjects from "./pages/superadmin/superadminProjects";
 
 const getStoredUser = () => {
   try {
-    return JSON.parse(sessionStorage.getItem("user") || "{}");
+    return JSON.parse(
+      sessionStorage.getItem("user") ||
+      localStorage.getItem("user") ||
+      "{}"
+    );
   } catch {
     return {};
   }
@@ -137,7 +141,15 @@ const App = () => {
         <Route path="projects" element={<SuperadminProjects />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route
+  path="*"
+  element={
+    <Navigate
+      to={getDefaultRouteByRole(getStoredUser()?.role_name)}
+      replace
+    />
+  }
+/>
     </Routes>
   );
 };

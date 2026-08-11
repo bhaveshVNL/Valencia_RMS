@@ -3480,3 +3480,28 @@
     grid-template-columns: 1fr !important;
   }
 }
+/* Activity Log dedicated scroller */
+
+.employee-activity-scroll-area {
+  max-height: 430px !important;
+  overflow-y: auto !important;
+  padding-right: 8px !important;
+}
+
+.employee-activity-scroll-area::-webkit-scrollbar {
+  width: 8px !important;
+}
+
+.employee-activity-scroll-area::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+  border-radius: 999px !important;
+}
+
+.employee-activity-scroll-area::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 999px !important;
+}
+
+.employee-activity-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
+}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Activity,
   CalendarCheck,
@@ -167,6 +168,7 @@ const getAttendanceStatus = (item) => {
 };
 
 const EmployeeOverview = () => {
+  const navigate = useNavigate();
   const user = getUser();
 
   const [loading, setLoading] = useState(false);
@@ -284,38 +286,66 @@ const EmployeeOverview = () => {
       {error && <div className="employee-overview-error">{error}</div>}
 
       <div className="employee-overview-stats">
-        <div className="employee-overview-stat-card">
-          <h2>{stats.totalTasks}</h2>
-          <p>
-            <ClipboardList size={22} />
-            Total Tasks
-          </p>
-        </div>
+  <button
+    type="button"
+    className="employee-overview-stat-card employee-overview-clickable"
+    onClick={() =>
+      navigate("/employee/tasks", {
+        state: { filter: "all" },
+      })
+    }
+  >
+    <h2>{stats.totalTasks}</h2>
+    <p>
+      <ClipboardList size={22} />
+      Total Tasks
+    </p>
+  </button>
 
-        <div className="employee-overview-stat-card">
-          <h2>{stats.inProgressTasks}</h2>
-          <p>
-            <Activity size={22} />
-            In Progress Tasks
-          </p>
-        </div>
+  <button
+    type="button"
+    className="employee-overview-stat-card employee-overview-clickable"
+    onClick={() =>
+      navigate("/employee/tasks", {
+        state: { filter: "in_progress" },
+      })
+    }
+  >
+    <h2>{stats.inProgressTasks}</h2>
+    <p>
+      <Activity size={22} />
+      In Progress Tasks
+    </p>
+  </button>
 
-        <div className="employee-overview-stat-card">
-          <h2>{stats.completedTasks}</h2>
-          <p>
-            <CheckCircle2 size={22} />
-            Completed Tasks
-          </p>
-        </div>
+  <button
+    type="button"
+    className="employee-overview-stat-card employee-overview-clickable"
+    onClick={() =>
+      navigate("/employee/tasks", {
+        state: { filter: "done" },
+      })
+    }
+  >
+    <h2>{stats.completedTasks}</h2>
+    <p>
+      <CheckCircle2 size={22} />
+      Completed Tasks
+    </p>
+  </button>
 
-        <div className="employee-overview-stat-card">
-          <h2>{stats.attendancePercentage}%</h2>
-          <p>
-            <CalendarCheck size={22} />
-            Weekly Attendance
-          </p>
-        </div>
-      </div>
+  <button
+    type="button"
+    className="employee-overview-stat-card employee-overview-clickable"
+    onClick={() => navigate("/employee/attendance")}
+  >
+    <h2>{stats.attendancePercentage}%</h2>
+    <p>
+      <CalendarCheck size={22} />
+      Weekly Attendance
+    </p>
+  </button>
+</div>
 
       <div className="employee-overview-main-grid">
         <div className="employee-overview-left-column">
@@ -337,10 +367,19 @@ const EmployeeOverview = () => {
                   const progress = getTaskProgress(task);
 
                   return (
-                    <div
-                      className="employee-recent-task-item"
-                      key={task.task_id || task.main_task_id || index}
-                    >
+                   <button
+  type="button"
+  className="employee-recent-task-item employee-recent-task-clickable"
+  key={task.task_id || task.main_task_id || index}
+  onClick={() =>
+    navigate("/employee/tasks", {
+      state: {
+        filter: "all",
+        taskId: task.task_id || task.main_task_id,
+      },
+    })
+  }
+>
                       <div>
                         <h3>{getTaskTitle(task)}</h3>
                         <p>{getTaskProject(task)}</p>
@@ -359,7 +398,7 @@ const EmployeeOverview = () => {
                         </strong>
                         <b>{progress}%</b>
                       </div>
-                    </div>
+                    </button>
                   );
                 })
               )}
@@ -375,26 +414,58 @@ const EmployeeOverview = () => {
             </div>
 
             <div className="employee-task-summary-list">
-              <div className="employee-task-summary-row">
-                <span>Total Tasks</span>
-                <strong>{stats.totalTasks}</strong>
-              </div>
+  <button
+    type="button"
+    className="employee-task-summary-row employee-summary-clickable"
+    onClick={() =>
+      navigate("/employee/tasks", {
+        state: { filter: "all" },
+      })
+    }
+  >
+    <span>Total Tasks</span>
+    <strong>{stats.totalTasks}</strong>
+  </button>
 
-              <div className="employee-task-summary-row">
-                <span>In Progress Tasks</span>
-                <strong>{stats.inProgressTasks}</strong>
-              </div>
+  <button
+    type="button"
+    className="employee-task-summary-row employee-summary-clickable"
+    onClick={() =>
+      navigate("/employee/tasks", {
+        state: { filter: "in_progress" },
+      })
+    }
+  >
+    <span>In Progress Tasks</span>
+    <strong>{stats.inProgressTasks}</strong>
+  </button>
 
-              <div className="employee-task-summary-row">
-                <span>Completed Tasks</span>
-                <strong>{stats.completedTasks}</strong>
-              </div>
+  <button
+    type="button"
+    className="employee-task-summary-row employee-summary-clickable"
+    onClick={() =>
+      navigate("/employee/tasks", {
+        state: { filter: "done" },
+      })
+    }
+  >
+    <span>Completed Tasks</span>
+    <strong>{stats.completedTasks}</strong>
+  </button>
 
-              <div className="employee-task-summary-row">
-                <span>Pending Tasks</span>
-                <strong>{stats.pendingTasks}</strong>
-              </div>
-            </div>
+  <button
+    type="button"
+    className="employee-task-summary-row employee-summary-clickable"
+    onClick={() =>
+      navigate("/employee/tasks", {
+        state: { filter: "todo" },
+      })
+    }
+  >
+    <span>Pending Tasks</span>
+    <strong>{stats.pendingTasks}</strong>
+  </button>
+</div>
           </section>
         </div>
 
@@ -407,34 +478,39 @@ const EmployeeOverview = () => {
               </div>
             </div>
 
-            <div className="employee-activity-list">
-              {overviewData.activityLog.length === 0 ? (
-                <div className="employee-overview-empty">No activity found.</div>
-              ) : (
-                overviewData.activityLog.slice(0, 5).map((activity, index) => (
-                  <div
-                    className="employee-activity-item"
-                    key={activity.activity_id || activity.log_id || index}
-                  >
-                    <div className="employee-activity-dot">
-                      <Activity size={14} />
-                    </div>
+            <div className="employee-activity-scroll-area">
+  <div className="employee-activity-list">
+    {overviewData.activityLog.length === 0 ? (
+      <div className="employee-overview-empty">No activity found.</div>
+    ) : (
+      overviewData.activityLog.map((activity, index) => (
+        <div
+          className="employee-activity-item"
+          key={activity.activity_id || activity.log_id || index}
+        >
+          <div className="employee-activity-dot">
+            <Activity size={14} />
+          </div>
 
-                    <div>
-                      <h3>{getActivityTitle(activity)}</h3>
-                      <p>{getActivityDescription(activity)}</p>
-                      <span>{getActivityDate(activity)}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          <div>
+            <h3>{getActivityTitle(activity)}</h3>
+            <p>{getActivityDescription(activity)}</p>
+            <span>{getActivityDate(activity)}</span>
+          </div>
+        </div>
+      ))
+    )}
+  </div>
+</div>
           </section>
 
-          <section className="employee-overview-card weekly-attendance-card">
+          <section
+         className="employee-overview-card weekly-attendance-card employee-overview-section-clickable"
+         onClick={() => navigate("/employee/attendance")}
+         >
             <div className="employee-overview-card-header">
               <div>
-                <h2>Week Attendance</h2>
+                <h2>Weekly Attendance</h2>
                 <p>Your attendance records for the week</p>
               </div>
             </div>
@@ -450,7 +526,8 @@ const EmployeeOverview = () => {
                     className="employee-week-attendance-row"
                     key={item.attendance_id || index}
                   >
-                    <span>{getAttendanceDate(item)}</span>
+                    <span> {item.day_name || item.day || "-"} - {getAttendanceDate(item)}
+                    </span>
                     <strong>{getAttendanceStatus(item)}</strong>
                   </div>
                 ))

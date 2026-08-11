@@ -112,29 +112,65 @@ const getEmployeeOverview = async (req, res) => {
 
     const latestDate = latestAttendanceRows[0]?.latest_date;
 
-    let weeklyAttendance = [];
+let weeklyAttendance = [];
 
-    if (latestDate) {
-      const [attendanceRows] = await db.query(
-        `
-        SELECT
-          attendance_id,
-          DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendance_date,
-          DAYNAME(attendance_date) AS day_name,
-          status,
-          check_in_time,
-          check_out_time,
-          total_minutes
-        FROM attendance
-        WHERE employee_id = ?
-          AND attendance_date BETWEEN DATE_SUB(?, INTERVAL 6 DAY) AND ?
-        ORDER BY attendance_date ASC
-        `,
-        [userId, latestDate, latestDate]
+if (latestDate) {
+  const [attendanceRows] = await db.query(
+    `
+    SELECT
+      attendance_id,
+      DATE_FORMAT(attendance_date, '%Y-%m-%d') AS attendance_date,
+      DAYNAME(attendance_date) AS day_name,
+      status,
+      check_in_time,
+      check_out_time,
+      total_minutes
+    FROM attendance
+    WHERE employee_id = ?
+      AND attendance_date BETWEEN DATE_SUB(?, INTERVAL 10 DAY) AND ?
+    ORDER BY attendance_date ASC
+    `,
+    [userId, latestDate, latestDate]
+  );
+
+  const attendanceMap = new Map(
+    attendanceRows.map((row) => [row.attendance_date, row])
+  );
+
+  const workingDays = [];
+  const cursor = new Date(latestDate);
+
+  while (workingDays.length < 6) {
+    const year = cursor.getFullYear();
+    const month = String(cursor.getMonth() + 1).padStart(2, "0");
+    const day = String(cursor.getDate()).padStart(2, "0");
+    const dateString = `${year}-${month}-${day}`;
+
+    const dayName = cursor.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    if (dayName !== "Sunday") {
+      const existingRow = attendanceMap.get(dateString);
+
+      workingDays.push(
+        existingRow || {
+          attendance_id: null,
+          attendance_date: dateString,
+          day_name: dayName,
+          status: "absent",
+          check_in_time: null,
+          check_out_time: null,
+          total_minutes: 0,
+        }
       );
-
-      weeklyAttendance = attendanceRows;
     }
+
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  weeklyAttendance = workingDays.reverse();
+}
 
     const attendanceTotalDays = weeklyAttendance.length;
 

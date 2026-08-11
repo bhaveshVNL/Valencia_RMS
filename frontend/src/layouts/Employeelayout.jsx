@@ -20,12 +20,18 @@ const EmployeeLayout = () => {
   const user = JSON.parse(sessionStorage.getItem("user") || "{}");
 
   const logout = () => {
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("user");
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login", { replace: true });
-  };
+  const confirmed = window.confirm("Are you sure you want to log out?");
+
+  if (!confirmed) {
+    return;
+  }
+
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("user");
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  navigate("/login", { replace: true });
+};
 
   const initials =
     user?.full_name

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Activity,
   CheckCircle2,
@@ -183,6 +184,7 @@ const parseTasksFromResponse = (response) => {
 };
 
 const EmployeeTasks = () => {
+  const location = useLocation();
   const [mainTasks, setMainTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState("");
@@ -306,11 +308,33 @@ const EmployeeTasks = () => {
     }
   };
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+ useEffect(() => {
+  fetchTasks();
+}, []);
 
-  const stats = useMemo(() => {
+useEffect(() => {
+  const requestedFilter = location.state?.filter;
+  const requestedTaskId = location.state?.taskId;
+
+  if (
+    requestedFilter &&
+    ["all", "todo", "in_progress", "done"].includes(requestedFilter)
+  ) {
+    setActiveFilter(requestedFilter);
+  }
+
+  if (requestedTaskId && mainTasks.length > 0) {
+    const matchedTask = mainTasks.find(
+      (task) => Number(task.task_id) === Number(requestedTaskId)
+    );
+
+    if (matchedTask) {
+      fetchTaskDetails(matchedTask);
+    }
+  }
+}, [location.state, mainTasks]);
+
+const stats = useMemo(() => {
     const total = mainTasks.length;
 
     const todo = mainTasks.filter((task) => {
