@@ -623,9 +623,17 @@ const getEmployeeProjectSubtasks = async (req, res) => {
         total_subtasks: Number(project.total_subtasks || 0),
         completed_subtasks: Number(project.completed_subtasks || 0),
 
-        task_progress: Number(project.task_progress || 0),
-        progress: Number(project.progress || 0),
-        overall_progress: Number(project.overall_progress || 0),
+       task_progress: Number(project.task_progress || 0),
+
+progress:
+  statusGroup === "rejected"
+    ? 0
+    : Number(project.progress || 0),
+
+overall_progress:
+  statusGroup === "rejected"
+    ? 0
+    : Number(project.overall_progress || 0),
       },
       subtasks,
     });

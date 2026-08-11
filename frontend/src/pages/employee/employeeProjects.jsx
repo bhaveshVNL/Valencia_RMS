@@ -176,7 +176,17 @@ const getProjectMainTask = (project) => {
     "No main task added."
   );
 };
+const formatDisplayDate = (dateValue) => {
+  if (!dateValue) return "-";
 
+  const parts = String(dateValue).split("-");
+
+  if (parts.length !== 3) {
+    return dateValue;
+  }
+
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+};
 const getProjectStartDate = (project) => {
   return (
     formatDate(project?.start_date) ||
@@ -749,42 +759,54 @@ const EmployeeProjects = () => {
             </div>
 
             <div style={styles.detailGrid}>
-              <div style={styles.detailBox}>
-                <span>Department</span>
-                <strong>{selectedProject.department_name || "-"}</strong>
-              </div>
 
-              <div style={styles.detailBox}>
-                <span>Created By</span>
-                <strong>{selectedProject.created_by_name || "-"}</strong>
-                <p>{selectedProject.created_by_email || "-"}</p>
-              </div>
+ <div style={styles.detailBox}>
+  <span style={styles.detailBoxLabel}>Department</span>
+  <p style={styles.detailBoxValue}>
+    {selectedProject.department_name || "-"}
+  </p>
+</div>
 
-              <div style={styles.detailBox}>
-                <span>Assigned To</span>
-                <strong>{getAssignedNames(selectedProject)}</strong>
-                <p>{getAssignedEmails(selectedProject)}</p>
-              </div>
+<div style={styles.detailBox}>
+  <span style={styles.detailBoxLabel}>Created By</span>
+  <p style={styles.detailBoxValue}>
+    {selectedProject.created_by_name || "-"}
+    <br />
+    {selectedProject.created_by_email || "-"}
+  </p>
+</div>
 
-              <div style={styles.detailBox}>
-                <span>Status</span>
-                <strong>
-                  {getStatusLabel(
-                    selectedProject.status_group || selectedProject.status
-                  )}
-                </strong>
-              </div>
+  <div style={styles.detailBox}>
+  <span style={styles.detailBoxLabel}>Assigned To</span>
+  <p style={styles.detailBoxValue}>
+      {getAssignedNames(selectedProject)}
+      <br />
+      {getAssignedEmails(selectedProject)}
+    </p>
+  </div>
 
-              <div style={styles.detailBox}>
-                <span>Start Date</span>
-                <strong>{getProjectStartDate(selectedProject) || "-"}</strong>
-              </div>
+  <div style={styles.detailBox}>
+    <span style={styles.detailBoxLabel}>Status</span>
+    <p style={styles.detailBoxValue}>
+      {getStatusLabel(
+        selectedProject.status_group || selectedProject.status
+      )}
+    </p>
+  </div>
 
-              <div style={styles.detailBox}>
-                <span>End Date</span>
-                <strong>{getProjectEndDate(selectedProject) || "-"}</strong>
-              </div>
-            </div>
+  <div style={styles.detailBox}>
+  <span style={styles.detailBoxLabel}>Start Date</span>
+  <p style={styles.detailBoxValue}>
+    {formatDisplayDate(getProjectStartDate(selectedProject))}
+  </p>
+</div>
+
+  <div style={styles.detailBox}>
+    <span style={styles.detailBoxLabel}>End Date</span>
+    <p style={styles.detailBoxValue}>{formatDisplayDate(getProjectEndDate(selectedProject))}</p>
+  </div>
+
+</div>
 
             <div style={styles.progressBlock}>
               <div style={styles.progressTop}>
@@ -820,8 +842,20 @@ const EmployeeProjects = () => {
               </div>
             )}
 
-            {!isProjectLocked(selectedProject) && (
-              <form style={styles.subtaskForm} onSubmit={handleAddSubtask}>
+           {isProjectLocked(selectedProject) && (
+  <div style={styles.lockNotice}>
+    Subtasks cannot be added.
+    <br />
+    This project is currently{" "}
+    {getStatusLabel(
+      selectedProject.status_group || selectedProject.status
+    )}
+    .
+  </div>
+)}
+
+{!isProjectLocked(selectedProject) && (
+  <form style={styles.subtaskForm} onSubmit={handleAddSubtask}>
                 <div style={styles.formTitleRow}>
                   <Plus size={18} />
                   <h3>Add Subtask</h3>
@@ -910,18 +944,20 @@ const EmployeeProjects = () => {
 
                     return (
                       <label style={styles.subtaskRow} key={subtaskId}>
-                        <input
-                          type="checkbox"
-                          checked={done}
-                          disabled={
-                            done ||
-                            isProjectLocked(selectedProject) ||
-                            togglingSubtaskId === subtaskId
-                          }
-                          onChange={(event) =>
-                            handleToggleSubtask(subtask, event.target.checked)
-                          }
-                        />
+                        {normalizeStatus(
+  selectedProject.status_group || selectedProject.status
+) !== "rejected" && (
+  <input
+    type="checkbox"
+    checked={Boolean(subtask.is_checked)}
+    disabled={
+      isProjectLocked(
+        selectedProject.status_group || selectedProject.status
+      )
+    }
+    onChange={() => handleToggleSubtask(subtask)}
+  />
+)}
 
                         <div>
                           <strong>{getSubtaskTitle(subtask)}</strong>
@@ -1274,12 +1310,31 @@ const styles = {
     gap: "12px",
     marginBottom: "20px",
   },
-  detailBox: {
+detailBox: {
     background: "#f8fafc",
     border: "1px solid #e5e7eb",
     borderRadius: "16px",
-    padding: "14px",
-  },
+    padding: "16px",
+    minWidth: 0,
+    overflow: "hidden",
+},
+
+detailBoxLabel: {
+    display: "block",
+    color: "#667085",
+    fontSize: "13px",
+    fontWeight: 900,
+    marginBottom: "8px",
+},
+
+detailBoxValue: {
+    color: "#111827",
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+},
   progressBlock: {
     background: "#fff7f4",
     border: "1px solid #ffd4c8",
@@ -1399,9 +1454,12 @@ const styles = {
     fontWeight: 900,
   },
   subtaskList: {
-    display: "grid",
-    gap: "10px",
-  },
+  display: "grid",
+  gap: "10px",
+  maxHeight: "320px",
+  overflowY: "auto",
+  paddingRight: "8px",
+},
   subtaskRow: {
     border: "1px solid #e5e7eb",
     borderRadius: "16px",
