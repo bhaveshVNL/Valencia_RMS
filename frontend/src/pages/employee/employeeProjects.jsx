@@ -1493,4 +1493,4 @@ detailBoxValue: {
   },
 };
 
-export default EmployeeProjects
+export default EmployeeProjects;
