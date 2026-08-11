@@ -108,3 +108,4 @@ The deployable frontend files will be created in `frontend/dist`.
 - `backend/.env.example` documents all backend settings.
 - `frontend/.env.example` documents the optional public API URL.
 - Real `.env` files are ignored by Git.
+"# Valencia_RMS" 
