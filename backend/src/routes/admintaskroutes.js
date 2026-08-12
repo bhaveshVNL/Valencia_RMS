@@ -5,8 +5,19 @@ const authMiddleware = require("../middleware/authmiddleware");
 
 const {
   getDepartmentTasks,
+  reviewDepartmentTask,
 } = require("../controllers/admintaskcontroller");
 
-router.get("/department-tasks", authMiddleware, getDepartmentTasks);
+router.get(
+  "/department-tasks",
+  authMiddleware,
+  getDepartmentTasks
+);
+
+router.post(
+  "/review",
+  authMiddleware,
+  reviewDepartmentTask
+);
 
 module.exports = router;

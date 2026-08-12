@@ -8,7 +8,10 @@ const formatDate = (dateValue) => {
 };
 
 const normalizeStatus = (status) => {
-  const value = String(status || "").toLowerCase().trim().replace(/\s+/g, "_");
+  const value = String(status || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "_");
 
   if (
     value === "todo" ||
@@ -20,7 +23,11 @@ const normalizeStatus = (status) => {
     return "todo";
   }
 
-  if (value === "in_progress" || value === "progress" || value === "ongoing") {
+  if (
+    value === "in_progress" ||
+    value === "progress" ||
+    value === "ongoing"
+  ) {
     return "in_progress";
   }
 
@@ -28,7 +35,11 @@ const normalizeStatus = (status) => {
     return "under_review";
   }
 
-  if (value === "done" || value === "completed" || value === "complete") {
+  if (
+    value === "done" ||
+    value === "completed" ||
+    value === "complete"
+  ) {
     return "done";
   }
 
@@ -71,23 +82,35 @@ const getStatusPriority = (status) => {
 
 const getTaskStatus = (tasks) => {
   const statuses = tasks.map((task) =>
-    normalizeStatus(task.status_group || task.status || task.project_status)
+    normalizeStatus(task.status_group || task.status)
   );
 
   if (statuses.includes("rejected")) {
-    return { status_group: "rejected", status_label: "Rejected" };
+    return {
+      status_group: "rejected",
+      status_label: "Rejected",
+    };
   }
 
   if (statuses.includes("under_review")) {
-    return { status_group: "under_review", status_label: "Under Review" };
+    return {
+      status_group: "under_review",
+      status_label: "Under Review",
+    };
   }
 
   if (statuses.includes("in_progress")) {
-    return { status_group: "in_progress", status_label: "In Progress" };
+    return {
+      status_group: "in_progress",
+      status_label: "In Progress",
+    };
   }
 
   if (statuses.includes("on_hold")) {
-    return { status_group: "on_hold", status_label: "On Hold" };
+    return {
+      status_group: "on_hold",
+      status_label: "On Hold",
+    };
   }
 
   const allDone =
@@ -95,10 +118,16 @@ const getTaskStatus = (tasks) => {
     statuses.every((status) => normalizeStatus(status) === "done");
 
   if (allDone) {
-    return { status_group: "done", status_label: "Done" };
+    return {
+      status_group: "done",
+      status_label: "Done",
+    };
   }
 
-  return { status_group: "todo", status_label: "To Do" };
+  return {
+    status_group: "todo",
+    status_label: "To Do",
+  };
 };
 
 const dedupeUsers = (users) => {
@@ -114,10 +143,8 @@ const dedupeUsers = (users) => {
 
     if (!id) return;
 
-    const key = String(id);
-
-    if (!map.has(key)) {
-      map.set(key, user);
+    if (!map.has(String(id))) {
+      map.set(String(id), user);
     }
   });
 
@@ -132,8 +159,15 @@ const getEmployeeInitials = (assignees = []) => {
   const cleanAssignees = Array.isArray(assignees) ? assignees : [];
 
   return cleanAssignees.map((assignee) => {
-    const name = assignee.assigned_name || assignee.full_name || "Employee";
-    const email = assignee.assigned_email || assignee.email || "";
+    const name =
+      assignee.assigned_name ||
+      assignee.full_name ||
+      "Employee";
+
+    const email =
+      assignee.assigned_email ||
+      assignee.email ||
+      "";
 
     return {
       id:
@@ -160,17 +194,26 @@ const AdminTasks = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [reviewRemark, setReviewRemark] = useState("");
+  const [reviewError, setReviewError] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+
   const fetchTasks = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await api.get("/admin-tasks/department-tasks");
+      const response = await api.get(
+        "/admin-tasks/department-tasks"
+      );
 
       setTasks(response.data?.tasks || []);
       setAdmin(response.data?.admin || null);
     } catch (err) {
-      console.error("Fetch admin department tasks error:", err);
+      console.error(
+        "Fetch admin department tasks error:",
+        err
+      );
 
       setError(
         err?.response?.data?.sqlMessage ||
@@ -186,6 +229,72 @@ const AdminTasks = () => {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  const openTaskDetails = (task) => {
+    setSelectedTask(task);
+    setReviewRemark("");
+    setReviewError("");
+  };
+
+  const closeTaskDetails = () => {
+    setSelectedTask(null);
+    setReviewRemark("");
+    setReviewError("");
+  };
+
+  const reviewSelectedTask = async (action) => {
+    if (!selectedTask) return;
+
+    const taskIds = [
+      ...new Set(
+        (selectedTask.main_task_assignees || [])
+          .map((assignee) => Number(assignee.task_id))
+          .filter(Boolean)
+      ),
+    ];
+
+    if (!taskIds.length) {
+      setReviewError(
+        "No task IDs were found for this main task."
+      );
+      return;
+    }
+
+    if (
+      (action === "reject" || action === "on_hold") &&
+      !reviewRemark.trim()
+    ) {
+      setReviewError(
+        action === "reject"
+          ? "Please add a remark before rejecting the task."
+          : "Please add a remark before putting the task on hold."
+      );
+      return;
+    }
+
+    try {
+      setReviewLoading(true);
+      setReviewError("");
+
+      await api.post("/admin-tasks/review", {
+        task_ids: taskIds,
+        action,
+        remark: reviewRemark.trim(),
+      });
+
+      closeTaskDetails();
+      await fetchTasks();
+    } catch (err) {
+      setReviewError(
+        err?.response?.data?.sqlMessage ||
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Failed to review task."
+      );
+    } finally {
+      setReviewLoading(false);
+    }
+  };
 
   const groupedMainTasks = useMemo(() => {
     const map = new Map();
@@ -203,24 +312,36 @@ const AdminTasks = () => {
       if (!map.has(mainTaskKey)) {
         map.set(mainTaskKey, {
           main_task_key: mainTaskKey,
-          project_id: task.project_id,
-          project_title: task.project_title || "Untitled Project",
 
-          task_title: task.task_title || "Untitled Main Task",
+          project_id: task.project_id,
+          project_title:
+            task.project_title || "Untitled Project",
+
+          task_title:
+            task.task_title || "Untitled Main Task",
+
           task_description:
             task.task_description ||
             task.project_description ||
             "No task description added.",
 
-          project_start_date: task.project_start_date || task.start_date,
+          project_start_date:
+            task.project_start_date ||
+            task.start_date,
+
           project_end_date:
-            task.project_end_date || task.due_date || task.end_date,
+            task.project_end_date ||
+            task.due_date ||
+            task.end_date,
 
           created_by_name: task.created_by_name,
 
           tasks: [],
           main_task_assignees: [],
-          project_assignees: dedupeUsers(task.project_assignees || []),
+
+          project_assignees: dedupeUsers(
+            task.project_assignees || []
+          ),
 
           total_progress: 0,
           total_subtasks: 0,
@@ -236,9 +357,18 @@ const AdminTasks = () => {
       const mainTask = map.get(mainTaskKey);
 
       mainTask.tasks.push(task);
-      mainTask.total_progress += Number(task.progress || 0);
-      mainTask.total_subtasks += Number(task.total_subtasks || 0);
-      mainTask.completed_subtasks += Number(task.completed_subtasks || 0);
+
+      mainTask.total_progress += Number(
+        task.progress || 0
+      );
+
+      mainTask.total_subtasks += Number(
+        task.total_subtasks || 0
+      );
+
+      mainTask.completed_subtasks += Number(
+        task.completed_subtasks || 0
+      );
 
       mainTask.project_assignees = dedupeUsers([
         ...mainTask.project_assignees,
@@ -247,69 +377,119 @@ const AdminTasks = () => {
 
       mainTask.main_task_assignees.push({
         task_id: task.task_id,
-        assigned_user_id: task.assigned_user_id,
-        assigned_name: task.assigned_name,
-        assigned_email: task.assigned_email,
-        assigned_employee_code: task.assigned_employee_code,
-        assigned_designation: task.assigned_designation,
-        assigned_department_name: task.assigned_department_name,
+
+        assigned_user_id:
+          task.assigned_user_id,
+
+        assigned_name:
+          task.assigned_name,
+
+        assigned_email:
+          task.assigned_email,
+
+        assigned_employee_code:
+          task.assigned_employee_code,
+
+        assigned_designation:
+          task.assigned_designation,
+
+        assigned_department_name:
+          task.assigned_department_name,
+
         status_group: normalizeStatus(
-          task.status_group || task.status || task.project_status
+          task.status_group || task.status
         ),
-        status_label: task.status_label || getTaskStatus([task]).status_label,
+
+        status_label:
+          task.status_label ||
+          getTaskStatus([task]).status_label,
+
         progress: Number(task.progress || 0),
-        completed_subtasks: Number(task.completed_subtasks || 0),
-        total_subtasks: Number(task.total_subtasks || 0),
+
+        completed_subtasks: Number(
+          task.completed_subtasks || 0
+        ),
+
+        total_subtasks: Number(
+          task.total_subtasks || 0
+        ),
+
         subtasks: task.subtasks || [],
       });
 
       if (
         task.is_rejected ||
         normalizeStatus(
-          task.status_group || task.status || task.project_status
+          task.status_group || task.status
         ) === "rejected"
       ) {
         mainTask.is_rejected = true;
-        mainTask.rejection_reason = task.rejection_reason || "";
-        mainTask.rejected_at = task.rejected_at || "";
-        mainTask.rejection_expires_at = task.rejection_expires_at || "";
+        mainTask.rejection_reason =
+          task.rejection_reason || "";
+        mainTask.rejected_at =
+          task.rejected_at || "";
+        mainTask.rejection_expires_at =
+          task.rejection_expires_at || "";
       }
     });
 
     return Array.from(map.values())
       .map((mainTask) => {
-        const status = getTaskStatus(mainTask.tasks);
+        const status = getTaskStatus(
+          mainTask.tasks
+        );
 
         const averageProgress =
           mainTask.tasks.length > 0
-            ? Math.round(mainTask.total_progress / mainTask.tasks.length)
+            ? Math.round(
+                mainTask.total_progress /
+                  mainTask.tasks.length
+              )
             : 0;
 
         const projectAssignedNames =
           mainTask.project_assignees
-            .map((assignee) => assignee.full_name || assignee.assigned_name)
+            .map(
+              (assignee) =>
+                assignee.full_name ||
+                assignee.assigned_name
+            )
             .filter(Boolean)
             .join(", ") || "-";
 
         const projectAssignedEmails =
           mainTask.project_assignees
-            .map((assignee) => assignee.email || assignee.assigned_email)
+            .map(
+              (assignee) =>
+                assignee.email ||
+                assignee.assigned_email
+            )
             .filter(Boolean)
             .join(", ") || "-";
 
         const mainTaskAssignedNames =
           mainTask.main_task_assignees
-            .map((assignee) => assignee.assigned_name)
+            .map(
+              (assignee) =>
+                assignee.assigned_name
+            )
             .filter(Boolean)
             .join(", ") || "-";
 
         return {
           ...mainTask,
           ...status,
+
           progress: averageProgress,
-          project_assigned_names: projectAssignedNames,
-          project_assigned_emails: projectAssignedEmails,
-          main_task_assigned_names: mainTaskAssignedNames,
+
+          project_assigned_names:
+            projectAssignedNames,
+
+          project_assigned_emails:
+            projectAssignedEmails,
+
+          main_task_assigned_names:
+            mainTaskAssignedNames,
         };
       })
       .sort((a, b) => {
@@ -317,93 +497,61 @@ const AdminTasks = () => {
           getStatusPriority(b.status_group) -
           getStatusPriority(a.status_group);
 
-        if (statusDifference !== 0) return statusDifference;
+        if (statusDifference !== 0) {
+          return statusDifference;
+        }
 
-        return Number(b.project_id || 0) - Number(a.project_id || 0);
+        return (
+          Number(b.project_id || 0) -
+          Number(a.project_id || 0)
+        );
       });
   }, [tasks]);
 
-  const taskCounts = useMemo(() => {
-    return groupedMainTasks.reduce(
-      (acc, task) => {
-        acc.all += 1;
-
-        const status = normalizeStatus(task.status_group);
-
-        acc[status] = (acc[status] || 0) + 1;
-
-        return acc;
-      },
-      {
-        all: 0,
-        todo: 0,
-        in_progress: 0,
-        under_review: 0,
-        done: 0,
-        rejected: 0,
-        on_hold: 0,
-      }
-    );
-  }, [groupedMainTasks]);
-
   const filteredTasks = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
+    const term = searchTerm
+      .toLowerCase()
+      .trim();
 
     return groupedMainTasks.filter((task) => {
       const matchesFilter =
-        activeFilter === "all" || task.status_group === activeFilter;
+        activeFilter === "all" ||
+        task.status_group === activeFilter;
 
       const matchesSearch =
         !term ||
-        String(task.project_title || "").toLowerCase().includes(term) ||
-        String(task.task_title || "").toLowerCase().includes(term) ||
-        String(task.task_description || "").toLowerCase().includes(term) ||
-        String(task.created_by_name || "").toLowerCase().includes(term) ||
-        String(task.status_label || "").toLowerCase().includes(term) ||
-        String(task.project_assigned_names || "").toLowerCase().includes(term) ||
-        String(task.project_assigned_emails || "").toLowerCase().includes(term) ||
-        String(task.main_task_assigned_names || "")
+        String(task.project_title || "")
           .toLowerCase()
           .includes(term) ||
-        task.project_assignees.some((assignee) => {
-          return (
-            String(assignee.full_name || assignee.assigned_name || "")
-              .toLowerCase()
-              .includes(term) ||
-            String(assignee.email || assignee.assigned_email || "")
-              .toLowerCase()
-              .includes(term) ||
-            String(
-              assignee.employee_code || assignee.assigned_employee_code || ""
-            )
-              .toLowerCase()
-              .includes(term) ||
-            String(assignee.designation || assignee.assigned_designation || "")
-              .toLowerCase()
-              .includes(term)
-          );
-        }) ||
-        task.main_task_assignees.some((assignee) => {
-          return (
-            String(assignee.assigned_name || "")
-              .toLowerCase()
-              .includes(term) ||
-            String(assignee.assigned_email || "")
-              .toLowerCase()
-              .includes(term) ||
-            String(assignee.assigned_employee_code || "")
-              .toLowerCase()
-              .includes(term) ||
-            String(assignee.assigned_designation || "")
-              .toLowerCase()
-              .includes(term) ||
-            String(assignee.status_label || "").toLowerCase().includes(term)
-          );
-        });
+        String(task.task_title || "")
+          .toLowerCase()
+          .includes(term) ||
+        String(task.task_description || "")
+          .toLowerCase()
+          .includes(term) ||
+        String(task.created_by_name || "")
+          .toLowerCase()
+          .includes(term) ||
+        String(task.status_label || "")
+          .toLowerCase()
+          .includes(term) ||
+        String(task.project_assigned_names || "")
+          .toLowerCase()
+          .includes(term) ||
+        String(task.project_assigned_emails || "")
+          .toLowerCase()
+          .includes(term) ||
+        String(task.main_task_assigned_names || "")
+          .toLowerCase()
+          .includes(term);
 
       return matchesFilter && matchesSearch;
     });
-  }, [groupedMainTasks, activeFilter, searchTerm]);
+  }, [
+    groupedMainTasks,
+    activeFilter,
+    searchTerm,
+  ]);
 
   const kanbanColumns = [
     {
@@ -411,7 +559,9 @@ const AdminTasks = () => {
       title: "To Do",
       subtitle: "Not started",
       tasks: filteredTasks.filter(
-        (task) => normalizeStatus(task.status_group) === "todo"
+        (task) =>
+          normalizeStatus(task.status_group) ===
+          "todo"
       ),
     },
     {
@@ -419,7 +569,9 @@ const AdminTasks = () => {
       title: "In Progress",
       subtitle: "Work started",
       tasks: filteredTasks.filter(
-        (task) => normalizeStatus(task.status_group) === "in_progress"
+        (task) =>
+          normalizeStatus(task.status_group) ===
+          "in_progress"
       ),
     },
     {
@@ -427,7 +579,9 @@ const AdminTasks = () => {
       title: "Under Review",
       subtitle: "Waiting review",
       tasks: filteredTasks.filter(
-        (task) => normalizeStatus(task.status_group) === "under_review"
+        (task) =>
+          normalizeStatus(task.status_group) ===
+          "under_review"
       ),
     },
     {
@@ -435,7 +589,9 @@ const AdminTasks = () => {
       title: "Done",
       subtitle: "Completed",
       tasks: filteredTasks.filter(
-        (task) => normalizeStatus(task.status_group) === "done"
+        (task) =>
+          normalizeStatus(task.status_group) ===
+          "done"
       ),
     },
     {
@@ -443,7 +599,9 @@ const AdminTasks = () => {
       title: "Rejected",
       subtitle: "Rejected tasks",
       tasks: filteredTasks.filter(
-        (task) => normalizeStatus(task.status_group) === "rejected"
+        (task) =>
+          normalizeStatus(task.status_group) ===
+          "rejected"
       ),
     },
     {
@@ -451,7 +609,9 @@ const AdminTasks = () => {
       title: "On Hold",
       subtitle: "Paused",
       tasks: filteredTasks.filter(
-        (task) => normalizeStatus(task.status_group) === "on_hold"
+        (task) =>
+          normalizeStatus(task.status_group) ===
+          "on_hold"
       ),
     },
   ];
@@ -459,141 +619,233 @@ const AdminTasks = () => {
   return (
     <div style={styles.page}>
       <div style={styles.topActions}>
-        <button type="button" style={styles.refreshButton} onClick={fetchTasks}>
+        <button
+          type="button"
+          style={styles.refreshButton}
+          onClick={fetchTasks}
+        >
           Refresh
         </button>
       </div>
 
-      {error && <div style={styles.errorBox}>{error}</div>}
+      {error && (
+        <div style={styles.errorBox}>
+          {error}
+        </div>
+      )}
 
       <input
         style={styles.searchInput}
         type="text"
         placeholder="Search by project, task, employee, email, code, designation..."
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={(event) =>
+          setSearchTerm(event.target.value)
+        }
       />
 
       <section style={styles.kanbanSection}>
         <div style={styles.kanbanHeader}>
-          <div>
-            <h2 style={styles.kanbanTitle}>Tasks Kanban</h2>
-            <p style={styles.kanbanSubtitle}>
-              Each tile represents one main task. Click a tile to view
-              employee-wise subtasks and progress.
-            </p>
-          </div>
+          <h2 style={styles.kanbanTitle}>
+            Tasks Kanban
+          </h2>
+
+          <p style={styles.kanbanSubtitle}>
+            Three columns are visible at a
+            time. Scroll horizontally to view
+            the remaining task statuses.
+          </p>
         </div>
 
         {loading ? (
-          <div style={styles.messageBox}>Loading department tasks...</div>
+          <div style={styles.messageBox}>
+            Loading department tasks...
+          </div>
         ) : filteredTasks.length === 0 ? (
-          <div style={styles.messageBox}>No tasks found.</div>
+          <div style={styles.messageBox}>
+            No tasks found.
+          </div>
         ) : (
-          <div style={styles.kanbanScroll}>
-            <div style={styles.kanbanBoard}>
-              {kanbanColumns.map((column) => (
-                <div style={styles.kanbanColumn} key={column.key}>
-                  <div style={styles.columnHeader}>
-                    <div>
-                      <h3 style={styles.columnTitle}>{column.title}</h3>
-                      <p style={styles.columnSubtitle}>{column.subtitle}</p>
+          <div style={styles.kanbanViewport}>
+            <div style={styles.kanbanScroll}>
+              <div style={styles.kanbanBoard}>
+                {kanbanColumns.map((column) => (
+                  <div
+                    style={styles.kanbanColumn}
+                    key={column.key}
+                  >
+                    <div style={styles.columnHeader}>
+                      <div>
+                        <h3 style={styles.columnTitle}>
+                          {column.title}
+                        </h3>
+
+                        <p
+                          style={
+                            styles.columnSubtitle
+                          }
+                        >
+                          {column.subtitle}
+                        </p>
+                      </div>
+
+                      <span
+                        style={styles.columnCount}
+                      >
+                        {column.tasks.length}
+                      </span>
                     </div>
 
-                    <span style={styles.columnCount}>{column.tasks.length}</span>
-                  </div>
-
-                  <div style={styles.columnBody}>
-                    {column.tasks.length === 0 ? (
-                      <div style={styles.emptyBox}>No tasks here.</div>
-                    ) : (
-                      column.tasks.map((task) => (
-                        <button
-                          type="button"
-                          key={task.main_task_key}
-                          style={styles.taskTile}
-                          onClick={() => setSelectedTask(task)}
+                    <div style={styles.columnBody}>
+                      {column.tasks.length ===
+                      0 ? (
+                        <div
+                          style={styles.emptyBox}
                         >
-                          <div style={styles.tileContent}>
-                            <h3
-                              style={styles.tileMainTaskTitle}
-                              title={task.task_title || "Untitled Main Task"}
+                          No tasks here.
+                        </div>
+                      ) : (
+                        column.tasks.map(
+                          (task) => (
+                            <button
+                              type="button"
+                              key={
+                                task.main_task_key
+                              }
+                              style={
+                                styles.taskTile
+                              }
+                              onClick={() =>
+                                openTaskDetails(
+                                  task
+                                )
+                              }
                             >
-                              {task.task_title || "Untitled Main Task"}
-                            </h3>
+                              <div
+                                style={
+                                  styles.tileContent
+                                }
+                              >
+                                <h3
+                                  style={
+                                    styles.tileMainTaskTitle
+                                  }
+                                >
+                                  {
+                                    task.task_title
+                                  }
+                                </h3>
 
-                            <p
-                              style={styles.tileProjectName}
-                              title={task.project_title || "-"}
-                            >
-                              {task.project_title || "-"}
-                            </p>
-                          </div>
+                                <p
+                                  style={
+                                    styles.tileProjectName
+                                  }
+                                >
+                                  {
+                                    task.project_title
+                                  }
+                                </p>
+                              </div>
 
-                          <div style={styles.tileBottomRow}>
-                            <span style={styles.tileSubtaskText}>
-                              {task.completed_subtasks || 0}/
-                              {task.total_subtasks || 0} subtasks done
-                            </span>
+                              <div
+                                style={
+                                  styles.tileBottomRow
+                                }
+                              >
+                                <span
+                                  style={
+                                    styles.tileSubtaskText
+                                  }
+                                >
+                                  {
+                                    task.completed_subtasks
+                                  }
+                                  /
+                                  {
+                                    task.total_subtasks
+                                  }{" "}
+                                  subtasks done
+                                </span>
 
-                            <div style={styles.tileAvatarGroup}>
-                              {getEmployeeInitials(task.main_task_assignees)
-                                .length === 0 ? (
-                                <span style={styles.tileNoEmployee}>-</span>
-                              ) : (
-                                getEmployeeInitials(
-                                  task.main_task_assignees
-                                ).map((employee) => (
-                                  <span
-                                    key={employee.id}
-                                    style={styles.tileAvatar}
-                                    title={`${employee.name}${
-                                      employee.email
-                                        ? ` - ${employee.email}`
-                                        : ""
-                                    }`}
-                                  >
-                                    {employee.initial}
-                                  </span>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      ))
-                    )}
+                                <div
+                                  style={
+                                    styles.tileAvatarGroup
+                                  }
+                                >
+                                  {getEmployeeInitials(task.main_task_assignees)
+                                    .slice(0, 3)
+                                    .map((employee) => (
+                                      <span
+                                      key={employee.id}
+                                      style={styles.tileAvatar}
+                                      title={employee.name}
+                                    >
+                                      {employee.initial}
+                                         </span>
+                                  ))}
+    
+  
+ 
+                                </div>
+                              </div>
+                            </button>
+                          )
+                        )
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
-            </section>
+      </section>
 
-      <AdminDepartmentMiniTasks />
+      <div style={styles.miniTasksGap}>
+        <AdminDepartmentMiniTasks />
+      </div>
 
       {selectedTask && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
+        <div
+          style={styles.modalOverlay}
+          onClick={closeTaskDetails}
+        >
+          <div
+            style={styles.modal}
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
             <button
               type="button"
               style={styles.closeButton}
-              onClick={() => setSelectedTask(null)}
+              onClick={closeTaskDetails}
             >
               ×
             </button>
 
             <div style={styles.modalHeader}>
               <div>
-                <h2 style={styles.modalTitle}>{selectedTask.task_title}</h2>
-                <p style={styles.modalSubtitle}>
-                  Project: <strong>{selectedTask.project_title || "-"}</strong>
+                <h2 style={styles.modalTitle}>
+                  {selectedTask.task_title}
+                </h2>
+
+                <p
+                  style={styles.modalSubtitle}
+                >
+                  Project:{" "}
+                  <strong>
+                    {selectedTask.project_title ||
+                      "-"}
+                  </strong>
                 </p>
               </div>
 
               <span style={styles.modalStatus}>
                 {selectedTask.status_label ||
-                  getStatusLabel(selectedTask.status_group)}
+                  getStatusLabel(
+                    selectedTask.status_group
+                  )}
               </span>
             </div>
 
@@ -601,179 +853,423 @@ const AdminTasks = () => {
               <div style={styles.infoBox}>
                 <span>Project Dates</span>
                 <strong>
-                  {formatDate(selectedTask.project_start_date)} to{" "}
-                  {formatDate(selectedTask.project_end_date)}
+                  {formatDate(
+                    selectedTask.project_start_date
+                  )}{" "}
+                  to{" "}
+                  {formatDate(
+                    selectedTask.project_end_date
+                  )}
                 </strong>
               </div>
 
               <div style={styles.infoBox}>
                 <span>Created By</span>
-                <strong>{selectedTask.created_by_name || "-"}</strong>
+                <strong>
+                  {selectedTask.created_by_name ||
+                    "-"}
+                </strong>
               </div>
 
               <div style={styles.infoBox}>
-                <span>Total Project Assignees</span>
-                <strong>{selectedTask.project_assignees.length}</strong>
+                <span>
+                  Total Project Assignees
+                </span>
+                <strong>
+                  {
+                    selectedTask
+                      .project_assignees
+                      .length
+                  }
+                </strong>
               </div>
 
               <div style={styles.infoBox}>
-                <span>Main Task Progress</span>
-                <strong>{selectedTask.progress || 0}%</strong>
+                <span>
+                  Main Task Progress
+                </span>
+                <strong>
+                  {selectedTask.progress || 0}%
+                </strong>
               </div>
             </div>
 
-            <div style={styles.modalProgressBox}>
-              <div style={styles.modalProgressTop}>
-                <strong>Overall Main Task Progress</strong>
-                <b>{selectedTask.progress || 0}%</b>
+            <div
+              style={styles.modalProgressBox}
+            >
+              <div
+                style={styles.modalProgressTop}
+              >
+                <strong>
+                  Overall Main Task Progress
+                </strong>
+
+                <b>
+                  {selectedTask.progress || 0}%
+                </b>
               </div>
 
-              <div style={styles.progressTrack}>
+              <div
+                style={styles.progressTrack}
+              >
                 <div
                   style={{
                     ...styles.progressFill,
-                    width: `${selectedTask.progress || 0}%`,
+                    width: `${
+                      selectedTask.progress ||
+                      0
+                    }%`,
                   }}
                 />
               </div>
             </div>
 
+            {normalizeStatus(
+              selectedTask.status_group
+            ) === "under_review" && (
+              <section
+                style={styles.reviewSection}
+              >
+                <h3
+                  style={styles.reviewTitle}
+                >
+                  Task Review
+                </h3>
+
+                <p
+                  style={styles.reviewSubtitle}
+                >
+                  Approve this task, place
+                  it on hold, or reject it
+                  and send it back to the
+                  employee's To Do section.
+                </p>
+
+                {reviewError && (
+                  <div
+                    style={
+                      styles.reviewErrorBox
+                    }
+                  >
+                    {reviewError}
+                  </div>
+                )}
+
+                <label
+                  style={styles.reviewField}
+                >
+                  <span>Remark</span>
+
+                  <textarea
+                    style={
+                      styles.reviewTextarea
+                    }
+                    value={reviewRemark}
+                    onChange={(event) =>
+                      setReviewRemark(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Add review remark..."
+                    disabled={reviewLoading}
+                  />
+                </label>
+
+                <div
+                  style={styles.reviewButtons}
+                >
+                  <button
+                    type="button"
+                    style={
+                      styles.approveButton
+                    }
+                    disabled={reviewLoading}
+                    onClick={() =>
+                      reviewSelectedTask(
+                        "approve"
+                      )
+                    }
+                  >
+                    {reviewLoading
+                      ? "Processing..."
+                      : "Approve"}
+                  </button>
+
+                  <button
+                    type="button"
+                    style={styles.holdButton}
+                    disabled={reviewLoading}
+                    onClick={() =>
+                      reviewSelectedTask(
+                        "on_hold"
+                      )
+                    }
+                  >
+                    On Hold
+                  </button>
+
+                  <button
+                    type="button"
+                    style={styles.rejectButton}
+                    disabled={reviewLoading}
+                    onClick={() =>
+                      reviewSelectedTask(
+                        "reject"
+                      )
+                    }
+                  >
+                    Reject
+                  </button>
+                </div>
+              </section>
+            )}
+
             <section style={styles.modalSection}>
-              <h3 style={styles.modalSectionTitle}>Project Assignees</h3>
+              <h3
+                style={styles.modalSectionTitle}
+              >
+                Project Assignees
+              </h3>
 
-              {selectedTask.project_assignees.length === 0 ? (
-                <div style={styles.emptyBox}>No project assignees found.</div>
+              {selectedTask.project_assignees
+                .length === 0 ? (
+                <div style={styles.emptyBox}>
+                  No project assignees found.
+                </div>
               ) : (
-                <div style={styles.assigneeGrid}>
-                  {selectedTask.project_assignees.map((assignee) => (
-                    <div
-                      style={styles.assigneeCard}
-                      key={
-                        assignee.user_id ||
-                        assignee.assigned_user_id ||
-                        assignee.email
-                      }
-                    >
-                      <div style={styles.avatar}>
-                        {getInitial(assignee.full_name || assignee.assigned_name)}
-                      </div>
+                <div
+                  style={styles.assigneeGrid}
+                >
+                  {selectedTask.project_assignees.map(
+                    (assignee) => (
+                      <div
+                        style={
+                          styles.assigneeCard
+                        }
+                        key={
+                          assignee.user_id ||
+                          assignee.assigned_user_id ||
+                          assignee.email
+                        }
+                      >
+                        <div
+                          style={styles.avatar}
+                        >
+                          {getInitial(
+                            assignee.full_name ||
+                              assignee.assigned_name
+                          )}
+                        </div>
 
-                      <div>
-                        <h4 style={styles.assigneeName}>
-                          {assignee.full_name || assignee.assigned_name || "-"}
-                        </h4>
-                        <p style={styles.assigneeEmail}>
-                          {assignee.email || assignee.assigned_email || "-"}
-                        </p>
-                        <span style={styles.assigneeMeta}>
-                          {assignee.employee_code ||
-                            assignee.assigned_employee_code ||
-                            "-"}{" "}
-                          ·{" "}
-                          {assignee.designation ||
-                            assignee.assigned_designation ||
-                            "-"}{" "}
-                          · {assignee.department_name || "-"}
-                        </span>
+                        <div>
+                          <h4
+                            style={
+                              styles.assigneeName
+                            }
+                          >
+                            {assignee.full_name ||
+                              assignee.assigned_name ||
+                              "-"}
+                          </h4>
+
+                          <p
+                            style={
+                              styles.assigneeEmail
+                            }
+                          >
+                            {assignee.email ||
+                              assignee.assigned_email ||
+                              "-"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               )}
             </section>
 
             <section style={styles.modalSection}>
-              <h3 style={styles.modalSectionTitle}>
-                Employee-wise Main Task Subtasks
+              <h3
+                style={styles.modalSectionTitle}
+              >
+                Employee-wise Main Task
+                Subtasks
               </h3>
 
-              {selectedTask.main_task_assignees.length === 0 ? (
-                <div style={styles.emptyBox}>No main task assignees found.</div>
-              ) : (
-                <div style={styles.employeeTaskList}>
-                  {selectedTask.main_task_assignees.map((assignee) => (
-                    <div style={styles.employeeTaskCard} key={assignee.task_id}>
-                      <div style={styles.employeeTaskTop}>
-                        <div style={styles.employeeIdentity}>
-                          <div style={styles.avatar}>
-                            {getInitial(assignee.assigned_name)}
+              <div
+                style={
+                  styles.employeeTaskList
+                }
+              >
+                {selectedTask.main_task_assignees.map(
+                  (assignee) => (
+                    <div
+                      style={
+                        styles.employeeTaskCard
+                      }
+                      key={assignee.task_id}
+                    >
+                      <div
+                        style={
+                          styles.employeeTaskTop
+                        }
+                      >
+                        <div
+                          style={
+                            styles.employeeIdentity
+                          }
+                        >
+                          <div
+                            style={
+                              styles.avatar
+                            }
+                          >
+                            {getInitial(
+                              assignee.assigned_name
+                            )}
                           </div>
 
                           <div>
-                            <h4 style={styles.assigneeName}>
-                              {assignee.assigned_name || "-"}
+                            <h4
+                              style={
+                                styles.assigneeName
+                              }
+                            >
+                              {assignee.assigned_name ||
+                                "-"}
                             </h4>
-                            <p style={styles.assigneeEmail}>
-                              {assignee.assigned_email || "-"}
+
+                            <p
+                              style={
+                                styles.assigneeEmail
+                              }
+                            >
+                              {assignee.assigned_email ||
+                                "-"}
                             </p>
-                            <span style={styles.assigneeMeta}>
-                              {assignee.assigned_employee_code || "-"} ·{" "}
-                              {assignee.assigned_designation || "-"} ·{" "}
-                              {assignee.status_label || "To Do"}
-                            </span>
                           </div>
                         </div>
 
-                        <strong style={styles.employeeProgressNumber}>
-                          {assignee.progress || 0}%
+                        <strong
+                          style={
+                            styles.employeeProgressNumber
+                          }
+                        >
+                          {assignee.progress ||
+                            0}
+                          %
                         </strong>
                       </div>
 
-                      <div style={styles.progressTrack}>
+                      <div
+                        style={
+                          styles.progressTrack
+                        }
+                      >
                         <div
                           style={{
                             ...styles.progressFill,
-                            width: `${assignee.progress || 0}%`,
+                            width: `${
+                              assignee.progress ||
+                              0
+                            }%`,
                           }}
                         />
                       </div>
 
-                      <p style={styles.subtaskCount}>
-                        {assignee.completed_subtasks || 0}/
-                        {assignee.total_subtasks || 0} subtasks done
+                      <p
+                        style={styles.subtaskCount}
+                      >
+                        {
+                          assignee.completed_subtasks
+                        }
+                        /
+                        {
+                          assignee.total_subtasks
+                        }{" "}
+                        subtasks done
                       </p>
 
-                      <div style={styles.subtaskList}>
-                        {assignee.subtasks && assignee.subtasks.length > 0 ? (
-                          assignee.subtasks.map((subtask) => (
-                            <div
-                              style={styles.subtaskRow}
-                              key={
-                                subtask.subtask_key ||
-                                `${assignee.task_id}-${subtask.subtask_id}`
-                              }
-                            >
-                              <span
+                      <div
+                        style={
+                          styles.subtaskList
+                        }
+                      >
+                        {assignee.subtasks &&
+                        assignee.subtasks.length >
+                          0 ? (
+                          assignee.subtasks.map(
+                            (subtask) => (
+                              <div
                                 style={
-                                  normalizeStatus(subtask.status) === "done"
-                                    ? styles.doneDot
-                                    : styles.pendingDot
+                                  styles.subtaskRow
                                 }
-                              />
+                                key={
+                                  subtask.subtask_key ||
+                                  `${assignee.task_id}-${subtask.subtask_id}`
+                                }
+                              >
+                                <span
+                                  style={
+                                    normalizeStatus(
+                                      subtask.status
+                                    ) ===
+                                    "done"
+                                      ? styles.doneDot
+                                      : styles.pendingDot
+                                  }
+                                />
 
-                              <div>
-                                <strong style={styles.subtaskTitle}>
-                                  {subtask.title}
-                                </strong>
-                                <p style={styles.subtaskMeta}>
-                                  {formatDate(subtask.start_date)} to{" "}
-                                  {formatDate(subtask.end_date)} ·{" "}
-                                  {getStatusLabel(subtask.status)}
-                                </p>
+                                <div>
+                                  <strong
+                                    style={
+                                      styles.subtaskTitle
+                                    }
+                                  >
+                                    {
+                                      subtask.title
+                                    }
+                                  </strong>
+
+                                  <p
+                                    style={
+                                      styles.subtaskMeta
+                                    }
+                                  >
+                                    {formatDate(
+                                      subtask.start_date
+                                    )}{" "}
+                                    to{" "}
+                                    {formatDate(
+                                      subtask.end_date
+                                    )}{" "}
+                                    ·{" "}
+                                    {getStatusLabel(
+                                      subtask.status
+                                    )}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          ))
+                            )
+                          )
                         ) : (
-                          <div style={styles.noSubtasks}>
+                          <div
+                            style={
+                              styles.noSubtasks
+                            }
+                          >
                             No subtasks added by{" "}
-                            {assignee.assigned_name || "employee"}.
+                            {assignee.assigned_name ||
+                              "employee"}
+                            .
                           </div>
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  )
+                )}
+              </div>
             </section>
           </div>
         </div>
@@ -785,307 +1281,302 @@ const AdminTasks = () => {
 const styles = {
   page: {
     width: "100%",
+    paddingBottom: "32px",
   },
 
   topActions: {
-    width: "100%",
     display: "flex",
     justifyContent: "flex-end",
-    alignItems: "center",
-    marginBottom: "22px",
+    marginBottom: "14px",
   },
 
   refreshButton: {
     border: "none",
+    borderRadius: "12px",
     background: "#ff5733",
     color: "#ffffff",
-    borderRadius: "16px",
-    padding: "15px 24px",
-    fontSize: "16px",
+    padding: "12px 20px",
     fontWeight: 900,
     cursor: "pointer",
-    boxShadow: "0 12px 28px rgba(255, 87, 51, 0.2)",
   },
 
   errorBox: {
     background: "#fff1f2",
-    color: "#b91c1c",
     border: "1px solid #fecdd3",
-    borderRadius: "18px",
-    padding: "16px 18px",
-    fontSize: "15px",
+    color: "#b91c1c",
+    padding: "14px",
+    borderRadius: "14px",
+    marginBottom: "14px",
     fontWeight: 800,
-    marginBottom: "22px",
   },
 
   searchInput: {
     width: "100%",
-    height: "58px",
-    border: "1.5px solid #cbd5e1",
-    borderRadius: "16px",
-    background: "#ffffff",
-    padding: "0 22px",
-    fontSize: "16px",
-    fontWeight: 800,
-    color: "#111827",
+    height: "52px",
+    border: "1px solid #d8dee7",
+    borderRadius: "14px",
+    padding: "0 18px",
+    fontSize: "14px",
+    fontWeight: 700,
     outline: "none",
-    marginBottom: "28px",
+    marginBottom: "20px",
+    boxSizing: "border-box",
   },
 
   kanbanSection: {
-    marginTop: "28px",
+    width: "100%",
     background: "#ffffff",
-    borderRadius: "26px",
-    padding: "26px",
-    boxShadow: "0 14px 36px rgba(15, 23, 42, 0.06)",
+    borderRadius: "22px",
+    padding: "22px",
+    border: "1px solid #edf0f4",
+    boxShadow:
+      "0 8px 26px rgba(15, 23, 42, 0.045)",
+    boxSizing: "border-box",
   },
 
   kanbanHeader: {
-    marginBottom: "22px",
+    marginBottom: "18px",
   },
 
   kanbanTitle: {
-    margin: "0 0 8px",
-    color: "#111827",
-    fontSize: "30px",
+    margin: "0 0 6px",
+    fontSize: "27px",
     fontWeight: 900,
+    color: "#111827",
   },
 
   kanbanSubtitle: {
     margin: 0,
+    fontSize: "13px",
     color: "#64748b",
-    fontSize: "16px",
-    lineHeight: 1.45,
   },
 
-  messageBox: {
-    border: "1px dashed #cbd5e1",
-    borderRadius: "18px",
-    padding: "34px",
-    textAlign: "center",
-    color: "#94a3b8",
-    fontWeight: 900,
-    background: "#f8fafc",
+  kanbanViewport: {
+    width: "100%",
+    overflow: "hidden",
   },
 
   kanbanScroll: {
     width: "100%",
     overflowX: "auto",
-    paddingBottom: "14px",
+    overflowY: "hidden",
+    paddingBottom: "12px",
+    position: "relative",
   },
 
   kanbanBoard: {
-    minWidth: "1280px",
     display: "grid",
-    gridTemplateColumns: "repeat(6, 360px)",
-    gap: "20px",
+    gridTemplateColumns:
+      "repeat(6, 420px)",
+    gap: "18px",
+    width: "max-content",
+    position: "relative",
   },
 
   kanbanColumn: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "22px",
-    padding: "18px",
-    minHeight: "500px",
-    background: "#ffffff",
+    width: "420px",
+    boxSizing: "border-box",
+    border: "1px solid #e5e9ef",
+    borderRadius: "18px",
+    padding: "14px",
+    minHeight: "480px",
+    background: "#fbfcfe",
   },
 
   columnHeader: {
-    background: "#f8fafc",
-    borderRadius: "18px",
-    padding: "18px",
+    background: "#f5f7fa",
+    borderRadius: "14px",
+    padding: "14px 16px",
     display: "flex",
-    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "16px",
+    marginBottom: "14px",
   },
 
   columnTitle: {
-    margin: "0 0 8px",
-    color: "#111827",
-    fontSize: "23px",
+    margin: "0 0 5px",
+    fontSize: "18px",
     fontWeight: 900,
+    color: "#111827",
   },
 
   columnSubtitle: {
     margin: 0,
-    color: "#64748b",
-    fontSize: "14px",
-    fontWeight: 700,
+    fontSize: "12px",
+    color: "#718096",
   },
 
   columnCount: {
-    width: "46px",
-    height: "46px",
+    width: "36px",
+    height: "36px",
     borderRadius: "50%",
-    background: "#e5e7eb",
-    color: "#111827",
+    background: "#e7ebf0",
     display: "grid",
     placeItems: "center",
-    fontSize: "16px",
     fontWeight: 900,
-    flexShrink: 0,
   },
 
-columnBody: {
-  display: "flex",
-  flexDirection: "column",
-  gap: "14px",
-  maxHeight: "500px",
-  overflowY: "auto",
-  paddingRight: "8px",
-},
+  columnBody: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "11px",
+    maxHeight: "460px",
+    overflowY: "auto",
+    paddingRight: "4px",
+  },
 
-taskTile: {
+  taskTile: {
   width: "100%",
-  minHeight: "155px",
-  border: "1px solid #e5e7eb",
+  minHeight: "120px",
+  boxSizing: "border-box",
+  border: "1px solid #e4e8ee",
   background: "#ffffff",
-  borderRadius: "18px",
-  padding: "16px 18px",
+  borderRadius: "14px",
+  padding: "14px",
   textAlign: "left",
   cursor: "pointer",
-  boxShadow: "0 10px 24px rgba(15, 23, 42, 0.04)",
   display: "flex",
   flexDirection: "column",
   justifyContent: "space-between",
-  gap: "14px",
-  overflow: "hidden",
+  alignItems: "stretch",
+  gap: "12px",
+  position: "relative",
+  zIndex: 2,
+  pointerEvents: "auto",
+  boxShadow: "0 4px 12px rgba(15, 23, 42, 0.035)",
 },
 
-tileContent: {
+
+  tileContent: {
   width: "100%",
   minWidth: 0,
   textAlign: "left",
-  overflow: "hidden",
+  alignSelf: "stretch",
 },
 
-tileMainTaskTitle: {
-  margin: "0 0 7px",
-  color: "#111827",
-  fontSize: "15px",
+  tileMainTaskTitle: {
+  margin: "0 0 6px",
+  fontSize: "14px",
   fontWeight: 900,
-  lineHeight: 1.22,
+  color: "#111827",
+  lineHeight: 1.3,
   textAlign: "left",
+  width: "100%",
   wordBreak: "break-word",
-  overflow: "hidden",
-  display: "-webkit-box",
-  WebkitLineClamp: 3,
-  WebkitBoxOrient: "vertical",
 },
 
-tileProjectName: {
+
+  tileProjectName: {
   margin: 0,
+  fontSize: "12px",
   color: "#64748b",
-  fontSize: "13px",
-  fontWeight: 800,
-  lineHeight: 1.25,
+  fontWeight: 700,
   textAlign: "left",
-  wordBreak: "break-word",
-  overflow: "hidden",
+  width: "100%",
   whiteSpace: "nowrap",
+  overflow: "hidden",
   textOverflow: "ellipsis",
 },
 
-tileBottomRow: {
+
+ tileBottomRow: {
   width: "100%",
   display: "flex",
-  alignItems: "center",
   justifyContent: "space-between",
-  gap: "12px",
+  alignItems: "center",
+  gap: "10px",
   marginTop: "auto",
 },
-
-tileSubtaskText: {
+  tileSubtaskText: {
+  fontSize: "10px",
   color: "#94a3b8",
-  fontSize: "11px",
-  fontWeight: 900,
+  fontWeight: 800,
   textAlign: "left",
-  lineHeight: 1.2,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  maxWidth: "210px",
+  flex: 1,
 },
 
-tileAvatarGroup: {
+  tileAvatarGroup: {
   display: "flex",
   alignItems: "center",
   justifyContent: "flex-end",
-  gap: "5px",
-  flexWrap: "nowrap",
+  gap: "4px",
   flexShrink: 0,
   marginLeft: "auto",
 },
 
-tileAvatar: {
-  width: "28px",
-  height: "28px",
-  borderRadius: "8px",
+
+  tileAvatar: {
+  width: "25px",
+  height: "25px",
+  borderRadius: "7px",
   background: "#ff5733",
   color: "#ffffff",
   display: "grid",
   placeItems: "center",
-  fontSize: "11px",
+  fontSize: "10px",
   fontWeight: 900,
-  boxShadow: "0 8px 18px rgba(255, 87, 51, 0.22)",
+  flexShrink: 0,
 },
 
-tileNoEmployee: {
-  width: "28px",
-  height: "28px",
-  borderRadius: "50%",
-  border: "2px solid #ffb7a7",
-  color: "#ff5733",
-  display: "grid",
-  placeItems: "center",
-  fontSize: "11px",
-  fontWeight: 900,
-},
-
-  emptyBox: {
+  messageBox: {
     border: "1px dashed #cbd5e1",
     borderRadius: "16px",
-    padding: "24px",
+    padding: "30px",
     textAlign: "center",
     color: "#94a3b8",
-    fontWeight: 900,
-    background: "#f8fafc",
+    fontWeight: 800,
+  },
+
+  emptyBox: {
+    border: "1px dashed #d5dce5",
+    borderRadius: "14px",
+    padding: "22px",
+    textAlign: "center",
+    color: "#9aa7b5",
+    fontWeight: 800,
+    background: "#ffffff",
+  },
+
+  miniTasksGap: {
+    marginTop: "32px",
   },
 
   modalOverlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(15, 23, 42, 0.68)",
+    background:
+      "rgba(15, 23, 42, 0.68)",
     zIndex: 9999,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "34px",
+    padding: "28px",
   },
 
   modal: {
     position: "relative",
-    width: "min(1240px, 96vw)",
+    width: "min(1150px, 95vw)",
     maxHeight: "90vh",
     overflowY: "auto",
     background: "#ffffff",
-    borderRadius: "26px",
-    padding: "34px",
-    boxShadow: "0 26px 70px rgba(15, 23, 42, 0.3)",
+    borderRadius: "24px",
+    padding: "30px",
+    boxSizing: "border-box",
+    boxShadow:
+      "0 28px 80px rgba(15, 23, 42, 0.32)",
   },
 
   closeButton: {
-    position: "sticky",
-    top: "0px",
-    float: "right",
+    position: "absolute",
+    top: "18px",
+    right: "18px",
     width: "42px",
     height: "42px",
     border: "none",
-    background: "transparent",
+    borderRadius: "12px",
+    background: "#f8fafc",
     color: "#111827",
-    fontSize: "34px",
-    lineHeight: "34px",
+    fontSize: "28px",
     cursor: "pointer",
     zIndex: 20,
   },
@@ -1095,67 +1586,71 @@ tileNoEmployee: {
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: "20px",
-    borderBottom: "1px solid #eef2f7",
-    paddingBottom: "22px",
-    marginBottom: "22px",
+    paddingRight: "60px",
+    paddingBottom: "20px",
+    borderBottom: "1px solid #edf0f4",
+    marginBottom: "20px",
   },
 
   modalTitle: {
-    margin: "0 0 10px",
-    color: "#111827",
-    fontSize: "34px",
+    margin: "0 0 8px",
+    fontSize: "30px",
+    lineHeight: 1.25,
     fontWeight: 900,
-    paddingRight: "50px",
+    color: "#111827",
   },
 
   modalSubtitle: {
     margin: 0,
     color: "#64748b",
-    fontSize: "16px",
+    fontSize: "14px",
   },
 
   modalStatus: {
     background: "#eef2ff",
     color: "#334155",
     borderRadius: "999px",
-    padding: "10px 14px",
-    fontSize: "14px",
+    padding: "9px 14px",
+    fontSize: "13px",
     fontWeight: 900,
     whiteSpace: "nowrap",
+    flexShrink: 0,
   },
 
   infoGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "16px",
-    marginBottom: "22px",
+    gridTemplateColumns:
+      "repeat(4, minmax(0, 1fr))",
+    gap: "14px",
+    marginBottom: "20px",
   },
 
   infoBox: {
+    minHeight: "90px",
+    boxSizing: "border-box",
     background: "#f8fafc",
     border: "1px solid #e5e7eb",
-    borderRadius: "18px",
-    padding: "18px",
-    minHeight: "96px",
+    borderRadius: "16px",
+    padding: "16px",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
-    gap: "8px",
+    gap: "7px",
   },
 
   modalProgressBox: {
     background: "#fff7f5",
     border: "1px solid #fecaca",
-    borderRadius: "18px",
-    padding: "18px",
-    marginBottom: "24px",
+    borderRadius: "16px",
+    padding: "16px",
+    marginBottom: "22px",
   },
 
   modalProgressTop: {
     display: "flex",
     justifyContent: "space-between",
-    gap: "16px",
-    marginBottom: "12px",
+    gap: "14px",
+    marginBottom: "10px",
   },
 
   progressTrack: {
@@ -1172,77 +1667,153 @@ tileNoEmployee: {
     borderRadius: "999px",
   },
 
+  reviewSection: {
+    background: "#f8fafc",
+    border: "1px solid #e5e7eb",
+    borderRadius: "18px",
+    padding: "18px",
+    marginBottom: "22px",
+  },
+
+  reviewTitle: {
+    margin: "0 0 6px",
+    fontSize: "21px",
+    fontWeight: 900,
+  },
+
+  reviewSubtitle: {
+    margin: "0 0 14px",
+    color: "#64748b",
+    fontSize: "13px",
+  },
+
+  reviewErrorBox: {
+    background: "#fff1f2",
+    border: "1px solid #fecdd3",
+    color: "#b91c1c",
+    borderRadius: "12px",
+    padding: "11px 13px",
+    marginBottom: "12px",
+    fontWeight: 800,
+  },
+
+  reviewField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    fontWeight: 900,
+    marginBottom: "14px",
+  },
+
+  reviewTextarea: {
+    width: "100%",
+    minHeight: "110px",
+    resize: "vertical",
+    boxSizing: "border-box",
+    border: "1px solid #cbd5e1",
+    borderRadius: "14px",
+    padding: "13px",
+    outline: "none",
+  },
+
+  reviewButtons: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+
+  approveButton: {
+    border: "none",
+    borderRadius: "12px",
+    background: "#16a34a",
+    color: "#ffffff",
+    padding: "12px 18px",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  holdButton: {
+    border: "none",
+    borderRadius: "12px",
+    background: "#111827",
+    color: "#ffffff",
+    padding: "12px 18px",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  rejectButton: {
+    border: "none",
+    borderRadius: "12px",
+    background: "#dc2626",
+    color: "#ffffff",
+    padding: "12px 18px",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
   modalSection: {
-    marginTop: "26px",
+    marginTop: "24px",
   },
 
   modalSectionTitle: {
+    margin: "0 0 14px",
+    fontSize: "22px",
     color: "#111827",
-    fontSize: "25px",
     fontWeight: 900,
-    margin: "0 0 16px",
   },
 
   assigneeGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "14px",
+    gridTemplateColumns:
+      "repeat(2, minmax(0, 1fr))",
+    gap: "12px",
   },
 
   assigneeCard: {
     display: "grid",
-    gridTemplateColumns: "54px 1fr",
-    gap: "14px",
+    gridTemplateColumns: "50px 1fr",
+    gap: "12px",
     alignItems: "center",
     border: "1px solid #e5e7eb",
-    borderRadius: "18px",
-    padding: "16px",
+    borderRadius: "16px",
+    padding: "14px",
     background: "#ffffff",
   },
 
   avatar: {
-    width: "54px",
-    height: "54px",
-    borderRadius: "16px",
+    width: "50px",
+    height: "50px",
+    borderRadius: "14px",
     background: "#ff5733",
     color: "#ffffff",
     display: "grid",
     placeItems: "center",
-    fontSize: "18px",
     fontWeight: 900,
   },
 
   assigneeName: {
-    margin: "0 0 5px",
-    color: "#111827",
-    fontSize: "16px",
+    margin: "0 0 4px",
     fontWeight: 900,
+    color: "#111827",
   },
 
   assigneeEmail: {
-    margin: "0 0 5px",
-    color: "#64748b",
-    fontSize: "13px",
-    fontWeight: 700,
-    overflowWrap: "anywhere",
-  },
-
-  assigneeMeta: {
+    margin: 0,
     color: "#64748b",
     fontSize: "12px",
-    fontWeight: 800,
   },
 
   employeeTaskList: {
     display: "flex",
     flexDirection: "column",
-    gap: "16px",
+    gap: "14px",
   },
 
   employeeTaskCard: {
     border: "1px solid #e5e7eb",
-    borderRadius: "20px",
-    padding: "18px",
+    borderRadius: "18px",
+    padding: "16px",
     background: "#ffffff",
   },
 
@@ -1250,82 +1821,79 @@ tileNoEmployee: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: "18px",
-    marginBottom: "16px",
+    gap: "14px",
+    marginBottom: "14px",
   },
 
   employeeIdentity: {
     display: "grid",
-    gridTemplateColumns: "54px 1fr",
-    gap: "14px",
+    gridTemplateColumns: "50px 1fr",
+    gap: "12px",
     alignItems: "center",
   },
 
   employeeProgressNumber: {
     color: "#ff5733",
-    fontSize: "22px",
+    fontSize: "20px",
     fontWeight: 900,
   },
 
   subtaskCount: {
-    margin: "10px 0 14px",
+    margin: "9px 0 12px",
     color: "#64748b",
-    fontSize: "13px",
-    fontWeight: 900,
+    fontSize: "12px",
+    fontWeight: 800,
   },
 
   subtaskList: {
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
+    gap: "9px",
   },
 
   subtaskRow: {
     display: "grid",
-    gridTemplateColumns: "18px 1fr",
-    gap: "12px",
-    alignItems: "flex-start",
+    gridTemplateColumns: "16px 1fr",
+    gap: "10px",
     background: "#f8fafc",
     border: "1px solid #e5e7eb",
-    borderRadius: "14px",
-    padding: "12px",
+    borderRadius: "12px",
+    padding: "11px",
   },
 
   pendingDot: {
-    width: "12px",
-    height: "12px",
+    width: "10px",
+    height: "10px",
     borderRadius: "50%",
     background: "#cbd5e1",
     marginTop: "5px",
   },
 
   doneDot: {
-    width: "12px",
-    height: "12px",
+    width: "10px",
+    height: "10px",
     borderRadius: "50%",
     background: "#22c55e",
     marginTop: "5px",
   },
 
   subtaskTitle: {
-    color: "#111827",
-    fontSize: "14px",
     fontWeight: 900,
+    color: "#111827",
   },
 
   subtaskMeta: {
     margin: "4px 0 0",
     color: "#64748b",
-    fontSize: "12px",
-    fontWeight: 700,
+    fontSize: "11px",
   },
 
   noSubtasks: {
     border: "1px dashed #cbd5e1",
-    borderRadius: "14px",
-    padding: "14px",
+    borderRadius: "12px",
+    padding: "12px",
     color: "#94a3b8",
-    fontWeight: 900,
+    fontWeight: 800,
     background: "#f8fafc",
   },
 };

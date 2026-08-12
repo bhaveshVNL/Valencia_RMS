@@ -314,6 +314,10 @@ const AdminProjects = () => {
   const [editAssigneeSearch, setEditAssigneeSearch] = useState("");
 
   const [editingMainTaskId, setEditingMainTaskId] = useState(null);
+  const [reviewRemark, setReviewRemark] = useState("");
+  const [reviewActionLoading, setReviewActionLoading] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSuccess, setReviewSuccess] = useState("");
 
   const [newProject, setNewProject] = useState({
     project_title: "",
@@ -553,6 +557,9 @@ const fetchUsers = async () => {
 
     setSelectedProject(normalizedProject);
     setShowEditProjectModal(false);
+    setReviewRemark("");
+    setReviewError("");
+    setReviewSuccess("");
 
     setEditProject({
       project_title: normalizedProject.project_title || "",
@@ -575,6 +582,9 @@ const fetchUsers = async () => {
   const closeProjectDetails = () => {
     setSelectedProject(null);
     setShowEditProjectModal(false);
+    setReviewRemark("");
+    setReviewError("");
+    setReviewSuccess("");
 
     setNewMainTask({
       task_title: "",
@@ -973,6 +983,57 @@ const fetchUsers = async () => {
       );
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleProjectReviewAction = async (action) => {
+    if (!selectedProject?.project_id || reviewActionLoading) return;
+
+    setReviewError("");
+    setReviewSuccess("");
+
+    if (
+      (action === "reject" || action === "on_hold") &&
+      !reviewRemark.trim()
+    ) {
+      setReviewError(
+        "Please add a remark before rejecting or putting the project on hold."
+      );
+      return;
+    }
+
+    setReviewActionLoading(true);
+
+    try {
+      const projectId = selectedProject.project_id;
+
+      const response = await api.post(
+        `/admin-review/projects/${projectId}/action`,
+        {
+          action,
+          remark: reviewRemark.trim(),
+        }
+      );
+
+      const message =
+        response?.data?.message || "Project review updated successfully.";
+
+      setReviewSuccess(message);
+      setSuccessMessage(message);
+      setReviewRemark("");
+
+      await fetchProjects();
+      closeProjectDetails();
+    } catch (err) {
+      console.error("Project review action failed:", err);
+
+      setReviewError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update project review."
+      );
+    } finally {
+      setReviewActionLoading(false);
     }
   };
 
@@ -1386,7 +1447,79 @@ const fetchUsers = async () => {
               </div>
             </div>
 
-           {canEditMainTasks(selectedProject.status) && (
+            {normalizeStatus(selectedProject.status) === "under_review" && (
+              <section style={styles.reviewActionSection}>
+                <div style={styles.reviewActionHeader}>
+                  <div>
+                    <h3 style={styles.reviewActionTitle}>Project Review</h3>
+                    <p style={styles.reviewActionSubtitle}>
+                      Approve this project, place it on hold, or reject it.
+                    </p>
+                  </div>
+                </div>
+
+                {reviewError && (
+                  <div style={styles.reviewInlineError}>{reviewError}</div>
+                )}
+
+                {reviewSuccess && (
+                  <div style={styles.reviewInlineSuccess}>{reviewSuccess}</div>
+                )}
+
+                <label style={styles.reviewRemarkField}>
+                  <span>Remark</span>
+                  <textarea
+                    value={reviewRemark}
+                    onChange={(event) => setReviewRemark(event.target.value)}
+                    placeholder="Add your review remark..."
+                    disabled={reviewActionLoading}
+                  />
+                </label>
+
+                <div style={styles.reviewActionButtons}>
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.approveButton,
+                      ...(reviewActionLoading ? styles.disabledReviewButton : {}),
+                    }}
+                    disabled={reviewActionLoading}
+                    onClick={() => handleProjectReviewAction("done")}
+                  >
+                    <CheckCircle2 size={18} />
+                    {reviewActionLoading ? "Processing..." : "Approve"}
+                  </button>
+
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.holdButton,
+                      ...(reviewActionLoading ? styles.disabledReviewButton : {}),
+                    }}
+                    disabled={reviewActionLoading}
+                    onClick={() => handleProjectReviewAction("on_hold")}
+                  >
+                    <PauseCircle size={18} />
+                    On Hold
+                  </button>
+
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.rejectButton,
+                      ...(reviewActionLoading ? styles.disabledReviewButton : {}),
+                    }}
+                    disabled={reviewActionLoading}
+                    onClick={() => handleProjectReviewAction("reject")}
+                  >
+                    <XCircle size={18} />
+                    Reject
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {canEditMainTasks(selectedProject.status) && (
   <section style={styles.editSection}>
     <h3 style={styles.modalSectionTitle}>
       <Plus size={21} color="#ff5733" />
@@ -2393,6 +2526,118 @@ projectModalCloseButton: {
     background: "#ff5733",
     borderRadius: "999px",
   },
+
+  reviewActionSection: {
+  background: "#f8fafc",
+  border: "1px solid #e5e7eb",
+  borderRadius: "20px",
+  padding: "20px",
+  marginBottom: "24px",
+},
+
+reviewActionHeader: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  marginBottom: "16px",
+},
+
+reviewActionTitle: {
+  margin: "0 0 6px",
+  color: "#111827",
+  fontSize: "22px",
+  fontWeight: 900,
+},
+
+reviewActionSubtitle: {
+  margin: 0,
+  color: "#64748b",
+  fontSize: "14px",
+  fontWeight: 700,
+},
+
+reviewInlineError: {
+  background: "#fff1f2",
+  border: "1px solid #fecdd3",
+  color: "#b91c1c",
+  borderRadius: "14px",
+  padding: "12px 14px",
+  marginBottom: "14px",
+  fontSize: "14px",
+  fontWeight: 800,
+},
+
+reviewInlineSuccess: {
+  background: "#dcfce7",
+  border: "1px solid #bbf7d0",
+  color: "#166534",
+  borderRadius: "14px",
+  padding: "12px 14px",
+  marginBottom: "14px",
+  fontSize: "14px",
+  fontWeight: 800,
+},
+
+reviewRemarkField: {
+  display: "flex",
+  flexDirection: "column",
+  gap: "9px",
+  marginBottom: "16px",
+  color: "#111827",
+  fontSize: "14px",
+  fontWeight: 900,
+},
+
+reviewActionButtons: {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
+},
+
+approveButton: {
+  border: "none",
+  background: "#16a34a",
+  color: "#ffffff",
+  borderRadius: "14px",
+  padding: "13px 20px",
+  fontWeight: 900,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+},
+
+holdButton: {
+  border: "none",
+  background: "#111827",
+  color: "#ffffff",
+  borderRadius: "14px",
+  padding: "13px 20px",
+  fontWeight: 900,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+},
+
+rejectButton: {
+  border: "none",
+  background: "#dc2626",
+  color: "#ffffff",
+  borderRadius: "14px",
+  padding: "13px 20px",
+  fontWeight: 900,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+},
+
+disabledReviewButton: {
+  opacity: 0.65,
+  cursor: "not-allowed",
+},
 
   editSection: {
     background: "#f8fafc",
