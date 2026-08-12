@@ -474,8 +474,6 @@ const AdminTasks = () => {
         onChange={(e) => setSearchTerm(e.target.value)}
       />
 
-      <AdminDepartmentMiniTasks />
-
       <section style={styles.kanbanSection}>
         <div style={styles.kanbanHeader}>
           <div>
@@ -570,7 +568,9 @@ const AdminTasks = () => {
             </div>
           </div>
         )}
-      </section>
+            </section>
+
+      <AdminDepartmentMiniTasks />
 
       {selectedTask && (
         <div style={styles.modalOverlay}>

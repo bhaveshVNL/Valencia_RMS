@@ -1321,8 +1321,8 @@ const fetchUsers = async () => {
               <div style={styles.projectModalTitleBlock}>
                 <h2 style={styles.modalTitle}>{selectedProject.project_title}</h2>
                 <p style={styles.modalSubtitle}>
-                  View project details, add main tasks, and manage project progress.
-                </p>
+  View project details, manage tasks, and track project progress.
+</p>
               </div>
 
               <button
@@ -1386,82 +1386,86 @@ const fetchUsers = async () => {
               </div>
             </div>
 
-            <section style={styles.editSection}>
-              <h3 style={styles.modalSectionTitle}>
-                <Plus size={21} color="#ff5733" />
-                Add Main Task
-              </h3>
+           {canEditMainTasks(selectedProject.status) && (
+  <section style={styles.editSection}>
+    <h3 style={styles.modalSectionTitle}>
+      <Plus size={21} color="#ff5733" />
+      Add Main Task
+    </h3>
 
-              <p style={styles.panelSubtitle}>
-                Select one or more assignees from this project's assignees only.
-              </p>
+    <p style={styles.panelSubtitle}>
+      Select one or more assignees from this project's assignees only.
+    </p>
 
-              <label style={styles.field}>
-                <span>Main Task Title</span>
-                <input
-                  value={newMainTask.task_title}
-                  onChange={(event) =>
-                    setNewMainTask((previous) => ({
-                      ...previous,
-                      task_title: event.target.value,
-                    }))
-                  }
-                  placeholder="Example: Frontend dashboard"
-                />
-              </label>
+    <label style={styles.field}>
+      <span>Main Task Title</span>
+      <input
+        value={newMainTask.task_title}
+        onChange={(event) =>
+          setNewMainTask((previous) => ({
+            ...previous,
+            task_title: event.target.value,
+          }))
+        }
+        placeholder="Example: Frontend dashboard"
+      />
+    </label>
 
-              <label style={styles.field}>
-                <span>Main Task Description</span>
-                <textarea
-                  value={newMainTask.task_description}
-                  onChange={(event) =>
-                    setNewMainTask((previous) => ({
-                      ...previous,
-                      task_description: event.target.value,
-                    }))
-                  }
-                  placeholder="Write task details..."
-                />
-              </label>
+    <label style={styles.field}>
+      <span>Main Task Description</span>
+      <textarea
+        value={newMainTask.task_description}
+        onChange={(event) =>
+          setNewMainTask((previous) => ({
+            ...previous,
+            task_description: event.target.value,
+          }))
+        }
+        placeholder="Write task details..."
+      />
+    </label>
 
-              <div style={styles.taskAssigneeList}>
-                {selectedProjectAssignees.length === 0 ? (
-                  <div style={styles.emptyColumn}>
-                    Select project assignees first.
-                  </div>
-                ) : (
-                  selectedProjectAssignees.map((user) => {
-                    const userId = String(getUserId(user));
-                    const checked = newMainTask.assignee_ids
-                      .map(String)
-                      .includes(userId);
+    <div style={styles.taskAssigneeList}>
+      {selectedProjectAssignees.length === 0 ? (
+        <div style={styles.emptyColumn}>
+          Select project assignees first.
+        </div>
+      ) : (
+        selectedProjectAssignees.map((user) => {
+          const userId = String(getUserId(user));
 
-                    return (
-                      <label style={styles.taskAssigneeRow} key={userId}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleMainTaskAssignee(userId)}
-                        />
-                        <strong>{getUserName(user)}</strong>
-                        <span>{user.department_name || "-"}</span>
-                      </label>
-                    );
-                  })
-                )}
-              </div>
+          const checked = newMainTask.assignee_ids
+            .map(String)
+            .includes(userId);
 
-              <button
-                type="button"
-                style={styles.fullPrimaryButton}
-                onClick={addMainTask}
-                disabled={actionLoading}
-              >
-                <Plus size={19} />
-                {actionLoading ? "Adding..." : "Add Main Task"}
-              </button>
-            </section>
+          return (
+            <label style={styles.taskAssigneeRow} key={userId}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggleMainTaskAssignee(userId)}
+              />
 
+              <strong>{getUserName(user)}</strong>
+              <span>{user.department_name || "-"}</span>
+            </label>
+          );
+        })
+      )}
+    </div>
+
+    <button
+      type="button"
+      style={styles.fullPrimaryButton}
+      onClick={addMainTask}
+      disabled={actionLoading}
+    >
+      <Plus size={19} />
+      {actionLoading ? "Adding..." : "Add Main Task"}
+    </button>
+
+  </section>
+)}
             <section>
               <h3 style={styles.modalSectionTitle}>Main Tasks</h3>
 

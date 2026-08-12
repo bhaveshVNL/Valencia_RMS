@@ -1,9 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  // Vite proxies /api to the local backend. When the frontend is hosted
-  // separately, set VITE_API_URL to the public backend URL ending in /api.
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: "http://localhost:5000/api",
 });
 
 api.interceptors.request.use(
@@ -23,7 +21,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message =
-      error.response?.data?.message || error.response?.data?.error || "";
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      "";
 
     const lowerMessage = String(message).toLowerCase();
 

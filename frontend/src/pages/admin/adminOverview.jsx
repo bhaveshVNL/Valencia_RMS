@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Activity,
   CalendarCheck,
@@ -9,6 +10,8 @@ import {
 } from "lucide-react";
 import api from "../../api/axios";
 import AdminReviewPopup from "./AdminReviewPopup";
+
+console.log("YASH_TEST_123");
 
 const statusLabels = {
   todo: "To Do",
@@ -111,9 +114,13 @@ const styles = {
     fontSize: "14px",
   },
   activityList: {
-    display: "grid",
-    gap: "14px",
-  },
+  display: "grid",
+  gap: "14px",
+  maxHeight: "420px",
+  overflowY: "auto",
+  paddingRight: "8px",
+  scrollbarWidth: "thin",
+},
   activityItem: {
     border: "1px solid #edf0f4",
     background: "#f8fafc",
@@ -148,21 +155,35 @@ const styles = {
     fontSize: "13px",
     fontWeight: 700,
   },
-  attendanceCircle: {
-    width: "150px",
-    height: "150px",
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, #ff5733, #ff8a65)",
-    color: "#ffffff",
-    display: "grid",
-    placeItems: "center",
-    margin: "4px auto 18px",
-    boxShadow: "0 16px 30px rgba(255,87,51,0.25)",
-  },
-  attendanceNumber: {
-    fontSize: "38px",
-    fontWeight: 900,
-  },
+  attendanceBarContainer: {
+  width: "100%",
+  margin: "20px 0",
+},
+
+attendanceBarLabel: {
+  display: "flex",
+  justifyContent: "space-between",
+  marginBottom: "10px",
+  color: "#111827",
+  fontSize: "15px",
+  fontWeight: 800,
+},
+
+attendanceBarTrack: {
+  width: "100%",
+  height: "22px",
+  background: "#f1f5f9",
+  borderRadius: "999px",
+  overflow: "hidden",
+  border: "1px solid #edf0f4",
+},
+
+attendanceBarFill: {
+  height: "100%",
+  background: "linear-gradient(90deg, #ff5733, #ff8a65)",
+  borderRadius: "999px",
+  transition: "width 0.4s ease",
+},
   miniGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, 1fr)",
@@ -197,6 +218,8 @@ const styles = {
 };
 
 const AdminOverview = () => {
+  const navigate = useNavigate();
+
   const [profile, setProfile] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState({});
@@ -364,38 +387,93 @@ const AdminOverview = () => {
       {message && <div style={styles.warning}>{message}</div>}
 
       <section style={styles.statsGrid}>
-        <div style={styles.statCard}>
-          <div style={styles.statIcon}>
-            <Users size={21} />
-          </div>
-          <span style={styles.statLabel}>Department Users</span>
-          <strong style={styles.statValue}>{totalUsers}</strong>
-        </div>
+  <div
+    style={{
+      ...styles.statCard,
+      cursor: "pointer",
+      transition: "0.2s ease",
+    }}
+    onClick={() => navigate("/admin/users")}
+  >
+    <div style={styles.statIcon}>
+      <Users size={21} />
+    </div>
 
-        <div style={styles.statCard}>
-          <div style={styles.statIcon}>
-            <FolderKanban size={21} />
-          </div>
-          <span style={styles.statLabel}>Department Projects</span>
-          <strong style={styles.statValue}>{totalProjects}</strong>
-        </div>
+    <span style={styles.statLabel}>
+      Department Users
+    </span>
 
-        <div style={styles.statCard}>
-          <div style={styles.statIcon}>
-            <ClipboardList size={21} />
-          </div>
-          <span style={styles.statLabel}>Department Tasks</span>
-          <strong style={styles.statValue}>{totalTasks}</strong>
-        </div>
+    <strong style={styles.statValue}>
+      {totalUsers}
+    </strong>
+  </div>
 
-        <div style={styles.statCard}>
-          <div style={styles.statIcon}>
-            <CheckCircle2 size={21} />
-          </div>
-          <span style={styles.statLabel}>Completed Tasks</span>
-          <strong style={styles.statValue}>{completedTasks}</strong>
-        </div>
-      </section>
+
+  <div
+    style={{
+      ...styles.statCard,
+      cursor: "pointer",
+      transition: "0.2s ease",
+    }}
+    onClick={() => navigate("/admin/projects")}
+  >
+    <div style={styles.statIcon}>
+      <FolderKanban size={21} />
+    </div>
+
+    <span style={styles.statLabel}>
+      Department Projects
+    </span>
+
+    <strong style={styles.statValue}>
+      {totalProjects}
+    </strong>
+  </div>
+
+
+  <div
+    style={{
+      ...styles.statCard,
+      cursor: "pointer",
+      transition: "0.2s ease",
+    }}
+    onClick={() => navigate("/admin/tasks")}
+  >
+    <div style={styles.statIcon}>
+      <ClipboardList size={21} />
+    </div>
+
+    <span style={styles.statLabel}>
+      Department Tasks
+    </span>
+
+    <strong style={styles.statValue}>
+      {totalTasks}
+    </strong>
+  </div>
+
+
+  <div
+    style={{
+      ...styles.statCard,
+      cursor: "pointer",
+      transition: "0.2s ease",
+    }}
+    onClick={() => navigate("/admin/tasks")}
+  >
+    <div style={styles.statIcon}>
+      <CheckCircle2 size={21} />
+    </div>
+
+    <span style={styles.statLabel}>
+      Completed Tasks
+    </span>
+
+    <strong style={styles.statValue}>
+      {completedTasks}
+    </strong>
+  </div>
+</section>
 
       <AdminReviewPopup />
 
@@ -439,10 +517,23 @@ const AdminOverview = () => {
             Department attendance summary for {adminName}.
           </p>
 
-          <div style={styles.attendanceCircle}>
-            <span style={styles.attendanceNumber}>{attendancePercentage}%</span>
-          </div>
+          <div style={styles.attendanceBarContainer}>
 
+  <div style={styles.attendanceBarLabel}>
+    <span>Attendance Completion</span>
+    <strong>{attendancePercentage}%</strong>
+  </div>
+
+  <div style={styles.attendanceBarTrack}>
+    <div
+      style={{
+        ...styles.attendanceBarFill,
+        width: `${attendancePercentage}%`,
+      }}
+    />
+  </div>
+
+</div>
           <div style={styles.miniGrid}>
             <div style={styles.miniCard}>
               <strong style={styles.miniValue}>
