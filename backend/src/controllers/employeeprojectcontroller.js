@@ -328,13 +328,16 @@ const getEmployeeProjects = async (req, res) => {
         p.project_title,
         p.project_description,
         p.project_description AS description,
+
         p.status,
         p.status AS project_status,
+
         COALESCE(p.overall_progress, 0) AS overall_progress,
         COALESCE(p.overall_progress, 0) AS progress,
 
         DATE_FORMAT(p.start_date, '%Y-%m-%d') AS start_date,
         DATE_FORMAT(p.start_date, '%Y-%m-%d') AS project_start_date,
+
         DATE_FORMAT(p.due_date, '%Y-%m-%d') AS end_date,
         DATE_FORMAT(p.due_date, '%Y-%m-%d') AS due_date,
         DATE_FORMAT(p.due_date, '%Y-%m-%d') AS project_end_date,
@@ -349,7 +352,7 @@ const getEmployeeProjects = async (req, res) => {
         t.task_title,
         t.task_description,
         t.status AS task_status,
-        t.progress AS task_progress,
+        COALESCE(t.progress, 0) AS task_progress,
 
         (
           SELECT COUNT(*)
@@ -362,33 +365,42 @@ const getEmployeeProjects = async (req, res) => {
           FROM tasks st
           WHERE st.parent_task_id = t.task_id
           AND (
-            LOWER(COALESCE(st.status, '')) IN ('completed', 'done', 'complete')
+            LOWER(COALESCE(st.status, '')) IN (
+              'completed',
+              'done',
+              'complete'
+            )
             OR COALESCE(st.is_checked, 0) = 1
           )
         ) AS completed_subtasks,
 
         (
-          SELECT GROUP_CONCAT(DISTINCT au.full_name ORDER BY au.full_name SEPARATOR ', ')
-          FROM tasks at
+          SELECT GROUP_CONCAT(
+            DISTINCT au.full_name
+            ORDER BY au.full_name
+            SEPARATOR ', '
+          )
+          FROM project_assignments pa_all
           LEFT JOIN users au
-            ON au.user_id = at.assigned_to_user_id
-          WHERE at.project_id = p.project_id
-          AND (at.parent_task_id IS NULL OR at.parent_task_id = 0)
+            ON au.user_id = pa_all.employee_id
+          WHERE pa_all.project_id = p.project_id
+          AND COALESCE(pa_all.assignment_status, 'assigned') <> 'removed'
         ) AS assigned_names,
 
         (
-          SELECT GROUP_CONCAT(DISTINCT au.email ORDER BY au.email SEPARATOR ', ')
-          FROM tasks at
+          SELECT GROUP_CONCAT(
+            DISTINCT au.email
+            ORDER BY au.email
+            SEPARATOR ', '
+          )
+          FROM project_assignments pa_all
           LEFT JOIN users au
-            ON au.user_id = at.assigned_to_user_id
-          WHERE at.project_id = p.project_id
-          AND (at.parent_task_id IS NULL OR at.parent_task_id = 0)
+            ON au.user_id = pa_all.employee_id
+          WHERE pa_all.project_id = p.project_id
+          AND COALESCE(pa_all.assignment_status, 'assigned') <> 'removed'
         ) AS assigned_emails
 
-      FROM tasks t
-
-      INNER JOIN projects p
-        ON p.project_id = t.project_id
+      FROM projects p
 
       LEFT JOIN departments d
         ON d.department_id = p.department_id
@@ -396,19 +408,53 @@ const getEmployeeProjects = async (req, res) => {
       LEFT JOIN users creator
         ON creator.user_id = p.created_by_user_id
 
-      WHERE t.assigned_to_user_id = ?
-      AND (t.parent_task_id IS NULL OR t.parent_task_id = 0)
+      LEFT JOIN tasks t
+        ON t.task_id = (
+          SELECT t1.task_id
+          FROM tasks t1
+          WHERE t1.project_id = p.project_id
+          AND t1.assigned_to_user_id = ?
+          AND (
+            t1.parent_task_id IS NULL
+            OR t1.parent_task_id = 0
+          )
+          ORDER BY t1.task_id DESC
+          LIMIT 1
+        )
+
+      WHERE
+        EXISTS (
+          SELECT 1
+          FROM project_assignments pa
+          WHERE pa.project_id = p.project_id
+          AND pa.employee_id = ?
+          AND COALESCE(pa.assignment_status, 'assigned') <> 'removed'
+        )
+
+        OR EXISTS (
+          SELECT 1
+          FROM tasks t2
+          WHERE t2.project_id = p.project_id
+          AND t2.assigned_to_user_id = ?
+          AND (
+            t2.parent_task_id IS NULL
+            OR t2.parent_task_id = 0
+          )
+        )
 
       ORDER BY p.project_id DESC
       `,
-      [userId]
+      [userId, userId, userId]
     );
 
     const formattedProjects = projects.map((project) => {
-      const statusGroup = normalizeStatus(project.project_status || project.status);
+      const statusGroup = normalizeStatus(
+        project.project_status || project.status
+      );
 
       return {
         ...project,
+
         status_group: statusGroup,
         status_label: getStatusLabel(statusGroup),
 
@@ -432,37 +478,46 @@ const getEmployeeProjects = async (req, res) => {
 
         task_progress: Number(project.task_progress || 0),
         progress: Number(project.progress || 0),
-        overall_progress:
-          normalizeStatus(project.project_status || project.status) === "rejected"
-            ? 0
-            : Number(project.overall_progress || 0),
+        overall_progress: Number(project.overall_progress || 0),
       };
     });
 
     const rejectedProjects = formattedProjects.filter(
-      (project) => normalizeStatus(project.status_group || project.status) === "rejected"
+      (project) =>
+        normalizeStatus(project.status_group || project.status) ===
+        "rejected"
     );
 
     const onHoldProjects = formattedProjects.filter(
-      (project) => normalizeStatus(project.status_group || project.status) === "on_hold"
+      (project) =>
+        normalizeStatus(project.status_group || project.status) ===
+        "on_hold"
     );
 
     const activeProjects = formattedProjects.filter((project) => {
-      const status = normalizeStatus(project.status_group || project.status);
+      const status = normalizeStatus(
+        project.status_group || project.status
+      );
+
       return status !== "rejected" && status !== "on_hold";
     });
 
     return res.json({
       success: true,
+
       projects: activeProjects,
       myProjects: activeProjects,
       my_projects: activeProjects,
+
       rejectedProjects,
       rejected_projects: rejectedProjects,
+
       onHoldProjects,
       on_hold_projects: onHoldProjects,
     });
   } catch (error) {
+    console.error("Get employee projects error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch employee projects.",
@@ -477,6 +532,9 @@ const getEmployeeProjectSubtasks = async (req, res) => {
     const userId = req.user.user_id;
     const projectId = Number(req.params.projectId);
 
+    // --------------------------------------------------
+    // GET PROJECT IF IT IS ASSIGNED TO THIS EMPLOYEE
+    // --------------------------------------------------
     const [projectRows] = await db.query(
       `
       SELECT
@@ -484,13 +542,16 @@ const getEmployeeProjectSubtasks = async (req, res) => {
         p.project_title,
         p.project_description,
         p.project_description AS description,
+
         p.status,
         p.status AS project_status,
+
         COALESCE(p.overall_progress, 0) AS overall_progress,
         COALESCE(p.overall_progress, 0) AS progress,
 
         DATE_FORMAT(p.start_date, '%Y-%m-%d') AS start_date,
         DATE_FORMAT(p.start_date, '%Y-%m-%d') AS project_start_date,
+
         DATE_FORMAT(p.due_date, '%Y-%m-%d') AS end_date,
         DATE_FORMAT(p.due_date, '%Y-%m-%d') AS due_date,
         DATE_FORMAT(p.due_date, '%Y-%m-%d') AS project_end_date,
@@ -505,7 +566,7 @@ const getEmployeeProjectSubtasks = async (req, res) => {
         t.task_title,
         t.task_description,
         t.status AS task_status,
-        t.progress AS task_progress,
+        COALESCE(t.progress, 0) AS task_progress,
 
         (
           SELECT COUNT(*)
@@ -518,33 +579,40 @@ const getEmployeeProjectSubtasks = async (req, res) => {
           FROM tasks st
           WHERE st.parent_task_id = t.task_id
           AND (
-            LOWER(COALESCE(st.status, '')) IN ('completed', 'done', 'complete')
+            LOWER(COALESCE(st.status, '')) IN (
+              'completed',
+              'done',
+              'complete'
+            )
             OR COALESCE(st.is_checked, 0) = 1
           )
         ) AS completed_subtasks,
 
         (
-          SELECT GROUP_CONCAT(DISTINCT au.full_name ORDER BY au.full_name SEPARATOR ', ')
-          FROM tasks at
+          SELECT GROUP_CONCAT(
+            DISTINCT au.full_name
+            ORDER BY au.full_name
+            SEPARATOR ', '
+          )
+          FROM project_assignments pa_all
           LEFT JOIN users au
-            ON au.user_id = at.assigned_to_user_id
-          WHERE at.project_id = p.project_id
-          AND (at.parent_task_id IS NULL OR at.parent_task_id = 0)
+            ON au.user_id = pa_all.employee_id
+          WHERE pa_all.project_id = p.project_id
         ) AS assigned_names,
 
         (
-          SELECT GROUP_CONCAT(DISTINCT au.email ORDER BY au.email SEPARATOR ', ')
-          FROM tasks at
+          SELECT GROUP_CONCAT(
+            DISTINCT au.email
+            ORDER BY au.email
+            SEPARATOR ', '
+          )
+          FROM project_assignments pa_all
           LEFT JOIN users au
-            ON au.user_id = at.assigned_to_user_id
-          WHERE at.project_id = p.project_id
-          AND (at.parent_task_id IS NULL OR at.parent_task_id = 0)
+            ON au.user_id = pa_all.employee_id
+          WHERE pa_all.project_id = p.project_id
         ) AS assigned_emails
 
-      FROM tasks t
-
-      INNER JOIN projects p
-        ON p.project_id = t.project_id
+      FROM projects p
 
       LEFT JOIN departments d
         ON d.department_id = p.department_id
@@ -552,66 +620,110 @@ const getEmployeeProjectSubtasks = async (req, res) => {
       LEFT JOIN users creator
         ON creator.user_id = p.created_by_user_id
 
-      WHERE t.project_id = ?
-      AND t.assigned_to_user_id = ?
-      AND (t.parent_task_id IS NULL OR t.parent_task_id = 0)
+      LEFT JOIN tasks t
+        ON t.task_id = (
+          SELECT t1.task_id
+          FROM tasks t1
+          WHERE t1.project_id = p.project_id
+          AND t1.assigned_to_user_id = ?
+          AND (
+            t1.parent_task_id IS NULL
+            OR t1.parent_task_id = 0
+          )
+          ORDER BY t1.task_id ASC
+          LIMIT 1
+        )
 
-      ORDER BY
-        (
-          SELECT COUNT(*)
-          FROM tasks st
-          WHERE st.parent_task_id = t.task_id
-        ) DESC,
-        t.task_id ASC
+      WHERE p.project_id = ?
+
+      AND (
+        EXISTS (
+          SELECT 1
+          FROM project_assignments pa
+          WHERE pa.project_id = p.project_id
+          AND pa.employee_id = ?
+        )
+
+        OR EXISTS (
+          SELECT 1
+          FROM tasks t2
+          WHERE t2.project_id = p.project_id
+          AND t2.assigned_to_user_id = ?
+          AND (
+            t2.parent_task_id IS NULL
+            OR t2.parent_task_id = 0
+          )
+        )
+      )
 
       LIMIT 1
       `,
-      [projectId, userId]
+      [userId, projectId, userId, userId]
     );
 
     if (!projectRows.length) {
       return res.status(404).json({
         success: false,
-        message: "Project not found for this employee.",
+        message: "This project is not assigned to your account.",
       });
     }
 
     const project = projectRows[0];
-    const statusGroup = normalizeStatus(project.project_status || project.status);
 
-    const [subtasks] = await db.query(
-      `
-      SELECT
-        task_id AS subtask_id,
-        task_id,
-        task_title AS title,
-        task_title,
-        task_description,
-        task_description AS description,
-        status,
-        progress,
-        is_checked,
-        DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
-        DATE_FORMAT(due_date, '%Y-%m-%d') AS end_date,
-        DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date
-      FROM tasks
-      WHERE parent_task_id = ?
-      ORDER BY start_date ASC, task_id ASC
-      `,
-      [project.main_task_id]
+    const statusGroup = normalizeStatus(
+      project.project_status || project.status
     );
 
+    // --------------------------------------------------
+    // GET SUBTASKS ONLY IF MAIN TASK EXISTS
+    // --------------------------------------------------
+    let subtasks = [];
+
+    if (project.main_task_id) {
+      const [subtaskRows] = await db.query(
+        `
+        SELECT
+          task_id AS subtask_id,
+          task_id,
+          task_title AS title,
+          task_title,
+          task_description,
+          task_description AS description,
+          status,
+          COALESCE(progress, 0) AS progress,
+          COALESCE(is_checked, 0) AS is_checked,
+
+          DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
+          DATE_FORMAT(due_date, '%Y-%m-%d') AS end_date,
+          DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date
+
+        FROM tasks
+
+        WHERE parent_task_id = ?
+
+        ORDER BY start_date ASC, task_id ASC
+        `,
+        [project.main_task_id]
+      );
+
+      subtasks = subtaskRows;
+    }
+
+    // --------------------------------------------------
+    // SEND PROJECT DETAILS
+    // --------------------------------------------------
     return res.json({
       success: true,
+
       project: {
         ...project,
+
         status_group: statusGroup,
         status_label: getStatusLabel(statusGroup),
 
         main_task:
           project.main_task ||
-          project.task_description ||
-          project.project_description ||
+          project.project_title ||
           "No main task added.",
 
         description:
@@ -624,23 +736,31 @@ const getEmployeeProjectSubtasks = async (req, res) => {
         assigned_emails: project.assigned_emails || "-",
 
         total_subtasks: Number(project.total_subtasks || 0),
-        completed_subtasks: Number(project.completed_subtasks || 0),
+        completed_subtasks: Number(
+          project.completed_subtasks || 0
+        ),
 
-       task_progress: Number(project.task_progress || 0),
+        task_progress: Number(project.task_progress || 0),
 
-progress:
-  statusGroup === "rejected"
-    ? 0
-    : Number(project.progress || 0),
+        progress:
+          statusGroup === "rejected"
+            ? 0
+            : Number(project.progress || 0),
 
-overall_progress:
-  statusGroup === "rejected"
-    ? 0
-    : Number(project.overall_progress || 0),
+        overall_progress:
+          statusGroup === "rejected"
+            ? 0
+            : Number(project.overall_progress || 0),
       },
+
       subtasks,
     });
   } catch (error) {
+    console.error(
+      "Get employee project subtasks error:",
+      error
+    );
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch project details.",
@@ -684,8 +804,11 @@ const addEmployeeProjectSubtask = async (req, res) => {
     const projectId = Number(req.params.projectId);
 
     const title = String(req.body.title || "").trim();
+
     const description = String(
-      req.body.description || req.body.task_description || ""
+      req.body.description ||
+        req.body.task_description ||
+        ""
     ).trim();
 
     const startDate = formatDate(req.body.start_date);
@@ -698,50 +821,75 @@ const addEmployeeProjectSubtask = async (req, res) => {
       });
     }
 
+    if (startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Subtask start date cannot be after end date.",
+      });
+    }
+
     await connection.beginTransaction();
 
-    const [mainTaskRows] = await connection.query(
+    // --------------------------------------------------
+    // 1. CHECK WHETHER PROJECT IS ACTUALLY ASSIGNED
+    // --------------------------------------------------
+    const [projectRows] = await connection.query(
       `
       SELECT
-        t.task_id,
-        t.project_id,
+        p.project_id,
+        p.project_title,
+        p.project_description,
         p.status AS project_status,
+        p.created_by_user_id,
+
         DATE_FORMAT(p.start_date, '%Y-%m-%d') AS project_start_date,
         DATE_FORMAT(p.due_date, '%Y-%m-%d') AS project_end_date
-      FROM tasks t
 
-      INNER JOIN projects p
-        ON p.project_id = t.project_id
+      FROM projects p
 
-      WHERE t.project_id = ?
-      AND t.assigned_to_user_id = ?
-      AND (t.parent_task_id IS NULL OR t.parent_task_id = 0)
+      WHERE p.project_id = ?
 
-      ORDER BY
-        (
-          SELECT COUNT(*)
-          FROM tasks st
-          WHERE st.parent_task_id = t.task_id
-        ) DESC,
-        t.task_id ASC
+      AND (
+        EXISTS (
+          SELECT 1
+          FROM project_assignments pa
+          WHERE pa.project_id = p.project_id
+          AND pa.employee_id = ?
+          AND COALESCE(pa.assignment_status, 'assigned') <> 'removed'
+        )
+
+        OR EXISTS (
+          SELECT 1
+          FROM tasks existing_task
+          WHERE existing_task.project_id = p.project_id
+          AND existing_task.assigned_to_user_id = ?
+          AND (
+            existing_task.parent_task_id IS NULL
+            OR existing_task.parent_task_id = 0
+          )
+        )
+      )
 
       LIMIT 1
       `,
-      [projectId, userId]
+      [projectId, userId, userId]
     );
 
-    if (!mainTaskRows.length) {
+    if (!projectRows.length) {
       await connection.rollback();
 
       return res.status(404).json({
         success: false,
-        message: "Project not found for this employee.",
+        message: "This project is not assigned to your account.",
       });
     }
 
-    const mainTask = mainTaskRows[0];
+    const project = projectRows[0];
 
-    if (isProjectLocked(mainTask.project_status)) {
+    // --------------------------------------------------
+    // 2. PROJECT LOCK CHECK
+    // --------------------------------------------------
+    if (isProjectLocked(project.project_status)) {
       await connection.rollback();
 
       return res.status(400).json({
@@ -750,24 +898,113 @@ const addEmployeeProjectSubtask = async (req, res) => {
       });
     }
 
-    if (mainTask.project_start_date && startDate < mainTask.project_start_date) {
+    // --------------------------------------------------
+    // 3. DATE CHECKS
+    // --------------------------------------------------
+    if (
+      project.project_start_date &&
+      startDate < project.project_start_date
+    ) {
       await connection.rollback();
 
       return res.status(400).json({
         success: false,
-        message: `Subtask start date cannot be before project start date ${mainTask.project_start_date}.`,
+        message: `Subtask start date cannot be before project start date ${project.project_start_date}.`,
       });
     }
 
-    if (mainTask.project_end_date && endDate > mainTask.project_end_date) {
+    if (
+      project.project_end_date &&
+      endDate > project.project_end_date
+    ) {
       await connection.rollback();
 
       return res.status(400).json({
         success: false,
-        message: `Subtask end date cannot exceed project end date ${mainTask.project_end_date}.`,
+        message: `Subtask end date cannot exceed project end date ${project.project_end_date}.`,
       });
     }
 
+    // --------------------------------------------------
+    // 4. LOOK FOR BHAVESH'S MAIN TASK
+    // --------------------------------------------------
+    const [existingMainTasks] = await connection.query(
+      `
+      SELECT
+        task_id,
+        project_id
+      FROM tasks
+      WHERE project_id = ?
+      AND assigned_to_user_id = ?
+      AND (
+        parent_task_id IS NULL
+        OR parent_task_id = 0
+      )
+      ORDER BY task_id ASC
+      LIMIT 1
+      `,
+      [projectId, userId]
+    );
+
+    let mainTaskId;
+
+    // --------------------------------------------------
+    // 5. IF PROJECT WAS ASSIGNED BUT NO MAIN TASK EXISTS,
+    //    CREATE ONE FOR THIS EMPLOYEE
+    // --------------------------------------------------
+    if (!existingMainTasks.length) {
+      const [mainTaskResult] = await connection.query(
+        `
+        INSERT INTO tasks (
+          project_id,
+          parent_task_id,
+          created_by_user_id,
+          assigned_to_user_id,
+          task_title,
+          task_description,
+          task_type,
+          status,
+          priority,
+          progress,
+          is_checked,
+          start_date,
+          due_date
+        )
+        VALUES (
+          ?,
+          NULL,
+          ?,
+          ?,
+          ?,
+          ?,
+          'main',
+          'not_started',
+          'medium',
+          0,
+          0,
+          ?,
+          ?
+        )
+        `,
+        [
+          projectId,
+          project.created_by_user_id || userId,
+          userId,
+          project.project_title || "Project Task",
+          project.project_description || "",
+          project.project_start_date,
+          project.project_end_date,
+        ]
+      );
+
+      mainTaskId = mainTaskResult.insertId;
+    } else {
+      mainTaskId = existingMainTasks[0].task_id;
+    }
+
+    // --------------------------------------------------
+    // 6. CREATE THE SUBTASK
+    // --------------------------------------------------
     await connection.query(
       `
       INSERT INTO tasks (
@@ -779,16 +1016,31 @@ const addEmployeeProjectSubtask = async (req, res) => {
         task_description,
         task_type,
         status,
+        priority,
         progress,
         is_checked,
         start_date,
         due_date
       )
-      VALUES (?, ?, ?, ?, ?, ?, 'subtask', 'not_started', 0, 0, ?, ?)
+      VALUES (
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        'subtask',
+        'not_started',
+        'medium',
+        0,
+        0,
+        ?,
+        ?
+      )
       `,
       [
         projectId,
-        mainTask.task_id,
+        mainTaskId,
         userId,
         userId,
         title,
@@ -798,12 +1050,20 @@ const addEmployeeProjectSubtask = async (req, res) => {
       ]
     );
 
-    await recalculateMainTask(connection, mainTask.task_id);
-    await recalculateProjectFromMainTasks(connection, projectId);
+    // --------------------------------------------------
+    // 7. UPDATE PROGRESS
+    // --------------------------------------------------
+    await recalculateMainTask(connection, mainTaskId);
+
+    await recalculateProjectFromMainTasks(
+      connection,
+      projectId
+    );
 
     await connection.commit();
 
-    const subtasks = await getSubtasksAfterUpdate(mainTask.task_id);
+    const subtasks =
+      await getSubtasksAfterUpdate(mainTaskId);
 
     return res.status(201).json({
       success: true,
@@ -812,6 +1072,11 @@ const addEmployeeProjectSubtask = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
+
+    console.error(
+      "Add employee project subtask error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,

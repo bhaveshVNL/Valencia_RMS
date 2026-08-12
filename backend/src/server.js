@@ -17,7 +17,7 @@ const employeeOverviewRoutes = require("./routes/employeeoverviewroutes");
 const employeeTaskRoutes = require("./routes/employeetaskroutes");
 const employeeProfileRoutes = require("./routes/employeeprofileroutes");
 const employeeAttendanceRoutes = require("./routes/employeeattendanceroutes");
-
+const employeeLeaveRoutes = require("./routes/employeeleaveroutes");
 const app = express();
 
 const superadminRoutes = require("./routes/superadminroutes");
@@ -152,6 +152,10 @@ app.use("/api/employee-profile", employeeProfileRoutes);
 app.use(
   "/api/employee-attendance",
   employeeAttendanceRoutes
+);
+app.use(
+  "/api/employee-leaves",
+  employeeLeaveRoutes
 );
 app.use("/api/superadmin", superadminRoutes);
 app.use(

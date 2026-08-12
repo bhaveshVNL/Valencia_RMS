@@ -231,7 +231,10 @@ const EmployeeAttendance = () => {
       const rowStatus = normalizeStatus(row.status || row.attendance_status);
 
       const matchesStatus =
-        statusFilter === "all" || rowStatus === statusFilter;
+        statusFilter === "all" ||
+        (statusFilter === "absent_leave" &&
+          (rowStatus === "absent" || rowStatus === "leave")) ||
+        rowStatus === statusFilter;
 
       const searchableText = [
         rowDate,
@@ -409,9 +412,8 @@ const EmployeeAttendance = () => {
         >
           <option value="all">All Status</option>
           <option value="present">Present</option>
-          <option value="absent">Absent</option>
+          <option value="absent_leave">Absent / Leave</option>
           <option value="late">Late</option>
-          <option value="leave">Leave</option>
         </select>
       </div>
 
@@ -447,7 +449,7 @@ const EmployeeAttendance = () => {
                       </td>
 
                       <td style={styles.td}>
-                        {row.day_name || row.remarks || "-"}
+                        {row.day_name || "-"}
                       </td>
 
                       <td style={styles.td}>

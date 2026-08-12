@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import {
-  Activity,
-  CheckCircle2,
-  ClipboardList,
-  Clock3,
+  ArrowUpDown,
+  Filter,
   Plus,
   RefreshCw,
   Search,
@@ -12,10 +9,9 @@ import {
 } from "lucide-react";
 import api from "../../api/axios";
 
-const asArray = (value) => {
-  if (Array.isArray(value)) return value;
-  return [];
-};
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const asArray = (value) => (Array.isArray(value) ? value : []);
 
 const getResponseData = (response) => {
   return response?.data?.data || response?.data || {};
@@ -29,7 +25,9 @@ const normalizeStatus = (status, progress = 0) => {
     .replace(/-/g, "_");
 
   if (Number(progress) >= 100) return "completed";
-  if (["todo", "to_do", "pending", "not_started", ""].includes(value)) return "not_started";
+  if (["todo", "to_do", "pending", "not_started", ""].includes(value)) {
+    return "not_started";
+  }
   if (["ongoing", "in_progress", "progress"].includes(value)) return "ongoing";
   if (["under_review", "review"].includes(value)) return "under_review";
   if (["completed", "done", "complete"].includes(value)) return "completed";
@@ -49,14 +47,62 @@ const formatStatus = (status, progress = 0) => {
   if (value === "rejected") return "Rejected";
   if (value === "on_hold") return "On Hold";
 
-  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
 const formatDateForInput = (dateValue) => {
   if (!dateValue) return "";
-  const value = String(dateValue);
-  if (value.includes("T")) return value.split("T")[0];
-  return value.slice(0, 10);
+
+  if (dateValue instanceof Date && !Number.isNaN(dateValue.getTime())) {
+    const year = dateValue.getFullYear();
+    const month = String(dateValue.getMonth() + 1).padStart(2, "0");
+    const day = String(dateValue.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  const value = String(dateValue).trim();
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseLocalDate = (dateValue) => {
+  const normalized = formatDateForInput(dateValue);
+  if (!normalized) return null;
+
+  const [year, month, day] = normalized.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day);
+};
+
+const formatDisplayDate = (dateValue) => {
+  const date = parseLocalDate(dateValue);
+  if (!date) return "-";
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const parseDateTime = (value) => {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
 };
 
 const getTaskId = (task) => {
@@ -110,6 +156,113 @@ const getTaskProgress = (task) => {
   return Number(task?.progress ?? task?.task_progress ?? task?.overall_progress ?? 0);
 };
 
+const getTaskPriority = (task) => {
+  const value = String(
+    task?.priority || task?.task_priority || task?.urgency || task?.priority_level || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (["critical", "urgent"].includes(value)) return "urgent";
+  if (["high", "high_priority"].includes(value)) return "high";
+  if (["medium", "normal", "moderate"].includes(value)) return "medium";
+  if (["low", "low_priority"].includes(value)) return "low";
+
+  return value;
+};
+
+const getTaskAssignedAt = (task) => {
+  return (
+    task?.assigned_at ||
+    task?.assigned_date ||
+    task?.created_at ||
+    task?.task_created_at ||
+    ""
+  );
+};
+
+const getTaskUpdatedAt = (task) => {
+  return (
+    task?.updated_at ||
+    task?.task_updated_at ||
+    task?.modified_at ||
+    task?.created_at ||
+    ""
+  );
+};
+
+const getDeadlineInfo = (task) => {
+  const status = normalizeStatus(task?.status, task?.progress);
+
+  if (status === "completed") {
+    return { label: "Completed", tone: "done", days: null };
+  }
+
+  if (status === "rejected") {
+    return { label: "Rejected", tone: "muted", days: null };
+  }
+
+  if (status === "on_hold") {
+    return { label: "On Hold", tone: "muted", days: null };
+  }
+
+  const dueDate = parseLocalDate(task?.due_date);
+  if (!dueDate) {
+    return { label: "No Deadline", tone: "muted", days: null };
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((dueDate.getTime() - today.getTime()) / DAY_MS);
+
+  if (days < 0) {
+    const overdueDays = Math.abs(days);
+    return {
+      label: `${overdueDays} ${overdueDays === 1 ? "Day" : "Days"} Overdue`,
+      tone: "danger",
+      days,
+    };
+  }
+
+  if (days === 0) {
+    return { label: "Due Today", tone: "danger", days };
+  }
+
+  if (days === 1) {
+    return { label: "1 Day Left", tone: "urgent", days };
+  }
+
+  if (days === 2) {
+    return { label: "2 Days Left", tone: "urgent", days };
+  }
+
+  return { label: `${days} Days Left`, tone: "normal", days };
+};
+
+const isUrgentTask = (task) => {
+  const status = normalizeStatus(task?.status, task?.progress);
+  if (["completed", "rejected", "on_hold"].includes(status)) return false;
+
+  const priority = getTaskPriority(task);
+  if (["urgent", "high", "critical"].includes(priority)) return true;
+
+  const deadline = getDeadlineInfo(task);
+  return deadline.days !== null && deadline.days <= 2;
+};
+
+const getPriorityLabel = (task) => {
+  const priority = getTaskPriority(task);
+  if (!priority) return isUrgentTask(task) ? "Urgent" : "Normal";
+  if (priority === "urgent") return "Urgent";
+  if (priority === "high") return "High";
+  if (priority === "medium") return "Medium";
+  if (priority === "low") return "Low";
+
+  return priority
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
+
 const normalizeSubtask = (subtask) => {
   const progress = Number(subtask?.progress || 0);
   const status = normalizeStatus(subtask?.status, progress);
@@ -121,11 +274,17 @@ const normalizeSubtask = (subtask) => {
   return {
     ...subtask,
     task_id: getSubtaskId(subtask),
-    task_title: subtask?.task_title || subtask?.subtask_title || subtask?.title || "Subtask",
+    task_title:
+      subtask?.task_title || subtask?.subtask_title || subtask?.title || "Subtask",
     task_description:
-      subtask?.task_description || subtask?.subtask_description || subtask?.description || "",
+      subtask?.task_description ||
+      subtask?.subtask_description ||
+      subtask?.description ||
+      "",
     start_date: formatDateForInput(subtask?.start_date || subtask?.task_start_date),
-    due_date: formatDateForInput(subtask?.due_date || subtask?.end_date || subtask?.task_end_date),
+    due_date: formatDateForInput(
+      subtask?.due_date || subtask?.end_date || subtask?.task_end_date
+    ),
     status: checked ? "completed" : status,
     is_checked: checked ? 1 : 0,
   };
@@ -134,18 +293,22 @@ const normalizeSubtask = (subtask) => {
 const normalizeMainTask = (task) => {
   const subtasks = asArray(
     task?.subtasks ||
-      task?.project_subtasks ||
-      task?.children ||
-      task?.sub_tasks ||
-      task?.main_subtasks
+    task?.project_subtasks ||
+    task?.children ||
+    task?.sub_tasks ||
+    task?.main_subtasks
   ).map(normalizeSubtask);
 
   const totalSubtasks = subtasks.length;
-  const completedSubtasks = subtasks.filter((subtask) => Number(subtask.is_checked) === 1).length;
+  const completedSubtasks = subtasks.filter(
+    (subtask) => Number(subtask.is_checked) === 1
+  ).length;
 
   const backendProgress = getTaskProgress(task);
   const calculatedProgress =
-    totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : backendProgress;
+    totalSubtasks > 0
+      ? Math.round((completedSubtasks / totalSubtasks) * 100)
+      : backendProgress;
 
   const finalProgress = Number.isFinite(calculatedProgress) ? calculatedProgress : 0;
   const status = normalizeStatus(task?.status || task?.main_task_status, finalProgress);
@@ -160,6 +323,9 @@ const normalizeMainTask = (task) => {
     due_date: getTaskEndDate(task),
     created_by_name: getAssignedByName(task),
     created_by_email: getAssignedByEmail(task),
+    priority: getTaskPriority(task),
+    assigned_at: getTaskAssignedAt(task),
+    updated_at: getTaskUpdatedAt(task),
     status,
     progress: finalProgress,
     subtasks,
@@ -183,16 +349,73 @@ const parseTasksFromResponse = (response) => {
   return asArray(taskList).map(normalizeMainTask);
 };
 
+const BASE_COLUMNS = [
+  {
+    key: "not_started",
+    title: "To Do",
+    subtitle: "Main tasks that have not started",
+  },
+  {
+    key: "ongoing",
+    title: "In Progress",
+    subtitle: "Main tasks currently being worked on",
+  },
+  {
+    key: "under_review",
+    title: "Under Review",
+    subtitle: "Main tasks waiting for admin review",
+  },
+  {
+    key: "completed",
+    title: "Done",
+    subtitle: "Completed main tasks",
+  },
+];
+
+const SPECIAL_COLUMNS = {
+  rejected: {
+    key: "rejected",
+    title: "Rejected",
+    subtitle: "Tasks rejected during review",
+  },
+  on_hold: {
+    key: "on_hold",
+    title: "On Hold",
+    subtitle: "Tasks temporarily paused",
+  },
+};
+
+const STATUS_SORT_RANK = {
+  not_started: 0,
+  ongoing: 1,
+  under_review: 2,
+  completed: 3,
+  rejected: 4,
+  on_hold: 5,
+};
+
+const PRIORITY_SORT_RANK = {
+  urgent: 0,
+  critical: 0,
+  high: 1,
+  medium: 2,
+  normal: 3,
+  low: 4,
+  "": 5,
+};
+
 const EmployeeTasks = () => {
-  const location = useLocation();
   const [mainTasks, setMainTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [taskFilter, setTaskFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("deadline");
   const [loading, setLoading] = useState(false);
   const [savingSubtask, setSavingSubtask] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [modalError, setModalError] = useState("");
+  const [modalSuccess, setModalSuccess] = useState("");
 
   const [subtaskForm, setSubtaskForm] = useState({
     title: "",
@@ -200,6 +423,11 @@ const EmployeeTasks = () => {
     start_date: "",
     end_date: "",
   });
+
+  const shouldTryNextEndpoint = (err) => {
+    const status = err?.response?.status;
+    return status === 404 || status === 405;
+  };
 
   const callFirstWorkingGet = async (urls) => {
     let lastError;
@@ -209,6 +437,7 @@ const EmployeeTasks = () => {
         return await api.get(url);
       } catch (err) {
         lastError = err;
+        if (!shouldTryNextEndpoint(err)) throw err;
       }
     }
 
@@ -223,6 +452,7 @@ const EmployeeTasks = () => {
         return await api.post(url, payload);
       } catch (err) {
         lastError = err;
+        if (!shouldTryNextEndpoint(err)) throw err;
       }
     }
 
@@ -245,6 +475,7 @@ const EmployeeTasks = () => {
         return await api.patch(item.url, payload);
       } catch (err) {
         lastError = err;
+        if (!shouldTryNextEndpoint(err)) throw err;
       }
     }
 
@@ -268,9 +499,9 @@ const EmployeeTasks = () => {
       setMainTasks(parseTasksFromResponse(response));
     } catch (err) {
       setError(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Failed to fetch assigned tasks."
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Failed to fetch assigned tasks."
       );
     } finally {
       setLoading(false);
@@ -279,6 +510,8 @@ const EmployeeTasks = () => {
 
   const fetchTaskDetails = async (task) => {
     const taskId = getTaskId(task);
+    setModalError("");
+    setModalSuccess("");
 
     if (!taskId) {
       setSelectedTask(normalizeMainTask(task));
@@ -303,61 +536,38 @@ const EmployeeTasks = () => {
         data;
 
       setSelectedTask(normalizeMainTask({ ...task, ...taskData }));
-    } catch {
+    } catch (err) {
       setSelectedTask(normalizeMainTask(task));
+      setModalError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Could not refresh task details. Showing the last loaded data."
+      );
     }
   };
 
- useEffect(() => {
-  fetchTasks();
-}, []);
+  useEffect(() => {
+    fetchTasks();
+  }, []);
 
-useEffect(() => {
-  const requestedFilter = location.state?.filter;
-  const requestedTaskId = location.state?.taskId;
+  const filterCounts = useMemo(() => {
+    return mainTasks.reduce(
+      (counts, task) => {
+        const status = normalizeStatus(task.status, task.progress);
 
-  if (
-    requestedFilter &&
-    ["all", "todo", "in_progress", "done"].includes(requestedFilter)
-  ) {
-    setActiveFilter(requestedFilter);
-  }
+        if (isUrgentTask(task)) counts.urgent += 1;
+        if (status === "rejected") counts.rejected += 1;
+        if (status === "on_hold") counts.on_hold += 1;
 
-  if (requestedTaskId && mainTasks.length > 0) {
-    const matchedTask = mainTasks.find(
-      (task) => Number(task.task_id) === Number(requestedTaskId)
+        return counts;
+      },
+      {
+        all: mainTasks.length,
+        urgent: 0,
+        rejected: 0,
+        on_hold: 0,
+      }
     );
-
-    if (matchedTask) {
-      fetchTaskDetails(matchedTask);
-    }
-  }
-}, [location.state, mainTasks]);
-
-const stats = useMemo(() => {
-    const total = mainTasks.length;
-
-    const todo = mainTasks.filter((task) => {
-      const status = normalizeStatus(task.status, task.progress);
-      return status === "not_started";
-    }).length;
-
-    const inProgress = mainTasks.filter((task) => {
-      const status = normalizeStatus(task.status, task.progress);
-      return status === "ongoing" || status === "under_review";
-    }).length;
-
-    const done = mainTasks.filter((task) => {
-      const status = normalizeStatus(task.status, task.progress);
-      return status === "completed";
-    }).length;
-
-    return {
-      total,
-      todo,
-      inProgress,
-      done,
-    };
   }, [mainTasks]);
 
   const filteredTasks = useMemo(() => {
@@ -367,11 +577,12 @@ const stats = useMemo(() => {
       const status = normalizeStatus(task.status, task.progress);
 
       const matchesFilter =
-        activeFilter === "all" ||
-        (activeFilter === "todo" && status === "not_started") ||
-        (activeFilter === "in_progress" &&
-          (status === "ongoing" || status === "under_review")) ||
-        (activeFilter === "done" && status === "completed");
+        taskFilter === "all" ||
+        (taskFilter === "urgent" && isUrgentTask(task)) ||
+        (taskFilter === "rejected" && status === "rejected") ||
+        (taskFilter === "on_hold" && status === "on_hold");
+
+      if (!matchesFilter) return false;
 
       const searchableText = [
         task.task_title,
@@ -379,55 +590,138 @@ const stats = useMemo(() => {
         task.project_title,
         task.created_by_name,
         task.created_by_email,
+        formatStatus(task.status, task.progress),
+        getPriorityLabel(task),
+        getDeadlineInfo(task).label,
       ]
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch = !query || searchableText.includes(query);
-
-      return matchesFilter && matchesSearch;
+      return !query || searchableText.includes(query);
     });
-  }, [mainTasks, searchText, activeFilter]);
+  }, [mainTasks, searchText, taskFilter]);
+
+  const sortedTasks = useMemo(() => {
+    const tasks = [...filteredTasks];
+
+    tasks.sort((a, b) => {
+      if (sortBy === "priority") {
+        const aPriority = getTaskPriority(a) || (isUrgentTask(a) ? "urgent" : "normal");
+        const bPriority = getTaskPriority(b) || (isUrgentTask(b) ? "urgent" : "normal");
+
+        const rankDifference =
+          (PRIORITY_SORT_RANK[aPriority] ?? 5) -
+          (PRIORITY_SORT_RANK[bPriority] ?? 5);
+
+        if (rankDifference !== 0) return rankDifference;
+      }
+
+      if (sortBy === "status") {
+        const statusDifference =
+          (STATUS_SORT_RANK[normalizeStatus(a.status, a.progress)] ?? 99) -
+          (STATUS_SORT_RANK[normalizeStatus(b.status, b.progress)] ?? 99);
+
+        if (statusDifference !== 0) return statusDifference;
+      }
+
+      if (sortBy === "recent_assigned") {
+        const assignedDifference =
+          parseDateTime(getTaskAssignedAt(b)) - parseDateTime(getTaskAssignedAt(a));
+
+        if (assignedDifference !== 0) return assignedDifference;
+        return Number(getTaskId(b) || 0) - Number(getTaskId(a) || 0);
+      }
+
+      if (sortBy === "recent_updated") {
+        const updatedDifference =
+          parseDateTime(getTaskUpdatedAt(b)) - parseDateTime(getTaskUpdatedAt(a));
+
+        if (updatedDifference !== 0) return updatedDifference;
+        return Number(getTaskId(b) || 0) - Number(getTaskId(a) || 0);
+      }
+
+      const aDue = parseLocalDate(a.due_date)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const bDue = parseLocalDate(b.due_date)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const deadlineDifference = aDue - bDue;
+
+      if (deadlineDifference !== 0) return deadlineDifference;
+      return Number(getTaskId(b) || 0) - Number(getTaskId(a) || 0);
+    });
+
+    return tasks;
+  }, [filteredTasks, sortBy]);
+
+  const visibleColumns = useMemo(() => {
+    if (taskFilter === "rejected") return [SPECIAL_COLUMNS.rejected];
+    if (taskFilter === "on_hold") return [SPECIAL_COLUMNS.on_hold];
+    if (taskFilter === "urgent") return BASE_COLUMNS.slice(0, 3);
+
+    const columns = [...BASE_COLUMNS];
+
+    if (filterCounts.rejected > 0) columns.push(SPECIAL_COLUMNS.rejected);
+    if (filterCounts.on_hold > 0) columns.push(SPECIAL_COLUMNS.on_hold);
+
+    return columns;
+  }, [taskFilter, filterCounts.rejected, filterCounts.on_hold]);
+
+  const groupedTasks = useMemo(() => {
+    const grouped = {
+      not_started: [],
+      ongoing: [],
+      under_review: [],
+      completed: [],
+      rejected: [],
+      on_hold: [],
+    };
+
+    sortedTasks.forEach((task) => {
+      const status = normalizeStatus(task.status, task.progress);
+      if (grouped[status]) grouped[status].push(task);
+    });
+
+    return grouped;
+  }, [sortedTasks]);
 
   const validateSubtaskForm = () => {
     const title = subtaskForm.title.trim();
 
-    if (!title) {
-      return "Subtask title is required.";
-    }
+    if (!title) return "Subtask title is required.";
 
     if (!subtaskForm.start_date || !subtaskForm.end_date) {
       return "Subtask start date and end date are required.";
     }
 
     if (subtaskForm.start_date > subtaskForm.end_date) {
-      return "Subtask start date cannot be after end date.";
+      return "Subtask start date cannot be after the end date.";
     }
 
     const mainStartDate = selectedTask?.start_date;
     const mainEndDate = selectedTask?.due_date;
 
     if (mainStartDate && subtaskForm.start_date < mainStartDate) {
-      return `Subtask start date must be on or after ${mainStartDate}.`;
+      return `Subtask start date cannot be before ${formatDisplayDate(mainStartDate)}.`;
     }
 
     if (mainEndDate && subtaskForm.end_date > mainEndDate) {
-      return `Subtask end date must be on or before ${mainEndDate}.`;
+      return `Subtask deadline cannot exceed the parent task deadline (${formatDisplayDate(
+        mainEndDate
+      )}).`;
     }
 
     return "";
   };
 
-  const addSubtask = async () => {
-    if (!selectedTask?.task_id) return;
+  const addSubtask = async (event) => {
+    event?.preventDefault?.();
 
-    setError("");
-    setSuccessMessage("");
+    if (!selectedTask?.task_id || savingSubtask) return;
+
+    setModalError("");
+    setModalSuccess("");
 
     const validationError = validateSubtaskForm();
-
     if (validationError) {
-      setError(validationError);
+      setModalError(validationError);
       return;
     }
 
@@ -463,15 +757,16 @@ const stats = useMemo(() => {
         end_date: "",
       });
 
-      setSuccessMessage("Subtask added successfully.");
+      setModalSuccess("Subtask added successfully.");
 
       await fetchTasks();
-      await fetchTaskDetails(selectedTask);
+      await fetchTaskDetails({ ...selectedTask, task_id: selectedTask.task_id });
+      setModalSuccess("Subtask added successfully.");
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Failed to add subtask."
+      setModalError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Failed to add subtask."
       );
     } finally {
       setSavingSubtask(false);
@@ -483,8 +778,8 @@ const stats = useMemo(() => {
 
     if (!subtaskId || Number(subtask.is_checked) === 1) return;
 
-    setError("");
-    setSuccessMessage("");
+    setModalError("");
+    setModalSuccess("");
 
     try {
       await callFirstWorkingPatch(
@@ -502,15 +797,14 @@ const stats = useMemo(() => {
         }
       );
 
-      setSuccessMessage("Subtask marked as done.");
-
       await fetchTasks();
       await fetchTaskDetails(selectedTask);
+      setModalSuccess("Subtask marked as done.");
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Failed to update subtask."
+      setModalError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Failed to update subtask."
       );
     }
   };
@@ -523,170 +817,193 @@ const stats = useMemo(() => {
       start_date: "",
       end_date: "",
     });
-    setError("");
-    setSuccessMessage("");
+    setModalError("");
+    setModalSuccess("");
   };
+
+  const selectedTaskStatus = selectedTask
+    ? normalizeStatus(selectedTask.status, selectedTask.progress)
+    : "";
+
+  const canAddSubtask =
+    selectedTask &&
+    !["completed", "rejected", "on_hold"].includes(selectedTaskStatus);
 
   return (
     <div style={styles.page}>
-      <div style={styles.topActions}>
-        <button type="button" style={styles.refreshBtn} onClick={fetchTasks} disabled={loading}>
-          <RefreshCw size={18} />
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+      <div style={styles.taskToolbar}>
+        <div style={styles.kanbanSearchBox}>
+          <Search size={18} color="#64748b" />
+          <input
+            style={styles.searchInput}
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Search project, task, admin..." />
+        </div>
+
+        <div style={styles.controlGroup}>
+          <div style={styles.selectWrap}>
+            <Filter size={17} color="#64748b" />
+            <select
+              style={styles.selectControl}
+              value={taskFilter}
+              onChange={(event) => setTaskFilter(event.target.value)}
+              aria-label="Filter tasks"
+            >
+              <option value="all">All ({filterCounts.all})</option>
+              <option value="rejected">Rejected ({filterCounts.rejected})</option>
+              <option value="on_hold">On Hold ({filterCounts.on_hold})</option>
+            </select>
+          </div>
+
+          <div style={styles.selectWrap}>
+            <ArrowUpDown size={17} color="#64748b" />
+            <select
+              style={styles.selectControl}
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+              aria-label="Sort tasks"
+            >
+              <option value="deadline">Deadline</option>
+              <option value="recent_assigned">Recently Assigned</option>
+              <option value="recent_updated">Recently Updated</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            style={styles.refreshBtn}
+            onClick={fetchTasks}
+            disabled={loading}
+          >
+            <RefreshCw size={17} />
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
       </div>
 
       {error && <div style={styles.errorBox}>{error}</div>}
       {successMessage && <div style={styles.successBox}>{successMessage}</div>}
 
-      <div style={styles.taskStatsGrid}>
-        <button
-          type="button"
-          style={{
-            ...styles.taskStatCard,
-            ...(activeFilter === "all" ? styles.activeStatCard : {}),
-          }}
-          onClick={() => setActiveFilter("all")}
-        >
-          <strong style={styles.taskStatNumber}>{stats.total}</strong>
-          <span style={styles.taskStatLabel}>
-            <ClipboardList size={20} />
-            Total Main Tasks
-          </span>
-        </button>
+      {loading && mainTasks.length === 0 ? (
+        <div style={styles.emptyBox}>Loading tasks...</div>
+      ) : sortedTasks.length === 0 ? (
+        <div style={styles.emptyBox}>No tasks match this filter.</div>
+      ) : (
+        <section style={styles.kanbanRow}>
+          {visibleColumns.map((column) => (
+            <div style={styles.kanbanColumn} key={column.key}>
+              <div style={styles.kanbanHeader}>
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={styles.kanbanTitle}>{column.title}</h2>
+                  <p style={styles.kanbanSubtitle}>{column.subtitle}</p>
+                </div>
 
-        <button
-          type="button"
-          style={{
-            ...styles.taskStatCard,
-            ...(activeFilter === "todo" ? styles.activeStatCard : {}),
-          }}
-          onClick={() => setActiveFilter("todo")}
-        >
-          <strong style={styles.taskStatNumber}>{stats.todo}</strong>
-          <span style={styles.taskStatLabel}>
-            <Clock3 size={20} />
-            To Do
-          </span>
-        </button>
+                <span style={styles.kanbanCount}>
+                  {groupedTasks[column.key]?.length || 0}
+                </span>
+              </div>
 
-        <button
-          type="button"
-          style={{
-            ...styles.taskStatCard,
-            ...(activeFilter === "in_progress" ? styles.activeStatCard : {}),
-          }}
-          onClick={() => setActiveFilter("in_progress")}
-        >
-          <strong style={styles.taskStatNumber}>{stats.inProgress}</strong>
-          <span style={styles.taskStatLabel}>
-            <Activity size={20} />
-            In Progress
-          </span>
-        </button>
+              <div style={styles.kanbanBody}>
+                {groupedTasks[column.key]?.length === 0 ? (
+                  <div style={styles.emptyKanbanColumn}>No tasks here.</div>
+                ) : (
+                  groupedTasks[column.key].map((task) => {
+                    const deadline = getDeadlineInfo(task);
+                    const priorityLabel = getPriorityLabel(task);
 
-        <button
-          type="button"
-          style={{
-            ...styles.taskStatCard,
-            ...(activeFilter === "done" ? styles.activeStatCard : {}),
-          }}
-          onClick={() => setActiveFilter("done")}
-        >
-          <strong style={styles.taskStatNumber}>{stats.done}</strong>
-          <span style={styles.taskStatLabel}>
-            <CheckCircle2 size={20} />
-            Done
-          </span>
-        </button>
-      </div>
+                    return (
+                      <button
+                        type="button"
+                        style={styles.kanbanTaskCard}
+                        key={task.task_id}
+                        onClick={() => fetchTaskDetails(task)}
+                      >
+                        <div style={styles.kanbanTaskTop}>
+                          <div style={{ minWidth: 0 }}>
+                            <h3 style={styles.kanbanTaskTitle}>{task.task_title}</h3>
+                            <p style={styles.kanbanProjectTitle}>{task.project_title}</p>
+                          </div>
 
-      <section style={styles.tasksPanel}>
-        <div style={styles.panelHeader}>
-          <div style={styles.panelTitleWrap}>
-            <ClipboardList size={24} color="#ff5733" />
-            <div>
-              <h2 style={styles.panelTitle}>My Assigned Main Tasks</h2>
-              <p style={styles.panelSubtitle}>
-                Click any main task to add subtasks and update progress.
-              </p>
+                          <span
+                            style={{
+                              ...styles.statusBadge,
+                              ...getStatusBadgeStyle(task.status, task.progress),
+                            }}
+                          >
+                            {formatStatus(task.status, task.progress)}
+                          </span>
+                        </div>
+
+                        <p style={styles.kanbanTaskDescription}>
+                          {task.task_description || "-"}
+                        </p>
+
+                        <div style={styles.cardBadgeRow}>
+                          <span
+                            style={{
+                              ...styles.deadlineBadge,
+                              ...getDeadlineBadgeStyle(deadline.tone),
+                            }}
+                          >
+                            {deadline.label}
+                          </span>
+
+                          <span style={styles.priorityBadge}>{priorityLabel}</span>
+                        </div>
+
+                        <div style={styles.kanbanMetaLine}>
+                          <span>Assigned by</span>
+                          <strong>{getAssignedByName(task)}</strong>
+                        </div>
+
+                        <div style={styles.kanbanDates}>
+                          <span>{formatDisplayDate(task.start_date)}</span>
+                          <span>→</span>
+                          <span>{formatDisplayDate(task.due_date)}</span>
+                        </div>
+
+                        <div style={styles.progressMeta}>
+                          <strong>
+                            {task.total_subtasks > 0
+                              ? `${task.completed_subtasks}/${task.total_subtasks} subtasks`
+                              : "No subtasks"}
+                          </strong>
+                          <strong>{task.progress}%</strong>
+                        </div>
+
+                        <div style={styles.progressTrack}>
+                          <div
+                            style={{
+                              ...styles.progressFill,
+                              width: `${Math.min(100, Math.max(0, task.progress))}%`,
+                            }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-
-          <div style={styles.searchBox}>
-            <Search size={19} color="#64748b" />
-            <input
-              style={styles.searchInput}
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder="Search project, main task, admin..."
-            />
-          </div>
-        </div>
-
-        {filteredTasks.length === 0 ? (
-          <div style={styles.emptyBox}>No tasks found.</div>
-        ) : (
-          <div style={styles.taskGrid}>
-            {filteredTasks.map((task) => {
-              const statusLabel = formatStatus(task.status, task.progress);
-
-              return (
-                <button
-                  type="button"
-                  style={styles.taskCard}
-                  key={task.task_id}
-                  onClick={() => fetchTaskDetails(task)}
-                >
-                  <div style={styles.taskCardTop}>
-                    <div>
-                      <h3 style={styles.taskTitle}>{task.task_title}</h3>
-                      <p style={styles.projectTitle}>{task.project_title}</p>
-                    </div>
-
-                    <span style={styles.statusBadge}>{statusLabel}</span>
-                  </div>
-
-                  <p style={styles.taskDescription}>{task.task_description}</p>
-
-                  <div style={styles.taskAssignedByLine}>
-                    Assigned by: <strong>{getAssignedByName(task)}</strong>
-                  </div>
-
-                  <div style={styles.taskDateRow}>
-                    <span>{task.start_date || "-"}</span>
-                    <span>to</span>
-                    <span>{task.due_date || "-"}</span>
-                  </div>
-
-                  <div style={styles.progressMeta}>
-                    <strong>
-                      {task.completed_subtasks}/{task.total_subtasks} subtasks done
-                    </strong>
-                    <strong>{task.progress}%</strong>
-                  </div>
-
-                  <div style={styles.progressTrack}>
-                    <div style={{ ...styles.progressFill, width: `${task.progress}%` }} />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </section>
+          ))}
+        </section>
+      )}
 
       {selectedTask && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
+        <div style={styles.modalOverlay} onMouseDown={closeModal}>
+          <div style={styles.modal} onMouseDown={(event) => event.stopPropagation()}>
             <button type="button" style={styles.closeBtn} onClick={closeModal}>
-              <X size={22} />
+              <X size={21} />
             </button>
 
             <div style={styles.modalHeader}>
               <h2 style={styles.modalTitle}>{selectedTask.task_title}</h2>
               <p style={styles.modalSubtitle}>{selectedTask.project_title}</p>
             </div>
+
+            {modalError && <div style={styles.modalError}>{modalError}</div>}
+            {modalSuccess && <div style={styles.modalSuccess}>{modalSuccess}</div>}
 
             <div style={styles.detailsGrid}>
               <div style={styles.detailBox}>
@@ -706,12 +1023,20 @@ const stats = useMemo(() => {
 
               <div style={styles.detailBox}>
                 <span>Start Date</span>
-                <strong>{selectedTask.start_date || "-"}</strong>
+                <strong>{formatDisplayDate(selectedTask.start_date)}</strong>
               </div>
 
               <div style={styles.detailBox}>
-                <span>End Date</span>
-                <strong>{selectedTask.due_date || "-"}</strong>
+                <span>Deadline</span>
+                <strong>{formatDisplayDate(selectedTask.due_date)}</strong>
+                <small
+                  style={{
+                    ...styles.deadlineText,
+                    ...getDeadlineTextStyle(getDeadlineInfo(selectedTask).tone),
+                  }}
+                >
+                  {getDeadlineInfo(selectedTask).label}
+                </small>
               </div>
             </div>
 
@@ -730,22 +1055,30 @@ const stats = useMemo(() => {
                 <div
                   style={{
                     ...styles.progressFill,
-                    width: `${selectedTask.progress}%`,
+                    width: `${Math.min(100, Math.max(0, selectedTask.progress))}%`,
                   }}
                 />
               </div>
 
               <p style={styles.subtaskCountText}>
-                {selectedTask.completed_subtasks}/{selectedTask.total_subtasks} subtasks completed
+                {selectedTask.total_subtasks > 0
+                  ? `${selectedTask.completed_subtasks}/${selectedTask.total_subtasks} subtasks completed`
+                  : "No subtasks"}
               </p>
             </div>
 
-            {normalizeStatus(selectedTask.status, selectedTask.progress) !== "completed" && (
-              <div style={styles.addSubtaskBox}>
+            {canAddSubtask ? (
+              <form style={styles.addSubtaskBox} onSubmit={addSubtask}>
                 <h3 style={styles.addSubtaskTitle}>
-                  <Plus size={20} />
+                  <Plus size={19} />
                   Add Subtask
                 </h3>
+
+                <p style={styles.dateLimitHint}>
+                  Subtask dates must stay within the parent task period: {" "}
+                  <strong>{formatDisplayDate(selectedTask.start_date)}</strong> to {" "}
+                  <strong>{formatDisplayDate(selectedTask.due_date)}</strong>.
+                </p>
 
                 <div style={styles.formGrid}>
                   <label style={styles.formGroup}>
@@ -769,27 +1102,39 @@ const stats = useMemo(() => {
                       type="date"
                       style={styles.input}
                       value={subtaskForm.start_date}
-                      onChange={(event) =>
+                      min={selectedTask.start_date || undefined}
+                      max={selectedTask.due_date || undefined}
+                      onChange={(event) => {
+                        const nextStartDate = event.target.value;
+
                         setSubtaskForm((previous) => ({
                           ...previous,
-                          start_date: event.target.value,
-                        }))
-                      }
+                          start_date: nextStartDate,
+                          end_date:
+                            previous.end_date && previous.end_date < nextStartDate
+                              ? ""
+                              : previous.end_date,
+                        }));
+                        setModalError("");
+                      }}
                     />
                   </label>
 
                   <label style={styles.formGroup}>
-                    <span>End Date</span>
+                    <span>End Date / Deadline</span>
                     <input
                       type="date"
                       style={styles.input}
                       value={subtaskForm.end_date}
-                      onChange={(event) =>
+                      min={subtaskForm.start_date || selectedTask.start_date || undefined}
+                      max={selectedTask.due_date || undefined}
+                      onChange={(event) => {
                         setSubtaskForm((previous) => ({
                           ...previous,
                           end_date: event.target.value,
-                        }))
-                      }
+                        }));
+                        setModalError("");
+                      }}
                     />
                   </label>
                 </div>
@@ -810,14 +1155,21 @@ const stats = useMemo(() => {
                 </label>
 
                 <button
-                  type="button"
-                  style={styles.addBtn}
-                  onClick={addSubtask}
+                  type="submit"
+                  style={{
+                    ...styles.addBtn,
+                    ...(savingSubtask ? styles.disabledBtn : {}),
+                  }}
                   disabled={savingSubtask}
                 >
                   <Plus size={18} />
                   {savingSubtask ? "Adding..." : "Add Subtask"}
                 </button>
+              </form>
+            ) : (
+              <div style={styles.lockedBox}>
+                Subtasks cannot be added while this task is {" "}
+                <strong>{formatStatus(selectedTask.status, selectedTask.progress)}</strong>.
               </div>
             )}
 
@@ -830,13 +1182,14 @@ const stats = useMemo(() => {
                 <div style={styles.subtaskList}>
                   {selectedTask.subtasks.map((subtask) => {
                     const checked = Number(subtask.is_checked) === 1;
+                    const subtaskDeadline = getDeadlineInfo(subtask);
 
                     return (
                       <div style={styles.subtaskItem} key={subtask.task_id}>
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={checked}
+                          disabled={checked || ["rejected", "on_hold"].includes(selectedTaskStatus)}
                           onChange={() => markSubtaskDone(subtask)}
                           style={styles.checkbox}
                         />
@@ -850,9 +1203,22 @@ const stats = useMemo(() => {
                             </p>
                           )}
 
-                          <p style={styles.subtaskDate}>
-                            {subtask.start_date || "-"} to {subtask.due_date || "-"}
-                          </p>
+                          <div style={styles.subtaskDateLine}>
+                            <span>
+                              {formatDisplayDate(subtask.start_date)} → {formatDisplayDate(subtask.due_date)}
+                            </span>
+
+                            {!checked && (
+                              <span
+                                style={{
+                                  ...styles.smallDeadlineBadge,
+                                  ...getDeadlineBadgeStyle(subtaskDeadline.tone),
+                                }}
+                              >
+                                {subtaskDeadline.label}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <span
@@ -861,7 +1227,7 @@ const stats = useMemo(() => {
                             ...(checked ? styles.doneBadge : {}),
                           }}
                         >
-                          {checked ? "Done" : "To Do"}
+                          {checked ? "Done" : formatStatus(subtask.status, subtask.progress)}
                         </span>
                       </div>
                     );
@@ -876,146 +1242,71 @@ const stats = useMemo(() => {
   );
 };
 
+const getStatusBadgeStyle = (status, progress = 0) => {
+  const normalized = normalizeStatus(status, progress);
+
+  if (normalized === "completed") {
+    return { background: "#dcfce7", color: "#166534" };
+  }
+
+  if (normalized === "rejected") {
+    return { background: "#fee2e2", color: "#b91c1c" };
+  }
+
+  if (normalized === "on_hold") {
+    return { background: "#fef3c7", color: "#92400e" };
+  }
+
+  if (normalized === "under_review") {
+    return { background: "#ede9fe", color: "#6d28d9" };
+  }
+
+  if (normalized === "ongoing") {
+    return { background: "#dbeafe", color: "#1d4ed8" };
+  }
+
+  return { background: "#eef2ff", color: "#334155" };
+};
+
+const getDeadlineBadgeStyle = (tone) => {
+  if (tone === "danger") return { background: "#fee2e2", color: "#b91c1c" };
+  if (tone === "urgent") return { background: "#ffedd5", color: "#c2410c" };
+  if (tone === "done") return { background: "#dcfce7", color: "#166534" };
+  if (tone === "muted") return { background: "#f1f5f9", color: "#64748b" };
+
+  return { background: "#e0f2fe", color: "#0369a1" };
+};
+
+const getDeadlineTextStyle = (tone) => {
+  if (tone === "danger") return { color: "#b91c1c" };
+  if (tone === "urgent") return { color: "#c2410c" };
+  if (tone === "done") return { color: "#166534" };
+  return { color: "#64748b" };
+};
+
 const styles = {
   page: {
     width: "100%",
-    padding: "0",
+    padding: 0,
   },
 
-  topActions: {
+  taskToolbar: {
     width: "100%",
     display: "flex",
-    justifyContent: "flex-end",
     alignItems: "center",
-    marginBottom: "22px",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: "12px",
+    marginBottom: "18px",
   },
 
-  refreshBtn: {
-    border: "none",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "18px",
-    padding: "15px 24px",
-    fontSize: "16px",
-    fontWeight: 900,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
-    cursor: "pointer",
-    boxShadow: "0 14px 28px rgba(255, 87, 51, 0.22)",
-  },
-
-  errorBox: {
-    background: "#fff1f2",
-    border: "1px solid #fecdd3",
-    color: "#b91c1c",
-    borderRadius: "18px",
-    padding: "16px 20px",
-    fontSize: "16px",
-    fontWeight: 800,
-    marginBottom: "22px",
-  },
-
-  successBox: {
-    background: "#dcfce7",
-    border: "1px solid #bbf7d0",
-    color: "#166534",
-    borderRadius: "18px",
-    padding: "16px 20px",
-    fontSize: "16px",
-    fontWeight: 800,
-    marginBottom: "22px",
-  },
-
-  taskStatsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "22px",
-    marginBottom: "28px",
-  },
-
-  taskStatCard: {
-    background: "#ffffff",
-    borderRadius: "22px",
-    padding: "24px 26px",
-    minHeight: "120px",
-    display: "grid",
-    gridTemplateColumns: "24px minmax(0, 1fr)",
-    gridTemplateRows: "auto auto",
-    alignContent: "center",
-    alignItems: "center",
-    gap: "16px 10px",
-    boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
-    border: "1px solid #eef2f7",
-    cursor: "pointer",
-    textAlign: "left",
-  },
-
-  activeStatCard: {
-    border: "1px solid #ff5733",
-    background: "#fff7f4",
-  },
-
-  taskStatNumber: {
-    gridColumn: "1 / -1",
-    color: "#111827",
-    fontSize: "34px",
-    fontWeight: 900,
-    lineHeight: 1,
-  },
-
-  taskStatLabel: {
-    gridColumn: "1 / -1",
-    color: "#64748b",
-    fontSize: "15px",
-    fontWeight: 900,
-    lineHeight: 1.25,
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  },
-
-  tasksPanel: {
-    background: "#ffffff",
-    borderRadius: "28px",
-    padding: "32px",
-    boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
-  },
-
-  panelHeader: {
-    display: "grid",
-    gridTemplateColumns: "minmax(260px, 0.8fr) minmax(320px, 1fr)",
-    gap: "24px",
-    alignItems: "start",
-    marginBottom: "26px",
-  },
-
-  panelTitleWrap: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "16px",
-  },
-
-  panelTitle: {
-    margin: "0 0 10px",
-    color: "#111827",
-    fontSize: "32px",
-    fontWeight: 900,
-    lineHeight: 1.12,
-  },
-
-  panelSubtitle: {
-    margin: 0,
-    color: "#64748b",
-    fontSize: "16px",
-    lineHeight: 1.45,
-  },
-
-  searchBox: {
-    height: "60px",
-    border: "1px solid #d6dde8",
-    borderRadius: "18px",
+  kanbanSearchBox: {
+    flex: "1 1 420px",
+    minWidth: "280px",
+    maxWidth: "720px",
+    height: "54px",
+    border: "1px solid #d1d5db",
+    borderRadius: "16px",
     display: "flex",
     alignItems: "center",
     gap: "12px",
@@ -1028,67 +1319,236 @@ const styles = {
     border: "none",
     outline: "none",
     color: "#111827",
-    fontSize: "16px",
+    fontSize: "14px",
     fontWeight: 700,
     background: "transparent",
   },
 
-  emptyBox: {
-    border: "1px dashed #cbd5e1",
-    borderRadius: "18px",
-    padding: "28px",
-    textAlign: "center",
-    color: "#64748b",
-    fontSize: "16px",
-    fontWeight: 900,
-    background: "#f8fafc",
-  },
-
-  taskGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "22px",
-  },
-
-  taskCard: {
-    border: "1px solid #e5e7eb",
-    background: "#ffffff",
-    borderRadius: "20px",
-    padding: "22px",
-    cursor: "pointer",
-    textAlign: "left",
-    boxShadow: "0 12px 28px rgba(15, 23, 42, 0.04)",
-  },
-
-  taskCardTop: {
+  controlGroup: {
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "16px",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "10px",
+  },
+
+  selectWrap: {
+    height: "54px",
+    border: "1px solid #d1d5db",
+    borderRadius: "16px",
+    background: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "0 12px 0 14px",
+  },
+
+  selectControl: {
+    height: "100%",
+    border: "none",
+    outline: "none",
+    background: "transparent",
+    color: "#111827",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+
+  refreshBtn: {
+    height: "54px",
+    border: "none",
+    background: "#ff5733",
+    color: "#ffffff",
+    borderRadius: "16px",
+    padding: "0 20px",
+    fontSize: "14px",
+    fontWeight: 900,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "9px",
+    cursor: "pointer",
+    boxShadow: "0 8px 20px rgba(255, 87, 51, 0.18)",
+  },
+
+  errorBox: {
+    background: "#fff1f2",
+    border: "1px solid #fecdd3",
+    color: "#b91c1c",
+    borderRadius: "14px",
+    padding: "12px 15px",
+    fontSize: "14px",
+    fontWeight: 800,
     marginBottom: "16px",
   },
 
-  taskTitle: {
-    margin: "0 0 8px",
-    color: "#111827",
-    fontSize: "20px",
-    fontWeight: 900,
-    lineHeight: 1.25,
+  successBox: {
+    background: "#dcfce7",
+    border: "1px solid #bbf7d0",
+    color: "#166534",
+    borderRadius: "14px",
+    padding: "12px 15px",
+    fontSize: "14px",
+    fontWeight: 800,
+    marginBottom: "16px",
   },
 
-  projectTitle: {
+  emptyBox: {
+    border: "1px dashed #cbd5e1",
+    borderRadius: "16px",
+    padding: "22px",
+    textAlign: "center",
+    color: "#64748b",
+    fontSize: "14px",
+    fontWeight: 800,
+    background: "#f8fafc",
+  },
+
+  kanbanRow: {
+  display: "flex",
+  flexWrap: "nowrap",
+  alignItems: "flex-start",
+  gap: "20px",
+
+  overflowX: "auto",
+  overflowY: "hidden",
+
+  paddingBottom: "14px",
+},
+  kanbanColumn: {
+  flex: "0 0 300px",
+
+  height: "560px",
+  minHeight: "560px",
+  maxHeight: "560px",
+
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "22px",
+  padding: "18px",
+  boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+
+  display: "flex",
+  flexDirection: "column",
+
+  overflow: "hidden",
+},
+
+  kanbanHeader: {
+  background: "#f8fafc",
+  borderRadius: "18px",
+  padding: "16px",
+
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "center",
+
+  marginBottom: "16px",
+
+  flexShrink: 0,
+},
+
+  kanbanTitle: {
+    margin: 0,
+    color: "#111827",
+    fontSize: "18px",
+    fontWeight: 900,
+  },
+
+  kanbanTitle: {
+    margin: 0,
+    color: "#111827",
+    fontSize: "22px",
+    fontWeight: 900,
+  },
+  kanbanSubtitle: {
+    margin: "5px 0 0",
+    color: "#667085",
+    fontSize: "13px",
+    lineHeight: 1.35,
+  },
+
+
+  kanbanCount: {
+    minWidth: "38px",
+    height: "38px",
+    padding: "0 10px",
+    borderRadius: "999px",
+    background: "#e5e7eb",
+    display: "grid",
+    placeItems: "center",
+    fontSize: "13px",
+    fontWeight: 900,
+    color: "#111827",
+    flexShrink: 0,
+  },
+
+  kanbanBody: {
+  display: "flex",
+  flexDirection: "column",
+  gap: "12px",
+
+  flex: 1,
+  minHeight: 0,
+
+  overflowY: "auto",
+  overflowX: "hidden",
+
+  paddingRight: "6px",
+},
+
+  emptyKanbanColumn: {
+    border: "1px dashed #d1d5db",
+    borderRadius: "13px",
+    padding: "16px",
+    textAlign: "center",
+    color: "#94a3b8",
+    fontSize: "12px",
+    fontWeight: 800,
+  },
+
+  kanbanTaskCard: {
+  width: "100%",
+  textAlign: "left",
+  border: "1px solid #e5e7eb",
+  background: "#ffffff",
+  borderRadius: "18px",
+  padding: "18px",
+  cursor: "pointer",
+  boxShadow: "0 8px 18px rgba(15, 23, 42, 0.04)",
+
+  flexShrink: 0,
+},
+
+  kanbanTaskTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "10px",
+    marginBottom: "12px",
+  },
+
+  kanbanTaskTitle: {
+    margin: "0 0 5px",
+    color: "#111827",
+    fontSize: "18px",
+    fontWeight: 900,
+    lineHeight: 1.25,
+    overflowWrap: "anywhere",
+  },
+
+  kanbanProjectTitle: {
     margin: 0,
     color: "#475569",
-    fontSize: "16px",
-    fontWeight: 700,
+    fontSize: "13px",
+    fontWeight: 800,
+    overflowWrap: "anywhere",
   },
 
   statusBadge: {
-    background: "#eef2ff",
-    color: "#334155",
-    padding: "9px 14px",
+    padding: "7px 11px",
     borderRadius: "999px",
-    fontSize: "14px",
+    fontSize: "12px",
     fontWeight: 900,
     whiteSpace: "nowrap",
   },
@@ -1098,42 +1558,77 @@ const styles = {
     color: "#166534",
   },
 
-  taskDescription: {
+  kanbanTaskDescription: {
     margin: "0 0 14px",
     color: "#64748b",
-    fontSize: "15px",
+    fontSize: "13px",
     lineHeight: 1.45,
+    overflow: "hidden",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
   },
-
-  taskAssignedByLine: {
-    marginBottom: "16px",
-    color: "#64748b",
-    fontSize: "14px",
-    fontWeight: 800,
-  },
-
-  taskDateRow: {
+  cardBadgeRow: {
     display: "flex",
-    gap: "8px",
+    flexWrap: "wrap",
+    gap: "7px",
+    marginBottom: "13px",
+  },
+
+  deadlineBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "28px",
+    padding: "5px 10px",
+    borderRadius: "999px",
+    fontSize: "11px",
+    fontWeight: 900,
+  },
+
+  priorityBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "28px",
+    padding: "5px 10px",
+    borderRadius: "999px",
+    background: "#f1f5f9",
+    color: "#475569",
+    fontSize: "11px",
+    fontWeight: 900,
+  },
+
+  kanbanMetaLine: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+    marginBottom: "11px",
     color: "#64748b",
-    fontSize: "14px",
-    fontWeight: 700,
-    marginBottom: "18px",
+    fontSize: "12px",
+  },
+
+  kanbanDates: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginBottom: "13px",
+    color: "#475569",
+    fontSize: "12px",
+    fontWeight: 800,
   },
 
   progressMeta: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: "16px",
+    gap: "12px",
     color: "#111827",
-    fontSize: "15px",
-    marginBottom: "10px",
+    fontSize: "12px",
+    marginBottom: "8px",
   },
 
   progressTrack: {
     width: "100%",
-    height: "11px",
+    height: "8px",
     borderRadius: "999px",
     background: "#ffd6cc",
     overflow: "hidden",
@@ -1152,28 +1647,28 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    padding: "36px",
+    padding: "28px",
     zIndex: 9999,
   },
 
   modal: {
-    width: "min(1080px, 96vw)",
-    maxHeight: "88vh",
+    width: "min(1040px, 96vw)",
+    maxHeight: "90vh",
     overflowY: "auto",
     background: "#ffffff",
-    borderRadius: "28px",
-    padding: "34px",
+    borderRadius: "24px",
+    padding: "28px",
     position: "relative",
     boxShadow: "0 30px 90px rgba(15, 23, 42, 0.28)",
   },
 
   closeBtn: {
     position: "absolute",
-    top: "28px",
-    right: "28px",
-    width: "52px",
-    height: "52px",
-    borderRadius: "16px",
+    top: "22px",
+    right: "22px",
+    width: "44px",
+    height: "44px",
+    borderRadius: "14px",
     border: "none",
     background: "#111827",
     color: "#ffffff",
@@ -1183,122 +1678,157 @@ const styles = {
   },
 
   modalHeader: {
-    paddingRight: "70px",
-    marginBottom: "26px",
+    paddingRight: "62px",
+    marginBottom: "18px",
   },
 
   modalTitle: {
-    margin: "0 0 8px",
+    margin: "0 0 6px",
     color: "#111827",
-    fontSize: "34px",
+    fontSize: "28px",
     fontWeight: 900,
   },
 
   modalSubtitle: {
     margin: 0,
     color: "#64748b",
-    fontSize: "18px",
+    fontSize: "15px",
+  },
+
+  modalError: {
+    background: "#fff1f2",
+    border: "1px solid #fecdd3",
+    color: "#b91c1c",
+    borderRadius: "13px",
+    padding: "11px 13px",
+    marginBottom: "16px",
+    fontSize: "13px",
+    fontWeight: 800,
+  },
+
+  modalSuccess: {
+    background: "#dcfce7",
+    border: "1px solid #bbf7d0",
+    color: "#166534",
+    borderRadius: "13px",
+    padding: "11px 13px",
+    marginBottom: "16px",
+    fontSize: "13px",
+    fontWeight: 800,
   },
 
   detailsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "16px",
-    marginBottom: "20px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "12px",
+    marginBottom: "16px",
   },
 
   detailBox: {
     border: "1px solid #e5e7eb",
     background: "#f8fafc",
-    borderRadius: "16px",
-    padding: "18px",
+    borderRadius: "14px",
+    padding: "14px",
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "6px",
+    fontSize: "13px",
   },
 
   assignedByEmail: {
     color: "#64748b",
-    fontSize: "13px",
+    fontSize: "11px",
     fontWeight: 700,
     lineHeight: 1.3,
     wordBreak: "break-word",
   },
 
+  deadlineText: {
+    fontSize: "11px",
+    fontWeight: 900,
+  },
+
   descriptionBox: {
     border: "1px solid #e5e7eb",
     background: "#ffffff",
-    borderRadius: "16px",
-    padding: "18px",
-    marginBottom: "20px",
+    borderRadius: "14px",
+    padding: "15px",
+    marginBottom: "16px",
   },
 
   modalProgressBox: {
     border: "1px solid #ffc6b8",
     background: "#fff7f4",
-    borderRadius: "18px",
-    padding: "20px",
-    marginBottom: "22px",
+    borderRadius: "15px",
+    padding: "16px",
+    marginBottom: "18px",
   },
 
   subtaskCountText: {
-    margin: "10px 0 0",
+    margin: "8px 0 0",
     color: "#64748b",
-    fontSize: "15px",
+    fontSize: "12px",
     fontWeight: 800,
   },
 
   addSubtaskBox: {
     border: "1px solid #e5e7eb",
     background: "#f8fafc",
-    borderRadius: "20px",
-    padding: "22px",
-    marginBottom: "26px",
+    borderRadius: "17px",
+    padding: "18px",
+    marginBottom: "20px",
   },
 
   addSubtaskTitle: {
-    margin: "0 0 18px",
+    margin: "0 0 8px",
     color: "#ff5733",
-    fontSize: "24px",
+    fontSize: "20px",
     fontWeight: 900,
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    gap: "8px",
+  },
+
+  dateLimitHint: {
+    margin: "0 0 14px",
+    color: "#64748b",
+    fontSize: "12px",
+    lineHeight: 1.45,
   },
 
   formGrid: {
     display: "grid",
-    gridTemplateColumns: "1.2fr 1fr 1fr",
-    gap: "14px",
-    marginBottom: "16px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+    gap: "12px",
+    marginBottom: "13px",
   },
 
   formGroup: {
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "7px",
     color: "#111827",
-    fontSize: "15px",
+    fontSize: "13px",
     fontWeight: 800,
   },
 
   input: {
-    height: "52px",
+    height: "46px",
     border: "1px solid #d6dde8",
-    borderRadius: "14px",
-    padding: "0 14px",
-    fontSize: "15px",
+    borderRadius: "12px",
+    padding: "0 12px",
+    fontSize: "13px",
     fontWeight: 700,
     outline: "none",
     background: "#ffffff",
   },
 
   textarea: {
-    minHeight: "96px",
+    minHeight: "82px",
     border: "1px solid #d6dde8",
-    borderRadius: "14px",
-    padding: "14px",
-    fontSize: "15px",
+    borderRadius: "12px",
+    padding: "12px",
+    fontSize: "13px",
     fontWeight: 700,
     outline: "none",
     resize: "vertical",
@@ -1307,51 +1837,66 @@ const styles = {
 
   addBtn: {
     width: "100%",
-    height: "56px",
+    height: "48px",
     border: "none",
-    borderRadius: "16px",
+    borderRadius: "13px",
     background: "#ff5733",
     color: "#ffffff",
-    fontSize: "17px",
+    fontSize: "14px",
     fontWeight: 900,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "10px",
-    marginTop: "18px",
+    gap: "8px",
+    marginTop: "14px",
     cursor: "pointer",
   },
 
+  disabledBtn: {
+    opacity: 0.65,
+    cursor: "not-allowed",
+  },
+
+  lockedBox: {
+    background: "#f8fafc",
+    border: "1px solid #e5e7eb",
+    borderRadius: "14px",
+    padding: "14px",
+    marginBottom: "20px",
+    color: "#64748b",
+    fontSize: "13px",
+  },
+
   subtasksSection: {
-    marginTop: "10px",
+    marginTop: "8px",
   },
 
   sectionTitle: {
-    margin: "0 0 16px",
+    margin: "0 0 13px",
     color: "#111827",
-    fontSize: "26px",
+    fontSize: "21px",
     fontWeight: 900,
   },
 
   subtaskList: {
     display: "flex",
     flexDirection: "column",
-    gap: "14px",
+    gap: "10px",
   },
 
   subtaskItem: {
     border: "1px solid #e5e7eb",
-    borderRadius: "18px",
-    padding: "18px",
+    borderRadius: "14px",
+    padding: "13px",
     display: "grid",
-    gridTemplateColumns: "24px 1fr auto",
+    gridTemplateColumns: "22px minmax(0, 1fr) auto",
     alignItems: "center",
-    gap: "16px",
+    gap: "12px",
   },
 
   checkbox: {
-    width: "18px",
-    height: "18px",
+    width: "17px",
+    height: "17px",
   },
 
   subtaskContent: {
@@ -1359,24 +1904,34 @@ const styles = {
   },
 
   subtaskTitle: {
-    margin: "0 0 6px",
+    margin: "0 0 4px",
     color: "#111827",
-    fontSize: "17px",
+    fontSize: "14px",
     fontWeight: 900,
   },
 
   subtaskDescription: {
-    margin: "0 0 8px",
+    margin: "0 0 6px",
     color: "#64748b",
-    fontSize: "15px",
+    fontSize: "12px",
     lineHeight: 1.4,
   },
 
-  subtaskDate: {
-    margin: 0,
+  subtaskDateLine: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "8px",
     color: "#64748b",
-    fontSize: "14px",
+    fontSize: "11px",
     fontWeight: 700,
+  },
+
+  smallDeadlineBadge: {
+    padding: "3px 7px",
+    borderRadius: "999px",
+    fontSize: "9px",
+    fontWeight: 900,
   },
 };
 

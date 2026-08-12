@@ -387,6 +387,9 @@ const addEmployeeSubtask = async (req, res) => {
     const startDate = req.body.start_date || null;
     const dueDate = req.body.due_date || req.body.end_date || null;
 
+    // -----------------------------
+    // BASIC VALIDATION
+    // -----------------------------
     if (!title.trim()) {
       return res.status(400).json({
         success: false,
@@ -401,14 +404,26 @@ const addEmployeeSubtask = async (req, res) => {
       });
     }
 
+    if (startDate > dueDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Subtask start date cannot be after subtask end date.",
+      });
+    }
+
+    // -----------------------------
+    // GET PARENT MAIN TASK
+    // -----------------------------
     const [mainTaskRows] = await db.query(
       `
       SELECT
         task_id,
         project_id,
         assigned_to_user_id,
-        start_date,
-        due_date
+        status,
+        COALESCE(progress, 0) AS progress,
+        DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
+        DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date
       FROM tasks
       WHERE task_id = ?
         AND assigned_to_user_id = ?
@@ -427,6 +442,61 @@ const addEmployeeSubtask = async (req, res) => {
 
     const mainTask = mainTaskRows[0];
 
+    // -----------------------------
+    // PREVENT SUBTASKS ON LOCKED TASKS
+    // -----------------------------
+    const mainTaskStatus = normalizeStatus(
+      mainTask.status,
+      mainTask.progress
+    );
+
+    if (mainTaskStatus === "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Subtasks cannot be added to a completed task.",
+      });
+    }
+
+    if (mainTaskStatus === "rejected") {
+      return res.status(400).json({
+        success: false,
+        message: "Subtasks cannot be added to a rejected task.",
+      });
+    }
+
+    if (mainTaskStatus === "on_hold") {
+      return res.status(400).json({
+        success: false,
+        message: "Subtasks cannot be added while the task is On Hold.",
+      });
+    }
+
+    // -----------------------------
+    // PARENT TASK DATE VALIDATION
+    // -----------------------------
+    if (
+      mainTask.start_date &&
+      startDate < mainTask.start_date
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: `Subtask start date cannot be before the parent task start date (${mainTask.start_date}).`,
+      });
+    }
+
+    if (
+      mainTask.due_date &&
+      dueDate > mainTask.due_date
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: `Subtask deadline cannot exceed the parent task deadline (${mainTask.due_date}).`,
+      });
+    }
+
+    // -----------------------------
+    // GET TABLE COLUMNS
+    // -----------------------------
     const columns = await getTaskTableColumns();
 
     const insertData = {
@@ -454,6 +524,13 @@ const addEmployeeSubtask = async (req, res) => {
       hasColumn(columns, key)
     );
 
+    if (!validInsertData.length) {
+      return res.status(500).json({
+        success: false,
+        message: "No valid task columns were found for creating the subtask.",
+      });
+    }
+
     const insertColumns = validInsertData.map(([key]) => key);
     const insertValues = validInsertData.map(([, value]) => value);
     const placeholders = insertColumns.map(() => "?").join(", ");
@@ -466,6 +543,9 @@ const addEmployeeSubtask = async (req, res) => {
       insertValues
     );
 
+    // -----------------------------
+    // UPDATE MAIN TASK PROGRESS
+    // -----------------------------
     await recalculateMainTask(mainTaskId);
 
     return res.status(201).json({
@@ -474,6 +554,8 @@ const addEmployeeSubtask = async (req, res) => {
       subtask_id: result.insertId,
     });
   } catch (error) {
+    console.error("Add employee subtask error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to add subtask.",

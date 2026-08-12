@@ -166,7 +166,7 @@ const buildAttendanceWithGeneratedAbsents = (attendanceRows, employeeId) => {
           total_minutes: totalMinutes,
           working_hours: formatWorkingHours(totalMinutes),
           status: normalizeStatus(existingRow.status),
-          remarks: existingRow.remarks || getDayName(currentDate),
+          remarks: existingRow.remarks || "-",
           is_generated_absent: false,
         });
       } else {

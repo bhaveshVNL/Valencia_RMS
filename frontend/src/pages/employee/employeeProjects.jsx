@@ -293,7 +293,9 @@ const EmployeeProjects = () => {
   const [loading, setLoading] = useState(true);
   const [modalLoading, setModalLoading] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
+
   const [togglingSubtaskId, setTogglingSubtaskId] = useState(null);
+  const [confirmSubtask, setConfirmSubtask] = useState(null);
 
   const [error, setError] = useState("");
   const [modalError, setModalError] = useState("");
@@ -454,105 +456,148 @@ const EmployeeProjects = () => {
   };
 
   const closeProjectModal = () => {
-    setSelectedProject(null);
-    setSubtasks([]);
+  setSelectedProject(null);
+  setSubtasks([]);
+  setSubtaskTitle("");
+  setSubtaskDescription("");
+  setSubtaskStartDate("");
+  setSubtaskEndDate("");
+  setModalError("");
+  setModalSuccess("");
+
+  setConfirmSubtask(null);
+  setTogglingSubtaskId(null);
+};
+
+  const handleAddSubtask = async (event) => {
+  event?.preventDefault?.();
+
+  if (!selectedProject || addingSubtask) return;
+
+  setModalError("");
+  setModalSuccess("");
+
+  if (isProjectLocked(selectedProject)) {
+    setModalError("This project is locked. Subtasks cannot be added now.");
+    return;
+  }
+
+  const projectStartDate = getProjectStartDate(selectedProject);
+  const projectEndDate = getProjectEndDate(selectedProject);
+
+  if (!subtaskTitle.trim()) {
+    setModalError("Please enter subtask title.");
+    return;
+  }
+
+  if (!subtaskStartDate) {
+    setModalError("Please select subtask start date.");
+    return;
+  }
+
+  if (!subtaskEndDate) {
+    setModalError("Please select subtask end date.");
+    return;
+  }
+
+  if (compareDateOnly(subtaskEndDate, subtaskStartDate) < 0) {
+    setModalError(
+      "Subtask end date cannot be before subtask start date."
+    );
+    return;
+  }
+
+  if (
+    projectStartDate &&
+    compareDateOnly(subtaskStartDate, projectStartDate) < 0
+  ) {
+    setModalError(
+      `Subtask start date cannot be before project start date ${projectStartDate}.`
+    );
+    return;
+  }
+
+  if (
+    projectEndDate &&
+    compareDateOnly(subtaskEndDate, projectEndDate) > 0
+  ) {
+    setModalError(
+      `Subtask end date cannot exceed project end date ${projectEndDate}.`
+    );
+    return;
+  }
+
+  try {
+    setAddingSubtask(true);
+
+    const projectId = selectedProject.project_id;
+
+    // ADD SUBTASK
+    const response = await api.post(
+      `${API_BASE}/projects/${projectId}/subtasks`,
+      {
+        title: subtaskTitle.trim(),
+        description: subtaskDescription.trim(),
+        start_date: subtaskStartDate,
+        end_date: subtaskEndDate,
+      }
+    );
+
+    // CLEAR FORM
     setSubtaskTitle("");
     setSubtaskDescription("");
     setSubtaskStartDate("");
     setSubtaskEndDate("");
-    setModalError("");
-    setModalSuccess("");
-  };
 
-  const handleAddSubtask = async (event) => {
-    event.preventDefault();
-
-    if (!selectedProject) return;
-
-    setModalError("");
-    setModalSuccess("");
-
-    if (isProjectLocked(selectedProject)) {
-      setModalError("This project is locked. Subtasks cannot be added now.");
-      return;
+    // USE SUBTASKS FROM POST RESPONSE IF AVAILABLE
+    if (Array.isArray(response.data?.subtasks)) {
+      setSubtasks(response.data.subtasks);
     }
 
-    const projectStartDate = getProjectStartDate(selectedProject);
-    const projectEndDate = getProjectEndDate(selectedProject);
-
-    if (!subtaskTitle.trim()) {
-      setModalError("Please enter subtask title.");
-      return;
-    }
-
-    if (!subtaskStartDate) {
-      setModalError("Please select subtask start date.");
-      return;
-    }
-
-    if (!subtaskEndDate) {
-      setModalError("Please select subtask end date.");
-      return;
-    }
-
-    if (compareDateOnly(subtaskEndDate, subtaskStartDate) < 0) {
-      setModalError("Subtask end date cannot be before subtask start date.");
-      return;
-    }
-
-    if (
-      projectStartDate &&
-      compareDateOnly(subtaskStartDate, projectStartDate) < 0
-    ) {
-      setModalError(
-        `Subtask start date cannot be before project start date ${projectStartDate}.`
-      );
-      return;
-    }
-
-    if (projectEndDate && compareDateOnly(subtaskEndDate, projectEndDate) > 0) {
-      setModalError(
-        `Subtask end date cannot exceed project end date ${projectEndDate}.`
-      );
-      return;
-    }
-
+    // REFRESH ONLY THIS PROJECT POPUP
     try {
-      setAddingSubtask(true);
-
-      const response = await api.post(
-        `${API_BASE}/projects/${selectedProject.project_id}/subtasks`,
-        {
-          title: subtaskTitle,
-          description: subtaskDescription,
-          start_date: subtaskStartDate,
-          end_date: subtaskEndDate,
-        }
+      const detailResponse = await api.get(
+        `${API_BASE}/projects/${projectId}/subtasks`
       );
 
-      setSubtasks(response.data?.subtasks || []);
-      setSubtaskTitle("");
-      setSubtaskDescription("");
-      setSubtaskStartDate("");
-      setSubtaskEndDate("");
-      setModalSuccess(response.data?.message || "Subtask added successfully.");
+      if (detailResponse.data?.project) {
+        setSelectedProject((previous) => ({
+          ...(previous || {}),
+          ...detailResponse.data.project,
+        }));
+      }
 
-      await fetchProjects();
-    } catch (err) {
-      console.error("Add employee subtask error:", err);
+      if (Array.isArray(detailResponse.data?.subtasks)) {
+        setSubtasks(detailResponse.data.subtasks);
+      }
+    } catch (detailError) {
+      console.error(
+        "Refresh project details after add error:",
+        detailError
+      );
+    }
 
-      setModalError(
-        err?.response?.data?.sqlMessage ||
+    setModalSuccess(
+      response.data?.message || "Subtask added successfully."
+    );
+
+    // IMPORTANT:
+    // DO NOT call fetchProjects() here.
+  } catch (err) {
+    console.error("Add employee subtask error:", err);
+
+    setModalError(
+      err?.response?.data?.sqlMessage ||
         err?.response?.data?.error ||
         err?.response?.data?.message ||
         "Failed to add subtask."
-      );
-    } finally {
-      setAddingSubtask(false);
-    }
-  };
+    );
+  } finally {
+    setAddingSubtask(false);
+  }
+};
 
-  const handleToggleSubtask = async (subtask, checked) => {
+  const handleToggleSubtask = (subtask) => {
     if (!selectedProject) return;
 
     const subtaskId = getSubtaskId(subtask);
@@ -568,7 +613,22 @@ const EmployeeProjects = () => {
     }
 
     if (isSubtaskDone(subtask.status, subtask.is_checked)) {
-      setModalError("Completed subtasks are locked and cannot be unchecked.");
+      return;
+    }
+
+    setModalError("");
+    setModalSuccess("");
+
+    // Open our custom confirmation popup
+    setConfirmSubtask(subtask);
+  };
+  const confirmMarkSubtaskDone = async () => {
+    if (!selectedProject || !confirmSubtask) return;
+
+    const subtaskId = getSubtaskId(confirmSubtask);
+
+    if (!subtaskId) {
+      setConfirmSubtask(null);
       return;
     }
 
@@ -577,31 +637,36 @@ const EmployeeProjects = () => {
       setModalError("");
       setModalSuccess("");
 
+      // Close confirmation box
+      setConfirmSubtask(null);
+
       const response = await api.patch(
         `${API_BASE}/projects/${selectedProject.project_id}/subtasks/${subtaskId}/status`,
         {
-          checked,
+          checked: true,
         }
       );
 
       setSubtasks(response.data?.subtasks || []);
-      setModalSuccess(response.data?.message || "Subtask updated successfully.");
+
+      setModalSuccess(
+        response.data?.message || "Subtask marked as Done."
+      );
 
       await fetchProjects();
     } catch (err) {
-      console.error("Toggle employee subtask error:", err);
+      console.error("Complete employee subtask error:", err);
 
       setModalError(
         err?.response?.data?.sqlMessage ||
         err?.response?.data?.error ||
         err?.response?.data?.message ||
-        "Failed to update subtask."
+        "Failed to complete subtask."
       );
     } finally {
       setTogglingSubtaskId(null);
     }
   };
-
   const renderCompactProjectTile = (project) => {
     return (
       <button
@@ -860,10 +925,7 @@ const EmployeeProjects = () => {
               </div>
             )}
 
-            <form
-              style={styles.subtaskForm}
-              onSubmit={handleAddSubtask}
-            >
+            <div style={styles.subtaskForm}>
               <div style={styles.formTitleRow}>
                 <Plus size={18} />
                 <h3>Add Subtask</h3>
@@ -910,9 +972,10 @@ const EmployeeProjects = () => {
                 </div>
 
                 <button
-                  type="submit"
+                  type="button"
                   style={styles.addBtn}
-                  disabled={addingSubtask || isProjectLocked(selectedProject)}
+                  disabled={addingSubtask}
+                  onClick={handleAddSubtask}
                 >
                   {addingSubtask ? "Adding..." : "Add"}
                 </button>
@@ -930,7 +993,7 @@ const EmployeeProjects = () => {
                   />
                 </div>
               </div>
-            </form>
+            </div>
             {modalError && <div style={styles.modalError}>{modalError}</div>}
 
             <section style={styles.subtaskSection}>
@@ -956,11 +1019,11 @@ const EmployeeProjects = () => {
                         ) !== "rejected" && (
                             <input
                               type="checkbox"
-                              checked={Boolean(subtask.is_checked)}
+                              checked={done}
                               disabled={
-                                isProjectLocked(
-                                  selectedProject.status_group || selectedProject.status
-                                )
+                                done ||
+                                isProjectLocked(selectedProject) ||
+                                togglingSubtaskId === subtaskId
                               }
                               onChange={() => handleToggleSubtask(subtask)}
                             />
@@ -994,10 +1057,38 @@ const EmployeeProjects = () => {
                   })}
                 </div>
               )}
-            </section>
+                        </section>
           </div>
         </div>
       )}
+
+      {/* CONFIRM SUBTASK DONE POPUP - PASTE HERE */}
+      {confirmSubtask && (
+        <div style={styles.confirmOverlay}>
+          <div style={styles.confirmBox}>
+            <h3 style={styles.confirmTitle}>Are you sure?</h3>
+
+            <div style={styles.confirmActions}>
+              <button
+                type="button"
+                style={styles.confirmCancelBtn}
+                onClick={() => setConfirmSubtask(null)}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                style={styles.confirmYesBtn}
+                onClick={confirmMarkSubtaskDone}
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -1100,32 +1191,49 @@ const styles = {
     marginBottom: "24px",
     background: "#ffffff",
   },
+
   stageRow: {
-    display: "flex",
-    flexWrap: "nowrap",
-    gap: "20px",
-    overflowX: "auto",
-    paddingBottom: "14px",
-  },
+  display: "flex",
+  flexWrap: "nowrap",
+  alignItems: "flex-start",
+  gap: "20px",
+  overflowX: "auto",
+  overflowY: "hidden",
+  paddingBottom: "14px",
+},
+
   stageColumn: {
-    flex: "0 0 300px",
-    minHeight: "520px",
-    background: "#ffffff",
-    border: "1px solid #e5e7eb",
-    borderRadius: "22px",
-    padding: "18px",
-    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
-  },
+  flex: "0 0 300px",
+
+  height: "560px",
+  minHeight: "560px",
+  maxHeight: "560px",
+
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "22px",
+  padding: "18px",
+  boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+
+  display: "flex",
+  flexDirection: "column",
+
+  overflow: "hidden",
+},
+
   stageHeader: {
-    background: "#f8fafc",
-    borderRadius: "18px",
-    padding: "16px",
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "12px",
-    alignItems: "center",
-    marginBottom: "16px",
-  },
+  background: "#f8fafc",
+  borderRadius: "18px",
+  padding: "16px",
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "center",
+  marginBottom: "16px",
+
+  flexShrink: 0,
+},
+
   stageTitle: {
     margin: 0,
     color: "#111827",
@@ -1149,19 +1257,29 @@ const styles = {
     flexShrink: 0,
   },
   stageBody: {
-    display: "grid",
-    gap: "12px",
-  },
+  display: "flex",
+  flexDirection: "column",
+  gap: "12px",
+
+  flex: 1,
+  minHeight: 0,
+
+  overflowY: "auto",
+  overflowX: "hidden",
+
+  paddingRight: "6px",
+},
   projectTile: {
-    width: "100%",
-    textAlign: "left",
-    border: "1px solid #e5e7eb",
-    background: "#ffffff",
-    borderRadius: "18px",
-    padding: "18px",
-    cursor: "pointer",
-    transition: "0.2s ease",
-  },
+  width: "100%",
+  textAlign: "left",
+  border: "1px solid #e5e7eb",
+  background: "#ffffff",
+  borderRadius: "18px",
+  padding: "18px",
+  cursor: "pointer",
+  transition: "0.2s ease",
+  flexShrink: 0,
+},
   projectTileTop: {
     display: "flex",
     justifyContent: "space-between",
@@ -1517,6 +1635,65 @@ const styles = {
     marginBottom: "14px",
     fontWeight: 800,
   },
+  confirmOverlay: {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(15, 23, 42, 0.45)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "20px",
+  zIndex: 20000,
+},
+
+confirmBox: {
+  width: "min(380px, 92vw)",
+  background: "#ffffff",
+  borderRadius: "22px",
+  padding: "30px",
+  boxShadow: "0 24px 70px rgba(15, 23, 42, 0.28)",
+  border: "1px solid #eef2f7",
+  textAlign: "center",
+},
+
+confirmTitle: {
+  margin: "0 0 26px",
+  color: "#111827",
+  fontSize: "24px",
+  fontWeight: 900,
+},
+
+confirmActions: {
+  display: "flex",
+  justifyContent: "center",
+  gap: "12px",
+},
+
+confirmCancelBtn: {
+  minWidth: "110px",
+  height: "46px",
+  border: "1px solid #d1d5db",
+  borderRadius: "13px",
+  background: "#ffffff",
+  color: "#111827",
+  fontSize: "15px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+
+confirmYesBtn: {
+  minWidth: "110px",
+  height: "46px",
+  border: "none",
+  borderRadius: "13px",
+  background: "#ff5733",
+  color: "#ffffff",
+  fontSize: "15px",
+  fontWeight: 900,
+  cursor: "pointer",
+  boxShadow: "0 8px 18px rgba(255, 87, 51, 0.22)",
+},
 };
+
 
 export default EmployeeProjects;

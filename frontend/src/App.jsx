@@ -17,6 +17,7 @@ import EmployeeProjects from "./pages/employee/employeeProjects";
 import EmployeeTasks from "./pages/employee/employeeTasks";
 import EmployeeProfile from "./pages/employee/employeeProfile";
 import EmployeeAttendance from "./pages/employee/employeeAttendance";
+import EmployeeLeaveApplications from "./pages/employee/employeeLeaveApplications";
 
 import AdminLayout from "./layouts/Adminlayout";
 import AdminOverview from "./pages/admin/adminOverview";
@@ -107,6 +108,7 @@ const App = () => {
         <Route path="tasks" element={<EmployeeTasks />} />
         <Route path="profile" element={<EmployeeProfile />} />
         <Route path="attendance" element={<EmployeeAttendance />} />
+        <Route path="leave-applications" element={<EmployeeLeaveApplications />} />
       </Route>
 
       <Route
