@@ -67,9 +67,9 @@ const statusColumns = [
     subtitle: "Work has started",
   },
   {
-  key: "blocked",
-  title: "Blocked",
-},
+    key: "blocked",
+    title: "Blocked",
+  },
   {
     key: "under_review",
     title: "Under Review",
@@ -80,7 +80,7 @@ const statusColumns = [
     title: "Completed",
     subtitle: "Completed work",
   },
-  
+
 ];
 
 const formatDate = (dateValue) => {
@@ -147,8 +147,8 @@ const normalizeStatus = (status) => {
     return "on_hold";
   }
   if (value === "blocked" || value === "block") {
-  return "blocked";
-}
+    return "blocked";
+  }
 
   return "todo";
 };
@@ -322,21 +322,21 @@ const EmployeeProjects = () => {
         normalizedData.rejectedProjects.length > 0
           ? normalizedData.rejectedProjects
           : receivedProjects.filter((project) => {
-              return (
-                normalizeStatus(project.status_group || project.status) ===
-                "rejected"
-              );
-            });
+            return (
+              normalizeStatus(project.status_group || project.status) ===
+              "rejected"
+            );
+          });
 
       const receivedOnHold =
         normalizedData.onHoldProjects.length > 0
           ? normalizedData.onHoldProjects
           : receivedProjects.filter((project) => {
-              return (
-                normalizeStatus(project.status_group || project.status) ===
-                "on_hold"
-              );
-            });
+            return (
+              normalizeStatus(project.status_group || project.status) ===
+              "on_hold"
+            );
+          });
 
       const activeProjects = receivedProjects.filter((project) => {
         const status = normalizeStatus(project.status_group || project.status);
@@ -351,9 +351,9 @@ const EmployeeProjects = () => {
 
       setError(
         err?.response?.data?.sqlMessage ||
-          err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          "Failed to fetch projects."
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to fetch projects."
       );
     } finally {
       setLoading(false);
@@ -368,8 +368,8 @@ const EmployeeProjects = () => {
     activeTab === "my"
       ? myProjects
       : activeTab === "rejected"
-      ? rejectedProjects
-      : onHoldProjects;
+        ? rejectedProjects
+        : onHoldProjects;
 
   const filteredProjects = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
@@ -390,30 +390,30 @@ const EmployeeProjects = () => {
     });
   }, [visibleProjects, searchTerm]);
 
-const grouped = useMemo(() => {
-  const grouped = {
-    todo: [],
-    in_progress: [],
-    blocked: [],
-    under_review: [],
-    done: [],
-  };
+  const grouped = useMemo(() => {
+    const grouped = {
+      todo: [],
+      in_progress: [],
+      blocked: [],
+      under_review: [],
+      done: [],
+    };
 
-  filteredProjects.forEach((project) => {
-    const key = normalizeStatus(
-      project.status_group || project.status || project.project_status
-    );
+    filteredProjects.forEach((project) => {
+      const key = normalizeStatus(
+        project.status_group || project.status || project.project_status
+      );
 
-    if (!grouped[key]) {
-      grouped.todo.push(project);
-      return;
-    }
+      if (!grouped[key]) {
+        grouped.todo.push(project);
+        return;
+      }
 
-    grouped[key].push(project);
-  });
+      grouped[key].push(project);
+    });
 
-  return grouped;
-}, [filteredProjects]);
+    return grouped;
+  }, [filteredProjects]);
 
   const openProjectModal = async (project) => {
     try {
@@ -444,9 +444,9 @@ const grouped = useMemo(() => {
 
       setModalError(
         err?.response?.data?.sqlMessage ||
-          err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          "Failed to fetch project details."
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to fetch project details."
       );
     } finally {
       setModalLoading(false);
@@ -543,9 +543,9 @@ const grouped = useMemo(() => {
 
       setModalError(
         err?.response?.data?.sqlMessage ||
-          err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          "Failed to add subtask."
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to add subtask."
       );
     } finally {
       setAddingSubtask(false);
@@ -593,9 +593,9 @@ const grouped = useMemo(() => {
 
       setModalError(
         err?.response?.data?.sqlMessage ||
-          err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          "Failed to update subtask."
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to update subtask."
       );
     } finally {
       setTogglingSubtaskId(null);
@@ -618,7 +618,7 @@ const grouped = useMemo(() => {
           </span>
         </div>
 
-<div style={styles.projectTileSpacer}></div>
+        <div style={styles.projectTileSpacer}></div>
         <span style={styles.clickHint}>Click to view full details</span>
       </button>
     );
@@ -666,19 +666,19 @@ const grouped = useMemo(() => {
   return (
     <div style={styles.page}>
       <div
-  style={{
-    width: "100%",
-    display: "flex",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    marginBottom: "18px",
-  }}
->
-  <button type="button" style={styles.refreshBtn} onClick={fetchProjects}>
-    <RefreshCw size={18} />
-    Refresh
-  </button>
-</div>
+        style={{
+          width: "100%",
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          marginBottom: "18px",
+        }}
+      >
+        <button type="button" style={styles.refreshBtn} onClick={fetchProjects}>
+          <RefreshCw size={18} />
+          Refresh
+        </button>
+      </div>
 
       <section style={styles.tabs}>
         <button
@@ -727,18 +727,18 @@ const grouped = useMemo(() => {
                   <h2 style={styles.stageTitle}>{column.title}</h2>
                   <p style={styles.stageSubtitle}>{column.subtitle}</p>
                 </div>
-<span style={styles.stageCount}>
-  {grouped[column.key]?.length || 0}
-</span>
-</div>
+                <span style={styles.stageCount}>
+                  {grouped[column.key]?.length || 0}
+                </span>
+              </div>
 
-<div style={styles.stageBody}>
-  {grouped[column.key]?.length === 0 ? (
-    <div style={styles.emptyColumn}>No projects here.</div>
-  ) : (
-    grouped[column.key].map(renderCompactProjectTile)
-  )}
-</div>
+              <div style={styles.stageBody}>
+                {grouped[column.key]?.length === 0 ? (
+                  <div style={styles.emptyColumn}>No projects here.</div>
+                ) : (
+                  grouped[column.key].map(renderCompactProjectTile)
+                )}
+              </div>
             </div>
           ))}
         </section>
@@ -766,172 +766,171 @@ const grouped = useMemo(() => {
               </button>
             </div>
 
-        <div style={styles.detailGrid}>
-  <div style={styles.detailBox}>
-    <span style={styles.detailBoxLabel}>Department</span>
-    <p style={styles.detailBoxValue}>
-      {selectedProject.department_name || "-"}
-    </p>
-  </div>
+            <div style={styles.detailGrid}>
+              <div style={styles.detailBox}>
+                <span style={styles.detailBoxLabel}>Department</span>
+                <p style={styles.detailBoxValue}>
+                  {selectedProject.department_name || "-"}
+                </p>
+              </div>
 
-  <div style={styles.detailBox}>
-    <span style={styles.detailBoxLabel}>Created By</span>
-    <p style={styles.detailBoxValue}>
-      {selectedProject.created_by_name || "-"}
-      <br />
-      {selectedProject.created_by_email || "-"}
-    </p>
-  </div>
+              <div style={styles.detailBox}>
+                <span style={styles.detailBoxLabel}>Created By</span>
+                <p style={styles.detailBoxValue}>
+                  {selectedProject.created_by_name || "-"}
+                  <br />
+                  {selectedProject.created_by_email || "-"}
+                </p>
+              </div>
 
-  <div style={styles.detailBox}>
-    <span style={styles.detailBoxLabel}>Assigned To</span>
-    <p style={styles.detailBoxValue}>
-      {getAssignedNames(selectedProject)}
-      <br />
-      {getAssignedEmails(selectedProject)}
-    </p>
-  </div>
+              <div style={styles.detailBox}>
+                <span style={styles.detailBoxLabel}>Assigned To</span>
+                <p style={styles.detailBoxValue}>
+                  {getAssignedNames(selectedProject)}
+                  <br />
+                  {getAssignedEmails(selectedProject)}
+                </p>
+              </div>
 
-  <div style={styles.detailBox}>
-    <span style={styles.detailBoxLabel}>Status</span>
-    <p style={styles.detailBoxValue}>
-      {getStatusLabel(
-        selectedProject.status_group || selectedProject.status
-      )}
-    </p>
-  </div>
+              <div style={styles.detailBox}>
+                <span style={styles.detailBoxLabel}>Status</span>
+                <p style={styles.detailBoxValue}>
+                  {getStatusLabel(
+                    selectedProject.status_group || selectedProject.status
+                  )}
+                </p>
+              </div>
 
-  <div style={styles.detailBox}>
-    <span style={styles.detailBoxLabel}>Start Date</span>
-    <p style={styles.detailBoxValue}>
-      {formatDisplayDate(getProjectStartDate(selectedProject))}
-    </p>
-  </div>
+              <div style={styles.detailBox}>
+                <span style={styles.detailBoxLabel}>Start Date</span>
+                <p style={styles.detailBoxValue}>
+                  {formatDisplayDate(getProjectStartDate(selectedProject))}
+                </p>
+              </div>
 
-  <div style={styles.detailBox}>
-    <span style={styles.detailBoxLabel}>End Date</span>
-    <p style={styles.detailBoxValue}>
-      {formatDisplayDate(getProjectEndDate(selectedProject))}
-    </p>
-  </div>
-</div>
+              <div style={styles.detailBox}>
+                <span style={styles.detailBoxLabel}>End Date</span>
+                <p style={styles.detailBoxValue}>
+                  {formatDisplayDate(getProjectEndDate(selectedProject))}
+                </p>
+              </div>
+            </div>
 
-<div style={styles.progressBlock}>
-  <div style={styles.progressTop}>
-    <strong>Project Progress</strong>
+            <div style={styles.progressBlock}>
+              <div style={styles.progressTop}>
+                <strong>Project Progress</strong>
 
-    <span>
-      {normalizeStatus(
-        selectedProject.status_group || selectedProject.status
-      ) === "rejected"
-        ? 0
-        : selectedProject.progress ||
-          selectedProject.overall_progress ||
-          0}
-      %
-    </span>
-  </div>
+                <span>
+                  {normalizeStatus(
+                    selectedProject.status_group || selectedProject.status
+                  ) === "rejected"
+                    ? 0
+                    : selectedProject.progress ||
+                    selectedProject.overall_progress ||
+                    0}
+                  %
+                </span>
+              </div>
 
-  <div style={styles.progressTrack}>
-    <div
-      style={{
-        ...styles.progressFill,
-        width: `${
-          normalizeStatus(
-            selectedProject.status_group || selectedProject.status
-          ) === "rejected"
-            ? 0
-            : selectedProject.progress ||
-              selectedProject.overall_progress ||
-              0
-        }%`,
-      }}
-    />
-  </div>
+              <div style={styles.progressTrack}>
+                <div
+                  style={{
+                    ...styles.progressFill,
+                    width: `${normalizeStatus(
+                      selectedProject.status_group || selectedProject.status
+                    ) === "rejected"
+                        ? 0
+                        : selectedProject.progress ||
+                        selectedProject.overall_progress ||
+                        0
+                      }%`,
+                  }}
+                />
+              </div>
 
-  <p style={styles.progressNote}>
-    {selectedProject.completed_subtasks || 0}/
-    {selectedProject.total_subtasks || 0} subtasks completed
-  </p>
-</div>
+              <p style={styles.progressNote}>
+                {selectedProject.completed_subtasks || 0}/
+                {selectedProject.total_subtasks || 0} subtasks completed
+              </p>
+            </div>
 
-{isProjectLocked(selectedProject) && (
-  <div style={styles.modalWarning}>
-    ⚠ Subtasks cannot be added.
-  </div>
-)}
+            {isProjectLocked(selectedProject) && (
+              <div style={styles.modalWarning}>
+                ⚠ Subtasks cannot be added.
+              </div>
+            )}
 
-<form
-  style={styles.subtaskForm}
-  onSubmit={handleAddSubtask}
->
-  <div style={styles.formTitleRow}>
-    <Plus size={18} />
-    <h3>Add Subtask</h3>
-  </div>
+            <form
+              style={styles.subtaskForm}
+              onSubmit={handleAddSubtask}
+            >
+              <div style={styles.formTitleRow}>
+                <Plus size={18} />
+                <h3>Add Subtask</h3>
+              </div>
 
-  <div style={styles.formGrid}>
-    <div style={styles.field}>
-      <label>Subtask Title</label>
-      <input
-        type="text"
-        value={subtaskTitle}
-        onChange={(event) => setSubtaskTitle(event.target.value)}
-        placeholder="Example: Backend API"
-        disabled={isProjectLocked(selectedProject)}
-      />
-    </div>
+              <div style={styles.formGrid}>
+                <div style={styles.field}>
+                  <label>Subtask Title</label>
+                  <input
+                    type="text"
+                    value={subtaskTitle}
+                    onChange={(event) => setSubtaskTitle(event.target.value)}
+                    placeholder="Example: Backend API"
+                    disabled={isProjectLocked(selectedProject)}
+                  />
+                </div>
 
-    <div style={styles.field}>
-      <label>Start Date</label>
-      <input
-        type="date"
-        value={subtaskStartDate}
-        min={getProjectStartDate(selectedProject) || undefined}
-        max={getProjectEndDate(selectedProject) || undefined}
-        onChange={(event) => setSubtaskStartDate(event.target.value)}
-        disabled={isProjectLocked(selectedProject)}
-      />
-    </div>
+                <div style={styles.field}>
+                  <label>Start Date</label>
+                  <input
+                    type="date"
+                    value={subtaskStartDate}
+                    min={getProjectStartDate(selectedProject) || undefined}
+                    max={getProjectEndDate(selectedProject) || undefined}
+                    onChange={(event) => setSubtaskStartDate(event.target.value)}
+                    disabled={isProjectLocked(selectedProject)}
+                  />
+                </div>
 
-    <div style={styles.field}>
-      <label>End Date</label>
-      <input
-        type="date"
-        value={subtaskEndDate}
-        min={
-          subtaskStartDate ||
-          getProjectStartDate(selectedProject) ||
-          undefined
-        }
-        max={getProjectEndDate(selectedProject) || undefined}
-        onChange={(event) => setSubtaskEndDate(event.target.value)}
-        disabled={isProjectLocked(selectedProject)}
-      />
-    </div>
+                <div style={styles.field}>
+                  <label>End Date</label>
+                  <input
+                    type="date"
+                    value={subtaskEndDate}
+                    min={
+                      subtaskStartDate ||
+                      getProjectStartDate(selectedProject) ||
+                      undefined
+                    }
+                    max={getProjectEndDate(selectedProject) || undefined}
+                    onChange={(event) => setSubtaskEndDate(event.target.value)}
+                    disabled={isProjectLocked(selectedProject)}
+                  />
+                </div>
 
-    <button
-      type="submit"
-      style={styles.addBtn}
-      disabled={addingSubtask || isProjectLocked(selectedProject)}
-    >
-      {addingSubtask ? "Adding..." : "Add"}
-    </button>
+                <button
+                  type="submit"
+                  style={styles.addBtn}
+                  disabled={addingSubtask || isProjectLocked(selectedProject)}
+                >
+                  {addingSubtask ? "Adding..." : "Add"}
+                </button>
 
-    <div style={styles.fieldFull}>
-      <label>Subtask Description</label>
-      <textarea
-        value={subtaskDescription}
-        onChange={(event) =>
-          setSubtaskDescription(event.target.value)
-        }
-        placeholder="Write what this subtask includes..."
-        style={styles.textarea}
-        disabled={isProjectLocked(selectedProject)}
-      />
-    </div>
-  </div>
-</form>
+                <div style={styles.fieldFull}>
+                  <label>Subtask Description</label>
+                  <textarea
+                    value={subtaskDescription}
+                    onChange={(event) =>
+                      setSubtaskDescription(event.target.value)
+                    }
+                    placeholder="Write what this subtask includes..."
+                    style={styles.textarea}
+                    disabled={isProjectLocked(selectedProject)}
+                  />
+                </div>
+              </div>
+            </form>
             {modalError && <div style={styles.modalError}>{modalError}</div>}
 
             <section style={styles.subtaskSection}>
@@ -953,19 +952,19 @@ const grouped = useMemo(() => {
                     return (
                       <label style={styles.subtaskRow} key={subtaskId}>
                         {normalizeStatus(
-  selectedProject.status_group || selectedProject.status
-) !== "rejected" && (
-  <input
-    type="checkbox"
-    checked={Boolean(subtask.is_checked)}
-    disabled={
-      isProjectLocked(
-        selectedProject.status_group || selectedProject.status
-      )
-    }
-    onChange={() => handleToggleSubtask(subtask)}
-  />
-)}
+                          selectedProject.status_group || selectedProject.status
+                        ) !== "rejected" && (
+                            <input
+                              type="checkbox"
+                              checked={Boolean(subtask.is_checked)}
+                              disabled={
+                                isProjectLocked(
+                                  selectedProject.status_group || selectedProject.status
+                                )
+                              }
+                              onChange={() => handleToggleSubtask(subtask)}
+                            />
+                          )}
                         <div>
                           <strong>{getSubtaskTitle(subtask)}</strong>
 
@@ -1183,8 +1182,8 @@ const styles = {
     lineHeight: 1.5,
   },
   projectTileSpacer: {
-  height: "18px",
-},
+    height: "18px",
+  },
   statusPill: {
     background: "#eef2ff",
     color: "#374151",
@@ -1195,13 +1194,13 @@ const styles = {
     whiteSpace: "nowrap",
   },
   clickHint: {
-  color: "#ff5a3c",
-  fontWeight: "700",
-  whiteSpace: "normal",
-  wordBreak: "break-word",
-  overflowWrap: "break-word",
-  marginTop: "8px",
-},
+    color: "#ff5a3c",
+    fontWeight: "700",
+    whiteSpace: "normal",
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
+    marginTop: "8px",
+  },
   emptyColumn: {
     border: "1px dashed #d1d5db",
     borderRadius: "16px",
@@ -1329,22 +1328,22 @@ const styles = {
     gap: "12px",
     marginBottom: "20px",
   },
-detailBox: {
+  detailBox: {
     background: "#f8fafc",
     border: "1px solid #e5e7eb",
     borderRadius: "16px",
     padding: "16px",
     minWidth: 0,
     overflow: "hidden",
-},
+  },
 
-detailBoxLabel: {
-  fontWeight: "700",
-  display: "block",
-  marginBottom: "6px",
-},
+  detailBoxLabel: {
+    fontWeight: "700",
+    display: "block",
+    marginBottom: "6px",
+  },
 
-detailBoxValue: {
+  detailBoxValue: {
     color: "#111827",
     fontSize: "14px",
     fontWeight: "400",
@@ -1352,7 +1351,7 @@ detailBoxValue: {
     lineHeight: "1.5",
     wordBreak: "break-word",
     overflowWrap: "anywhere",
-},
+  },
   progressBlock: {
     background: "#fff7f4",
     border: "1px solid #ffd4c8",
@@ -1472,12 +1471,12 @@ detailBoxValue: {
     fontWeight: 900,
   },
   subtaskList: {
-  display: "grid",
-  gap: "10px",
-  maxHeight: "320px",
-  overflowY: "auto",
-  paddingRight: "8px",
-},
+    display: "grid",
+    gap: "10px",
+    maxHeight: "320px",
+    overflowY: "auto",
+    paddingRight: "8px",
+  },
   subtaskRow: {
     border: "1px solid #e5e7eb",
     borderRadius: "16px",
@@ -1510,14 +1509,14 @@ detailBoxValue: {
     fontWeight: 900,
   },
   modalWarning: {
-  background: "#fff7ed",
-  color: "#c2410c",
-  border: "1px solid #fed7aa",
-  borderRadius: "14px",
-  padding: "12px 14px",
-  marginBottom: "14px",
-  fontWeight: 800,
-},
+    background: "#fff7ed",
+    color: "#c2410c",
+    border: "1px solid #fed7aa",
+    borderRadius: "14px",
+    padding: "12px 14px",
+    marginBottom: "14px",
+    fontWeight: 800,
+  },
 };
 
 export default EmployeeProjects;

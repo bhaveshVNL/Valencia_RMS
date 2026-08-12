@@ -2405,6 +2405,7 @@
 }
 
 .employee-recent-task-item {
+  width: 100% !important;
   min-height: 112px;
   border: 1px solid #e5e7eb;
   border-radius: 18px;
@@ -2415,6 +2416,8 @@
   justify-content: space-between;
   gap: 18px;
   background: #ffffff;
+  box-sizing: border-box;
+  text-align: left;
 }
 
 .employee-recent-task-item h3 {
@@ -3070,11 +3073,12 @@
 
 /* Only Recent Tasks gets internal scroll */
 .recent-tasks-scroll-area {
+  width: 100% !important;
   max-height: 508px !important;
   overflow-y: auto !important;
   padding-right: 8px !important;
+  box-sizing: border-box !important;
 }
-
 .recent-tasks-scroll-area::-webkit-scrollbar {
   width: 8px;
 }
