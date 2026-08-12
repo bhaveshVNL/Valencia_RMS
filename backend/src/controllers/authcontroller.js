@@ -103,13 +103,14 @@ const login = async (req, res) => {
       token,
       user,
     });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Login failed.",
-      error: error.message,
-    });
-  }
+  }catch (error) {
+  console.error("LOGIN ERROR:", error);
+
+  return res.status(500).json({
+    message: "Login failed",
+    error: error.message,
+  });
+}
 };
 
 const getMe = async (req, res) => {

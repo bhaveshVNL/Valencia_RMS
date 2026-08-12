@@ -432,7 +432,10 @@ const getEmployeeProjects = async (req, res) => {
 
         task_progress: Number(project.task_progress || 0),
         progress: Number(project.progress || 0),
-        overall_progress: Number(project.overall_progress || 0),
+        overall_progress:
+          normalizeStatus(project.project_status || project.status) === "rejected"
+            ? 0
+            : Number(project.overall_progress || 0),
       };
     });
 

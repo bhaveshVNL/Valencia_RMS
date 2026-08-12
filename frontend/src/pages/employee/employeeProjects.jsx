@@ -67,15 +67,20 @@ const statusColumns = [
     subtitle: "Work has started",
   },
   {
+  key: "blocked",
+  title: "Blocked",
+},
+  {
     key: "under_review",
     title: "Under Review",
     subtitle: "Waiting for admin review",
   },
   {
     key: "done",
-    title: "Done",
+    title: "Completed",
     subtitle: "Completed work",
   },
+  
 ];
 
 const formatDate = (dateValue) => {
@@ -141,6 +146,9 @@ const normalizeStatus = (status) => {
   if (value === "on_hold" || value === "hold") {
     return "on_hold";
   }
+  if (value === "blocked" || value === "block") {
+  return "blocked";
+}
 
   return "todo";
 };
@@ -148,12 +156,13 @@ const normalizeStatus = (status) => {
 const getStatusLabel = (status) => {
   const value = normalizeStatus(status);
 
-  if (value === "todo") return "To Do";
+  if (value === "todo") return "Needed";
   if (value === "in_progress") return "In Progress";
   if (value === "under_review") return "Under Review";
-  if (value === "done") return "Done";
+  if (value === "done") return "Completed";
   if (value === "rejected") return "Rejected";
   if (value === "on_hold") return "On Hold";
+  if (value === "blocked") return "Blocked";
 
   return "To Do";
 };
@@ -381,29 +390,30 @@ const EmployeeProjects = () => {
     });
   }, [visibleProjects, searchTerm]);
 
-  const groupedProjects = useMemo(() => {
-    const grouped = {
-      todo: [],
-      in_progress: [],
-      under_review: [],
-      done: [],
-    };
+const grouped = useMemo(() => {
+  const grouped = {
+    todo: [],
+    in_progress: [],
+    blocked: [],
+    under_review: [],
+    done: [],
+  };
 
-    filteredProjects.forEach((project) => {
-      const key = normalizeStatus(
-        project.status_group || project.status || project.project_status
-      );
+  filteredProjects.forEach((project) => {
+    const key = normalizeStatus(
+      project.status_group || project.status || project.project_status
+    );
 
-      if (!grouped[key]) {
-        grouped.todo.push(project);
-        return;
-      }
+    if (!grouped[key]) {
+      grouped.todo.push(project);
+      return;
+    }
 
-      grouped[key].push(project);
-    });
+    grouped[key].push(project);
+  });
 
-    return grouped;
-  }, [filteredProjects]);
+  return grouped;
+}, [filteredProjects]);
 
   const openProjectModal = async (project) => {
     try {
@@ -608,8 +618,7 @@ const EmployeeProjects = () => {
           </span>
         </div>
 
-        <p style={styles.projectTileDescription}>{getProjectMainTask(project)}</p>
-
+<div style={styles.projectTileSpacer}></div>
         <span style={styles.clickHint}>Click to view full details</span>
       </button>
     );
@@ -645,7 +654,7 @@ const EmployeeProjects = () => {
               </span>
             </div>
 
-            <p style={styles.projectTileDescription}>{getProjectMainTask(project)}</p>
+            <div style={{ height: "18px" }} />
 
             <span style={styles.clickHint}>Click to view details</span>
           </button>
@@ -718,19 +727,18 @@ const EmployeeProjects = () => {
                   <h2 style={styles.stageTitle}>{column.title}</h2>
                   <p style={styles.stageSubtitle}>{column.subtitle}</p>
                 </div>
+<span style={styles.stageCount}>
+  {grouped[column.key]?.length || 0}
+</span>
+</div>
 
-                <span style={styles.stageCount}>
-                  {groupedProjects[column.key]?.length || 0}
-                </span>
-              </div>
-
-              <div style={styles.stageBody}>
-                {groupedProjects[column.key]?.length === 0 ? (
-                  <div style={styles.emptyColumn}>No projects here.</div>
-                ) : (
-                  groupedProjects[column.key].map(renderCompactProjectTile)
-                )}
-              </div>
+<div style={styles.stageBody}>
+  {grouped[column.key]?.length === 0 ? (
+    <div style={styles.emptyColumn}>No projects here.</div>
+  ) : (
+    grouped[column.key].map(renderCompactProjectTile)
+  )}
+</div>
             </div>
           ))}
         </section>
@@ -758,27 +766,26 @@ const EmployeeProjects = () => {
               </button>
             </div>
 
-            <div style={styles.detailGrid}>
-
- <div style={styles.detailBox}>
-  <span style={styles.detailBoxLabel}>Department</span>
-  <p style={styles.detailBoxValue}>
-    {selectedProject.department_name || "-"}
-  </p>
-</div>
-
-<div style={styles.detailBox}>
-  <span style={styles.detailBoxLabel}>Created By</span>
-  <p style={styles.detailBoxValue}>
-    {selectedProject.created_by_name || "-"}
-    <br />
-    {selectedProject.created_by_email || "-"}
-  </p>
-</div>
+        <div style={styles.detailGrid}>
+  <div style={styles.detailBox}>
+    <span style={styles.detailBoxLabel}>Department</span>
+    <p style={styles.detailBoxValue}>
+      {selectedProject.department_name || "-"}
+    </p>
+  </div>
 
   <div style={styles.detailBox}>
-  <span style={styles.detailBoxLabel}>Assigned To</span>
-  <p style={styles.detailBoxValue}>
+    <span style={styles.detailBoxLabel}>Created By</span>
+    <p style={styles.detailBoxValue}>
+      {selectedProject.created_by_name || "-"}
+      <br />
+      {selectedProject.created_by_email || "-"}
+    </p>
+  </div>
+
+  <div style={styles.detailBox}>
+    <span style={styles.detailBoxLabel}>Assigned To</span>
+    <p style={styles.detailBoxValue}>
       {getAssignedNames(selectedProject)}
       <br />
       {getAssignedEmails(selectedProject)}
@@ -795,135 +802,136 @@ const EmployeeProjects = () => {
   </div>
 
   <div style={styles.detailBox}>
-  <span style={styles.detailBoxLabel}>Start Date</span>
-  <p style={styles.detailBoxValue}>
-    {formatDisplayDate(getProjectStartDate(selectedProject))}
-  </p>
-</div>
+    <span style={styles.detailBoxLabel}>Start Date</span>
+    <p style={styles.detailBoxValue}>
+      {formatDisplayDate(getProjectStartDate(selectedProject))}
+    </p>
+  </div>
 
   <div style={styles.detailBox}>
     <span style={styles.detailBoxLabel}>End Date</span>
-    <p style={styles.detailBoxValue}>{formatDisplayDate(getProjectEndDate(selectedProject))}</p>
+    <p style={styles.detailBoxValue}>
+      {formatDisplayDate(getProjectEndDate(selectedProject))}
+    </p>
   </div>
-
 </div>
 
-            <div style={styles.progressBlock}>
-              <div style={styles.progressTop}>
-                <strong>Project Progress</strong>
-                <span>
-                  {selectedProject.progress || selectedProject.overall_progress || 0}%
-                </span>
-              </div>
+<div style={styles.progressBlock}>
+  <div style={styles.progressTop}>
+    <strong>Project Progress</strong>
 
-              <div style={styles.progressTrack}>
-                <div
-                  style={{
-                    ...styles.progressFill,
-                    width: `${
-                      selectedProject.progress ||
-                      selectedProject.overall_progress ||
-                      0
-                    }%`,
-                  }}
-                />
-              </div>
+    <span>
+      {normalizeStatus(
+        selectedProject.status_group || selectedProject.status
+      ) === "rejected"
+        ? 0
+        : selectedProject.progress ||
+          selectedProject.overall_progress ||
+          0}
+      %
+    </span>
+  </div>
 
-              <p style={styles.progressNote}>
-                {selectedProject.completed_subtasks || 0}/
-                {selectedProject.total_subtasks || 0} subtasks completed
-              </p>
-            </div>
+  <div style={styles.progressTrack}>
+    <div
+      style={{
+        ...styles.progressFill,
+        width: `${
+          normalizeStatus(
+            selectedProject.status_group || selectedProject.status
+          ) === "rejected"
+            ? 0
+            : selectedProject.progress ||
+              selectedProject.overall_progress ||
+              0
+        }%`,
+      }}
+    />
+  </div>
 
-            {isProjectLocked(selectedProject) && (
-              <div style={styles.lockNotice}>
-                This project is locked because it is{" "}
-                {getStatusLabel(selectedProject.status_group || selectedProject.status)}.
-              </div>
-            )}
+  <p style={styles.progressNote}>
+    {selectedProject.completed_subtasks || 0}/
+    {selectedProject.total_subtasks || 0} subtasks completed
+  </p>
+</div>
 
-           {isProjectLocked(selectedProject) && (
-  <div style={styles.lockNotice}>
-    Subtasks cannot be added.
-    <br />
-    This project is currently{" "}
-    {getStatusLabel(
-      selectedProject.status_group || selectedProject.status
-    )}
-    .
+{isProjectLocked(selectedProject) && (
+  <div style={styles.modalWarning}>
+    ⚠ Subtasks cannot be added.
   </div>
 )}
 
-{!isProjectLocked(selectedProject) && (
-  <form style={styles.subtaskForm} onSubmit={handleAddSubtask}>
-                <div style={styles.formTitleRow}>
-                  <Plus size={18} />
-                  <h3>Add Subtask</h3>
-                </div>
+<form
+  style={styles.subtaskForm}
+  onSubmit={handleAddSubtask}
+>
+  <div style={styles.formTitleRow}>
+    <Plus size={18} />
+    <h3>Add Subtask</h3>
+  </div>
 
-                <div style={styles.formGrid}>
-                  <div style={styles.field}>
-                    <label>Subtask Title</label>
-                    <input
-                      type="text"
-                      value={subtaskTitle}
-                      onChange={(event) => setSubtaskTitle(event.target.value)}
-                      placeholder="Example: Backend API"
-                    />
-                  </div>
+  <div style={styles.formGrid}>
+    <div style={styles.field}>
+      <label>Subtask Title</label>
+      <input
+        type="text"
+        value={subtaskTitle}
+        onChange={(event) => setSubtaskTitle(event.target.value)}
+        placeholder="Example: Backend API"
+        disabled={isProjectLocked(selectedProject)}
+      />
+    </div>
 
-                  <div style={styles.field}>
-                    <label>Start Date</label>
-                    <input
-                      type="date"
-                      value={subtaskStartDate}
-                      min={getProjectStartDate(selectedProject) || undefined}
-                      max={getProjectEndDate(selectedProject) || undefined}
-                      onChange={(event) =>
-                        setSubtaskStartDate(event.target.value)
-                      }
-                    />
-                  </div>
+    <div style={styles.field}>
+      <label>Start Date</label>
+      <input
+        type="date"
+        value={subtaskStartDate}
+        min={getProjectStartDate(selectedProject) || undefined}
+        max={getProjectEndDate(selectedProject) || undefined}
+        onChange={(event) => setSubtaskStartDate(event.target.value)}
+        disabled={isProjectLocked(selectedProject)}
+      />
+    </div>
 
-                  <div style={styles.field}>
-                    <label>End Date</label>
-                    <input
-                      type="date"
-                      value={subtaskEndDate}
-                      min={
-                        subtaskStartDate ||
-                        getProjectStartDate(selectedProject) ||
-                        undefined
-                      }
-                      max={getProjectEndDate(selectedProject) || undefined}
-                      onChange={(event) => setSubtaskEndDate(event.target.value)}
-                    />
-                  </div>
+    <div style={styles.field}>
+      <label>End Date</label>
+      <input
+        type="date"
+        value={subtaskEndDate}
+        min={
+          subtaskStartDate ||
+          getProjectStartDate(selectedProject) ||
+          undefined
+        }
+        max={getProjectEndDate(selectedProject) || undefined}
+        onChange={(event) => setSubtaskEndDate(event.target.value)}
+        disabled={isProjectLocked(selectedProject)}
+      />
+    </div>
 
-                  <button
-                    type="submit"
-                    style={styles.addBtn}
-                    disabled={addingSubtask}
-                  >
-                    {addingSubtask ? "Adding..." : "Add"}
-                  </button>
+    <button
+      type="submit"
+      style={styles.addBtn}
+      disabled={addingSubtask || isProjectLocked(selectedProject)}
+    >
+      {addingSubtask ? "Adding..." : "Add"}
+    </button>
 
-                  <div style={styles.fieldFull}>
-                    <label>Subtask Description</label>
-                    <textarea
-                      value={subtaskDescription}
-                      onChange={(event) =>
-                        setSubtaskDescription(event.target.value)
-                      }
-                      placeholder="Write what this subtask includes..."
-                      style={styles.textarea}
-                    />
-                  </div>
-                </div>
-              </form>
-            )}
-
-            {modalSuccess && <div style={styles.modalSuccess}>{modalSuccess}</div>}
+    <div style={styles.fieldFull}>
+      <label>Subtask Description</label>
+      <textarea
+        value={subtaskDescription}
+        onChange={(event) =>
+          setSubtaskDescription(event.target.value)
+        }
+        placeholder="Write what this subtask includes..."
+        style={styles.textarea}
+        disabled={isProjectLocked(selectedProject)}
+      />
+    </div>
+  </div>
+</form>
             {modalError && <div style={styles.modalError}>{modalError}</div>}
 
             <section style={styles.subtaskSection}>
@@ -958,11 +966,10 @@ const EmployeeProjects = () => {
     onChange={() => handleToggleSubtask(subtask)}
   />
 )}
-
                         <div>
                           <strong>{getSubtaskTitle(subtask)}</strong>
 
-                          <p>
+                          <p style={styles.detailBoxValue}>
                             {getSubtaskStartDate(subtask) || "-"} to{" "}
                             {getSubtaskEndDate(subtask) || "-"}
                           </p>
@@ -974,7 +981,13 @@ const EmployeeProjects = () => {
                           )}
                         </div>
 
-                        <span style={done ? styles.doneBadge : styles.todoBadge}>
+                        <span
+                          style={
+                            done
+                              ? styles.doneBadge
+                              : styles.todoBadge
+                          }
+                        >
                           {done ? "Done" : getStatusLabel(subtask.status)}
                         </span>
                       </label>
@@ -1169,6 +1182,9 @@ const styles = {
     fontSize: "14px",
     lineHeight: 1.5,
   },
+  projectTileSpacer: {
+  height: "18px",
+},
   statusPill: {
     background: "#eef2ff",
     color: "#374151",
@@ -1179,10 +1195,13 @@ const styles = {
     whiteSpace: "nowrap",
   },
   clickHint: {
-    color: "#ff5733",
-    fontSize: "13px",
-    fontWeight: 900,
-  },
+  color: "#ff5a3c",
+  fontWeight: "700",
+  whiteSpace: "normal",
+  wordBreak: "break-word",
+  overflowWrap: "break-word",
+  marginTop: "8px",
+},
   emptyColumn: {
     border: "1px dashed #d1d5db",
     borderRadius: "16px",
@@ -1320,18 +1339,17 @@ detailBox: {
 },
 
 detailBoxLabel: {
-    display: "block",
-    color: "#667085",
-    fontSize: "13px",
-    fontWeight: 900,
-    marginBottom: "8px",
+  fontWeight: "700",
+  display: "block",
+  marginBottom: "6px",
 },
 
 detailBoxValue: {
     color: "#111827",
     fontSize: "14px",
-    fontWeight: 500,
-    lineHeight: 1.5,
+    fontWeight: "400",
+    margin: 0,
+    lineHeight: "1.5",
     wordBreak: "break-word",
     overflowWrap: "anywhere",
 },
@@ -1491,6 +1509,15 @@ detailBoxValue: {
     fontSize: "12px",
     fontWeight: 900,
   },
+  modalWarning: {
+  background: "#fff7ed",
+  color: "#c2410c",
+  border: "1px solid #fed7aa",
+  borderRadius: "14px",
+  padding: "12px 14px",
+  marginBottom: "14px",
+  fontWeight: 800,
+},
 };
 
 export default EmployeeProjects;
