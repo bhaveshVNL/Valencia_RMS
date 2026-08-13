@@ -41,22 +41,61 @@ const getTaskTypeValue = async (preferredType) => {
   }
 };
 
-const normalizeStatus = (status, progress = 0) => {
+const normalizeStatus = (status) => {
   const value = String(status || "")
     .toLowerCase()
     .trim()
     .replace(/\s+/g, "_")
     .replace(/-/g, "_");
 
-  if (Number(progress) >= 100) return "completed";
-  if (["todo", "to_do", "pending", "not_started", ""].includes(value)) return "not_started";
-  if (["ongoing", "in_progress", "progress"].includes(value)) return "ongoing";
-  if (["under_review", "review"].includes(value)) return "under_review";
-  if (["completed", "done", "complete"].includes(value)) return "completed";
-  if (["rejected", "reject"].includes(value)) return "rejected";
-  if (["on_hold", "hold"].includes(value)) return "on_hold";
+  if (["todo", "to_do", "pending", "not_started", ""].includes(value)) {
+    return "not_started";
+  }
+
+  if (["ongoing", "in_progress", "progress"].includes(value)) {
+    return "ongoing";
+  }
+
+  if (["under_review", "review"].includes(value)) {
+    return "under_review";
+  }
+
+  if (["completed", "done", "complete"].includes(value)) {
+    return "completed";
+  }
+
+  if (["rejected", "reject"].includes(value)) {
+    return "rejected";
+  }
+
+  if (["on_hold", "hold"].includes(value)) {
+    return "on_hold";
+  }
 
   return value || "not_started";
+};
+
+const getOwnedTask = async (taskId, userId) => {
+  const [rows] = await db.query(
+    `
+    SELECT
+      task_id,
+      parent_task_id,
+      project_id,
+      assigned_to_user_id,
+      task_title,
+      status,
+      COALESCE(progress, 0) AS progress,
+      COALESCE(is_checked, 0) AS is_checked
+    FROM tasks
+    WHERE task_id = ?
+      AND assigned_to_user_id = ?
+    LIMIT 1
+    `,
+    [taskId, userId]
+  );
+
+  return rows[0] || null;
 };
 
 const recalculateMainTask = async (mainTaskId) => {
@@ -81,31 +120,14 @@ const recalculateMainTask = async (mainTaskId) => {
   const totalSubtasks = Number(subtaskRows[0]?.total_subtasks || 0);
   const completedSubtasks = Number(subtaskRows[0]?.completed_subtasks || 0);
 
-  let progress = 0;
-  let status = "not_started";
+  const progress =
+    totalSubtasks > 0
+      ? Math.round((completedSubtasks / totalSubtasks) * 100)
+      : 0;
 
-  if (totalSubtasks > 0) {
-    progress = Math.round((completedSubtasks / totalSubtasks) * 100);
-
-    if (completedSubtasks === totalSubtasks) {
-      status = "completed";
-    } else if (completedSubtasks > 0) {
-      status = "ongoing";
-    }
-  }
-
-  await db.query(
+  const [taskRows] = await db.query(
     `
-    UPDATE tasks
-    SET status = ?, progress = ?, updated_at = NOW()
-    WHERE task_id = ?
-    `,
-    [status, progress, mainTaskId]
-  );
-
-  const [mainTaskRows] = await db.query(
-    `
-    SELECT project_id
+    SELECT status, project_id
     FROM tasks
     WHERE task_id = ?
     LIMIT 1
@@ -113,7 +135,31 @@ const recalculateMainTask = async (mainTaskId) => {
     [mainTaskId]
   );
 
-  const projectId = mainTaskRows[0]?.project_id;
+  if (!taskRows.length) return;
+
+  const currentStatus = normalizeStatus(taskRows[0].status);
+
+  /*
+Task status changes only through explicit actions:
+Start -> In Progress
+Submit for Review -> Under Review
+Admin approval -> Done
+*/
+  const nextStatus = currentStatus;
+
+  await db.query(
+    `
+    UPDATE tasks
+    SET
+      status = ?,
+      progress = ?,
+      updated_at = NOW()
+    WHERE task_id = ?
+    `,
+    [nextStatus, progress, mainTaskId]
+  );
+
+  const projectId = taskRows[0].project_id;
 
   if (projectId) {
     await recalculateProjectProgress(projectId);
@@ -216,64 +262,87 @@ const getEmployeeTasks = async (req, res) => {
   try {
     const userId = req.user.user_id;
 
-    const [mainTasks] = await db.query(
+    const [tasks] = await db.query(
       `
       SELECT
-        mt.task_id,
-        mt.project_id,
-        mt.task_title,
-        mt.task_description,
-        mt.status,
-        COALESCE(mt.progress, 0) AS progress,
-        DATE_FORMAT(mt.start_date, '%Y-%m-%d') AS start_date,
-        DATE_FORMAT(mt.due_date, '%Y-%m-%d') AS due_date,
+        t.task_id,
+        t.parent_task_id,
+        t.project_id,
+        t.task_title,
+        t.task_description,
+        t.task_type,
+        t.status,
+        t.priority,
+        COALESCE(t.progress, 0) AS progress,
+        COALESCE(t.is_checked, 0) AS is_checked,
+
+        DATE_FORMAT(t.start_date, '%Y-%m-%d') AS start_date,
+        DATE_FORMAT(t.due_date, '%Y-%m-%d') AS due_date,
+
         p.project_title,
         p.project_description,
+
         creator.full_name AS created_by_name,
         creator.email AS created_by_email
-      FROM tasks mt
-      LEFT JOIN projects p ON p.project_id = mt.project_id
-      LEFT JOIN users creator ON creator.user_id = mt.created_by_user_id
-      WHERE mt.assigned_to_user_id = ?
-        AND (mt.parent_task_id IS NULL OR mt.parent_task_id = 0)
-      ORDER BY mt.task_id DESC
+
+      FROM tasks t
+
+      LEFT JOIN projects p
+        ON p.project_id = t.project_id
+
+      LEFT JOIN users creator
+        ON creator.user_id = t.created_by_user_id
+
+      WHERE t.assigned_to_user_id = ?
+
+        /*
+        Show the actual tasks created inside projects,
+        not the automatic project-shell task.
+        */
+        AND t.parent_task_id IS NOT NULL
+        AND t.parent_task_id <> 0
+
+      ORDER BY
+        t.task_id DESC
       `,
       [userId]
     );
 
-    if (!mainTasks.length) {
-      return res.json({
-        success: true,
-        main_tasks: [],
-        data: {
-          main_tasks: [],
-        },
-      });
-    }
-
-    const mainTaskIds = mainTasks.map((task) => task.task_id);
-
-    const [subtasks] = await db.query(
+    const [runningSessions] = await db.query(
       `
-      SELECT
-        task_id,
-        parent_task_id,
-        project_id,
-        task_title,
-        task_description,
-        status,
-        COALESCE(progress, 0) AS progress,
-        COALESCE(is_checked, 0) AS is_checked,
-        DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
-        DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date
-      FROM tasks
-      WHERE parent_task_id IN (?)
-      ORDER BY task_id ASC
+      SELECT task_id
+      FROM task_work_sessions
+      WHERE employee_id = ?
+        AND ended_at IS NULL
       `,
-      [mainTaskIds]
+      [userId]
     );
 
-    const formattedTasks = formatMainTasks(mainTasks, subtasks);
+    const runningTaskIds = new Set(
+      runningSessions.map((row) => Number(row.task_id))
+    );
+
+    const formattedTasks = tasks.map((task) => ({
+      ...task,
+
+      status: normalizeStatus(task.status),
+
+      progress:
+        Number(task.is_checked || 0) === 1
+          ? 100
+          : Number(task.progress || 0),
+
+      total_subtasks: 0,
+      completed_subtasks: 0,
+      subtasks: [],
+
+      work_state:
+        normalizeStatus(task.status) === "ongoing"
+          ? runningTaskIds.has(Number(task.task_id))
+            ? "running"
+            : "paused"
+          : "stopped",
+    }));
 
     return res.json({
       success: true,
@@ -283,6 +352,8 @@ const getEmployeeTasks = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Get employee tasks error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch assigned tasks.",
@@ -294,62 +365,89 @@ const getEmployeeTasks = async (req, res) => {
 const getEmployeeTaskDetails = async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const taskId = req.params.taskId;
+    const taskId = Number(req.params.taskId);
 
-    const [mainTaskRows] = await db.query(
+    const [rows] = await db.query(
       `
       SELECT
-        mt.task_id,
-        mt.project_id,
-        mt.task_title,
-        mt.task_description,
-        mt.status,
-        COALESCE(mt.progress, 0) AS progress,
-        DATE_FORMAT(mt.start_date, '%Y-%m-%d') AS start_date,
-        DATE_FORMAT(mt.due_date, '%Y-%m-%d') AS due_date,
+        t.task_id,
+        t.parent_task_id,
+        t.project_id,
+        t.task_title,
+        t.task_description,
+        t.task_type,
+        t.status,
+        t.priority,
+        COALESCE(t.progress, 0) AS progress,
+        COALESCE(t.is_checked, 0) AS is_checked,
+
+        DATE_FORMAT(t.start_date, '%Y-%m-%d') AS start_date,
+        DATE_FORMAT(t.due_date, '%Y-%m-%d') AS due_date,
+
         p.project_title,
         p.project_description,
+
         creator.full_name AS created_by_name,
         creator.email AS created_by_email
-      FROM tasks mt
-      LEFT JOIN projects p ON p.project_id = mt.project_id
-      LEFT JOIN users creator ON creator.user_id = mt.created_by_user_id
-      WHERE mt.task_id = ?
-        AND mt.assigned_to_user_id = ?
-        AND (mt.parent_task_id IS NULL OR mt.parent_task_id = 0)
+
+      FROM tasks t
+
+      LEFT JOIN projects p
+        ON p.project_id = t.project_id
+
+      LEFT JOIN users creator
+        ON creator.user_id = t.created_by_user_id
+
+      WHERE t.task_id = ?
+        AND t.assigned_to_user_id = ?
+
       LIMIT 1
       `,
       [taskId, userId]
     );
 
-    if (!mainTaskRows.length) {
+    if (!rows.length) {
       return res.status(404).json({
         success: false,
         message: "Task not found.",
       });
     }
 
-    const [subtasks] = await db.query(
+    const task = rows[0];
+
+    const [runningRows] = await db.query(
       `
-      SELECT
-        task_id,
-        parent_task_id,
-        project_id,
-        task_title,
-        task_description,
-        status,
-        COALESCE(progress, 0) AS progress,
-        COALESCE(is_checked, 0) AS is_checked,
-        DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
-        DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date
-      FROM tasks
-      WHERE parent_task_id = ?
-      ORDER BY task_id ASC
+      SELECT session_id
+      FROM task_work_sessions
+      WHERE task_id = ?
+        AND employee_id = ?
+        AND ended_at IS NULL
+      LIMIT 1
       `,
-      [taskId]
+      [taskId, userId]
     );
 
-    const formattedTask = formatMainTasks(mainTaskRows, subtasks)[0];
+    const formattedTask = {
+      ...task,
+
+      status: normalizeStatus(task.status),
+
+      progress:
+        Number(task.is_checked || 0) === 1
+          ? 100
+          : Number(task.progress || 0),
+
+      total_subtasks: 0,
+      completed_subtasks: 0,
+      subtasks: [],
+
+      work_state:
+        normalizeStatus(task.status) === "ongoing"
+          ? runningRows.length
+            ? "running"
+            : "paused"
+          : "stopped",
+    };
 
     return res.json({
       success: true,
@@ -359,6 +457,8 @@ const getEmployeeTaskDetails = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Get employee task details error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch task details.",
@@ -620,10 +720,378 @@ const markEmployeeSubtaskDone = async (req, res) => {
     });
   }
 };
+const startEmployeeTask = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const taskId = Number(req.params.taskId);
 
+    const task = await getOwnedTask(taskId, userId)
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found.",
+      });
+    }
+
+    const status = normalizeStatus(task.status);
+
+    if (status !== "not_started") {
+      return res.status(400).json({
+        success: false,
+        message: "Only To Do tasks can be started.",
+      });
+    }
+
+    /*
+    An employee should not have two project-task timers
+    running simultaneously.
+    */
+    const [runningRows] = await db.query(
+      `
+      SELECT session_id, task_id
+      FROM task_work_sessions
+      WHERE employee_id = ?
+        AND ended_at IS NULL
+      LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (runningRows.length) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Another task is currently running. Pause it before starting this task.",
+      });
+    }
+
+    await db.query(
+      `
+      INSERT INTO task_work_sessions (
+        task_id,
+        employee_id,
+        started_at
+      )
+      VALUES (?, ?, NOW())
+      `,
+      [taskId, userId]
+    );
+
+    await db.query(
+      `
+      UPDATE tasks
+      SET
+        status = 'ongoing',
+        updated_at = NOW()
+      WHERE task_id = ?
+      `,
+      [taskId]
+    );
+
+    return res.json({
+      success: true,
+      message: "Task started.",
+      work_state: "running",
+      status: "ongoing",
+    });
+  } catch (error) {
+    console.error("Start employee task error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to start task.",
+      error: error.message,
+    });
+  }
+};
+const pauseEmployeeTask = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const taskId = Number(req.params.taskId);
+
+    const task = await getOwnedTask(taskId, userId);
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found.",
+      });
+    }
+
+    if (normalizeStatus(task.status) !== "ongoing") {
+      return res.status(400).json({
+        success: false,
+        message: "Only an In Progress task can be paused.",
+      });
+    }
+
+    const [runningRows] = await db.query(
+      `
+      SELECT session_id
+      FROM task_work_sessions
+      WHERE task_id = ?
+        AND employee_id = ?
+        AND ended_at IS NULL
+      ORDER BY session_id DESC
+      LIMIT 1
+      `,
+      [taskId, userId]
+    );
+
+    if (!runningRows.length) {
+      return res.status(400).json({
+        success: false,
+        message: "This task is already paused.",
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE task_work_sessions
+      SET
+        ended_at = NOW(),
+        end_reason = 'paused'
+      WHERE session_id = ?
+      `,
+      [runningRows[0].session_id]
+    );
+
+    return res.json({
+      success: true,
+      message: "Task paused.",
+      status: "ongoing",
+      work_state: "paused",
+    });
+  } catch (error) {
+    console.error("Pause employee task error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to pause task.",
+      error: error.message,
+    });
+  }
+};
+const resumeEmployeeTask = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const taskId = Number(req.params.taskId);
+
+    const task = await getOwnedTask(taskId, userId)
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found.",
+      });
+    }
+
+    if (normalizeStatus(task.status) !== "ongoing") {
+      return res.status(400).json({
+        success: false,
+        message: "Only an In Progress task can be resumed.",
+      });
+    }
+
+    const [sameTaskRunning] = await db.query(
+      `
+      SELECT session_id
+      FROM task_work_sessions
+      WHERE task_id = ?
+        AND employee_id = ?
+        AND ended_at IS NULL
+      LIMIT 1
+      `,
+      [taskId, userId]
+    );
+
+    if (sameTaskRunning.length) {
+      return res.status(400).json({
+        success: false,
+        message: "This task is already running.",
+      });
+    }
+
+    const [otherRunning] = await db.query(
+      `
+      SELECT session_id, task_id
+      FROM task_work_sessions
+      WHERE employee_id = ?
+        AND ended_at IS NULL
+      LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (otherRunning.length) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Another task is currently running. Pause it before resuming this task.",
+      });
+    }
+
+    await db.query(
+      `
+      INSERT INTO task_work_sessions (
+        task_id,
+        employee_id,
+        started_at
+      )
+      VALUES (?, ?, NOW())
+      `,
+      [taskId, userId]
+    );
+
+    return res.json({
+      success: true,
+      message: "Task resumed.",
+      status: "ongoing",
+      work_state: "running",
+    });
+  } catch (error) {
+    console.error("Resume employee task error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to resume task.",
+      error: error.message,
+    });
+  }
+};
+const submitEmployeeTaskForReview = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const taskId = Number(req.params.taskId);
+
+    const task = await getOwnedTask(taskId, userId)
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found.",
+      });
+    }
+
+    if (normalizeStatus(task.status) !== "ongoing") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only an In Progress task can be submitted for review.",
+      });
+    }
+
+    /*
+    Require all subtasks to be completed when subtasks exist.
+    */
+    const [subtaskSummary] = await db.query(
+      `
+      SELECT
+        COUNT(*) AS total_subtasks,
+        SUM(
+          CASE
+            WHEN is_checked = 1
+              OR LOWER(REPLACE(status, ' ', '_'))
+                IN ('completed', 'done', 'complete')
+            THEN 1
+            ELSE 0
+          END
+        ) AS completed_subtasks
+      FROM tasks
+      WHERE parent_task_id = ?
+      `,
+      [taskId]
+    );
+
+    const totalSubtasks = Number(
+      subtaskSummary[0]?.total_subtasks || 0
+    );
+
+    const completedSubtasks = Number(
+      subtaskSummary[0]?.completed_subtasks || 0
+    );
+
+    if (
+      totalSubtasks > 0 &&
+      completedSubtasks < totalSubtasks
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Complete all subtasks before submitting the task for review.",
+      });
+    }
+
+    /*
+    If currently running, stop the session.
+    If paused, there is simply no open session to close.
+    */
+    const [runningRows] = await db.query(
+      `
+      SELECT session_id
+      FROM task_work_sessions
+      WHERE task_id = ?
+        AND employee_id = ?
+        AND ended_at IS NULL
+      ORDER BY session_id DESC
+      LIMIT 1
+      `,
+      [taskId, userId]
+    );
+
+    if (runningRows.length) {
+      await db.query(
+        `
+        UPDATE task_work_sessions
+        SET
+          ended_at = NOW(),
+          end_reason = 'submitted_for_review'
+        WHERE session_id = ?
+        `,
+        [runningRows[0].session_id]
+      );
+    }
+
+    await db.query(
+      `
+      UPDATE tasks
+      SET
+        status = 'under_review',
+        progress = 100,
+        updated_at = NOW()
+      WHERE task_id = ?
+      `,
+      [taskId]
+    );
+
+    if (task.project_id) {
+      await recalculateProjectProgress(task.project_id);
+    }
+
+    return res.json({
+      success: true,
+      message: "Task submitted for Admin review.",
+      status: "under_review",
+      work_state: "stopped",
+    });
+  } catch (error) {
+    console.error("Submit employee task for review error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to submit task for review.",
+      error: error.message,
+    });
+  }
+};
 module.exports = {
   getEmployeeTasks,
   getEmployeeTaskDetails,
   addEmployeeSubtask,
   markEmployeeSubtaskDone,
+  startEmployeeTask,
+  pauseEmployeeTask,
+  resumeEmployeeTask,
+  submitEmployeeTaskForReview,
 };

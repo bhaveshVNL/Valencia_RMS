@@ -13,7 +13,24 @@ const getStoredUser = () => {
 };
 
 const getResponseData = (response) => {
-  return response?.data?.data || response?.data?.profile || response?.data || {};
+  const data = response?.data || {};
+  const profile = data.profile || data.data || data;
+
+  const skills = Array.isArray(data.skills)
+    ? data.skills
+        .map((skill) =>
+          typeof skill === "string"
+            ? skill
+            : skill.skill_name
+        )
+        .filter(Boolean)
+        .join(", ")
+    : profile.skills || "";
+
+  return {
+    ...profile,
+    skills,
+  };
 };
 
 const getInitials = (name = "") => {
@@ -82,78 +99,77 @@ const EmployeeProfile = () => {
   }, [profile.skills]);
 
   const fetchProfile = async () => {
+  try {
     setLoading(true);
     setError("");
     setSuccessMessage("");
 
-    try {
-      let response;
+    const response = await api.get(
+      "/employee-profile/me"
+    );
 
-      try {
-        response = await api.get("/employee/profile");
-      } catch {
-        try {
-          response = await api.get("/employee-profile");
-        } catch {
-          try {
-            response = await api.get("/employee-profile/me");
-          } catch {
-            response = await api.get("/employee/me");
-          }
-        }
-      }
+    const normalized = normalizeProfile(
+      getResponseData(response),
+      storedUser
+    );
 
-      const normalized = normalizeProfile(getResponseData(response), storedUser);
-      setProfile(normalized);
-      setSkillsText(normalized.skills || "");
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Failed to load profile."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    setProfile(normalized);
+    setSkillsText(normalized.skills || "");
+  } catch (err) {
+    console.error("Fetch employee profile error:", err);
+
+    setError(
+      err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to load profile."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const saveSkills = async () => {
+  try {
     setSavingSkills(true);
     setError("");
     setSuccessMessage("");
 
-    try {
-      const payload = {
+    const response = await api.put(
+      "/employee-profile/skills",
+      {
         skills: skillsText,
-      };
-
-      try {
-        await api.put("/employee/profile/skills", payload);
-      } catch {
-        try {
-          await api.put("/employee-profile/skills", payload);
-        } catch {
-          await api.put("/employee-profile/me/skills", payload);
-        }
       }
+    );
 
-      setProfile((previous) => ({
-        ...previous,
-        skills: skillsText,
-      }));
+    const updatedSkills = Array.isArray(response.data?.skills)
+      ? response.data.skills
+          .map((skill) => skill.skill_name)
+          .filter(Boolean)
+          .join(", ")
+      : skillsText;
 
-      setEditingSkills(false);
-      setSuccessMessage("Skills updated successfully.");
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Failed to update skills."
-      );
-    } finally {
-      setSavingSkills(false);
-    }
-  };
+    setProfile((previous) => ({
+      ...previous,
+      skills: updatedSkills,
+    }));
+
+    setSkillsText(updatedSkills);
+    setEditingSkills(false);
+    setSuccessMessage(
+      response.data?.message || "Skills updated successfully."
+    );
+  } catch (err) {
+    console.error("Save employee skills error:", err);
+
+    setError(
+      err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to update skills."
+    );
+  } finally {
+    setSavingSkills(false);
+  }
+};
 
   useEffect(() => {
     fetchProfile();

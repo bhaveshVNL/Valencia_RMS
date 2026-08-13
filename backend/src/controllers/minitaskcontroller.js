@@ -130,6 +130,32 @@ const createEmployeeMiniTask = async (req, res) => {
         message: "End time must be after start time.",
       });
     }
+    
+    const now = new Date();
+
+const today = [
+  now.getFullYear(),
+  String(now.getMonth() + 1).padStart(2, "0"),
+  String(now.getDate()).padStart(2, "0"),
+].join("-");
+
+if (cleanDate > today) {
+  return res.status(400).json({
+    message: "Mini tasks cannot be logged for a future date.",
+  });
+}
+
+if (cleanDate === today) {
+  const currentMinutes =
+    now.getHours() * 60 + now.getMinutes();
+
+  if (endMinutes > currentMinutes) {
+    return res.status(400).json({
+      message:
+        "Mini task end time cannot be in the future.",
+    });
+  }
+}
 
     const totalMinutes = endMinutes - startMinutes;
 

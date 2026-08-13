@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import EmployeeMiniTasks from "../../components/MiniTasks/EmployeeMiniTasks";
 import {
   ArrowUpDown,
+  CheckCircle2,
   Filter,
+  Pause,
+  Play,
   Plus,
   RefreshCw,
   Search,
@@ -24,7 +28,6 @@ const normalizeStatus = (status, progress = 0) => {
     .replace(/\s+/g, "_")
     .replace(/-/g, "_");
 
-  if (Number(progress) >= 100) return "completed";
   if (["todo", "to_do", "pending", "not_started", ""].includes(value)) {
     return "not_started";
   }
@@ -412,6 +415,7 @@ const EmployeeTasks = () => {
   const [sortBy, setSortBy] = useState("deadline");
   const [loading, setLoading] = useState(false);
   const [savingSubtask, setSavingSubtask] = useState(false);
+  const [taskActionId, setTaskActionId] = useState(null);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [modalError, setModalError] = useState("");
@@ -809,6 +813,61 @@ const EmployeeTasks = () => {
     }
   };
 
+  const handleTaskAction = async (task, action) => {
+  const taskId = getTaskId(task);
+
+  if (!taskId || taskActionId) return;
+
+  setError("");
+  setSuccessMessage("");
+  setTaskActionId(taskId);
+
+  try {
+    let endpoint = "";
+
+    if (action === "start") {
+      endpoint = `/employee-tasks/${taskId}/start`;
+    }
+
+    if (action === "pause") {
+      endpoint = `/employee-tasks/${taskId}/pause`;
+    }
+
+    if (action === "resume") {
+      endpoint = `/employee-tasks/${taskId}/resume`;
+    }
+
+    if (action === "submit-review") {
+      endpoint = `/employee-tasks/${taskId}/submit-review`;
+    }
+
+    if (!endpoint) return;
+
+    const response = await api.post(endpoint);
+
+    setSuccessMessage(
+      response.data?.message || "Task updated successfully."
+    );
+
+    await fetchTasks();
+
+    if (selectedTask?.task_id === taskId) {
+      await fetchTaskDetails({
+        ...selectedTask,
+        task_id: taskId,
+      });
+    }
+  } catch (err) {
+    setError(
+      err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Failed to update task."
+    );
+  } finally {
+    setTaskActionId(null);
+  }
+};
+
   const closeModal = () => {
     setSelectedTask(null);
     setSubtaskForm({
@@ -890,7 +949,10 @@ const EmployeeTasks = () => {
       ) : sortedTasks.length === 0 ? (
         <div style={styles.emptyBox}>No tasks match this filter.</div>
       ) : (
-        <section style={styles.kanbanRow}>
+            <section
+              style={styles.kanbanRow}
+              className="employee-kanban-scroll"
+            >
           {visibleColumns.map((column) => (
             <div style={styles.kanbanColumn} key={column.key}>
               <div style={styles.kanbanHeader}>
@@ -921,8 +983,9 @@ const EmployeeTasks = () => {
                       >
                         <div style={styles.kanbanTaskTop}>
                           <div style={{ minWidth: 0 }}>
-                            <h3 style={styles.kanbanTaskTitle}>{task.task_title}</h3>
-                            <p style={styles.kanbanProjectTitle}>{task.project_title}</p>
+                            <h3 style={styles.kanbanTaskTitle}>
+                              {task.task_title}
+                            </h3>
                           </div>
 
                           <span
@@ -980,6 +1043,89 @@ const EmployeeTasks = () => {
                             }}
                           />
                         </div>
+                        <div
+                          style={styles.taskActions}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {normalizeStatus(task.status, task.progress) === "not_started" && (
+                            <button
+                              type="button"
+                              style={styles.primaryActionBtn}
+                              disabled={taskActionId === task.task_id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleTaskAction(task, "start");
+                              }}
+                            >
+                              <Play size={14} />
+                              {taskActionId === task.task_id ? "Starting..." : "Start"}
+                            </button>
+                          )}
+
+                          {normalizeStatus(task.status, task.progress) === "ongoing" && (
+                            <div style={styles.compactActionRow}>
+                              {task.work_state === "running" ? (
+                                <button
+                                  type="button"
+                                  style={styles.iconActionBtn}
+                                  disabled={taskActionId === task.task_id}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleTaskAction(task, "pause");
+                                  }}
+                                  title="Pause task"
+                                >
+                                  <Pause size={14} />
+                                  Pause
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  style={styles.iconActionBtn}
+                                  disabled={taskActionId === task.task_id}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleTaskAction(task, "resume");
+                                  }}
+                                  title="Resume task"
+                                >
+                                  <Play size={14} />
+                                  Resume
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                style={{
+                                  ...styles.reviewActionBtn,
+                                  ...(task.total_subtasks > 0 &&
+                                    task.completed_subtasks < task.total_subtasks
+                                    ? styles.disabledActionBtn
+                                    : {}),
+                                }}
+                                disabled={
+                                  taskActionId === task.task_id ||
+                                  (task.total_subtasks > 0 &&
+                                    task.completed_subtasks < task.total_subtasks)
+                                }
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleTaskAction(task, "submit-review");
+                                }}
+                              >
+                                <CheckCircle2 size={14} />
+                                Submit Review
+                              </button>
+                            </div>
+                          )}
+
+                          {normalizeStatus(task.status, task.progress) === "under_review" && (
+                            <div style={styles.awaitingReview}>
+                              <CheckCircle2 size={14} />
+                              Awaiting Review
+                            </div>
+                          )}
+                        </div>
                       </button>
                     );
                   })
@@ -989,6 +1135,10 @@ const EmployeeTasks = () => {
           ))}
         </section>
       )}
+
+      <div style={{ marginTop: "22px" }}>
+        <EmployeeMiniTasks />
+      </div>
 
       {selectedTask && (
         <div style={styles.modalOverlay} onMouseDown={closeModal}>
@@ -1449,18 +1599,12 @@ const styles = {
 },
 
   kanbanTitle: {
-    margin: 0,
-    color: "#111827",
-    fontSize: "18px",
-    fontWeight: 900,
-  },
+  margin: 0,
+  color: "#111827",
+  fontSize: "22px",
+  fontWeight: 900,
+},
 
-  kanbanTitle: {
-    margin: 0,
-    color: "#111827",
-    fontSize: "22px",
-    fontWeight: 900,
-  },
   kanbanSubtitle: {
     margin: "5px 0 0",
     color: "#667085",
@@ -1933,6 +2077,89 @@ const styles = {
     fontSize: "9px",
     fontWeight: 900,
   },
-};
+taskActions: {
+  marginTop: "12px",
+  paddingTop: "10px",
+  borderTop: "1px solid #eef2f6",
+},
+
+compactActionRow: {
+  display: "flex",
+  alignItems: "center",
+  gap: "7px",
+  width: "100%",
+},
+
+primaryActionBtn: {
+  width: "100%",
+  height: "34px",
+  border: "none",
+  borderRadius: "9px",
+  background: "#ff5733",
+  color: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  fontSize: "11px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+
+iconActionBtn: {
+  height: "34px",
+  border: "1px solid #dbe1e8",
+  borderRadius: "9px",
+  background: "#ffffff",
+  color: "#475569",
+  padding: "0 11px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+  fontSize: "11px",
+  fontWeight: 900,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+},
+
+reviewActionBtn: {
+  flex: 1,
+  height: "34px",
+  border: "none",
+  borderRadius: "9px",
+  background: "#111827",
+  color: "#ffffff",
+  padding: "0 11px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+  fontSize: "11px",
+  fontWeight: 900,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+},
+
+disabledActionBtn: {
+  opacity: 0.4,
+  cursor: "not-allowed",
+},
+
+awaitingReview: {
+  width: "100%",
+  boxSizing: "border-box",
+  minHeight: "34px",
+  borderRadius: "9px",
+  background: "#f5f3ff",
+  color: "#6d28d9",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  fontSize: "11px",
+  fontWeight: 900,
+},
+};     
 
 export default EmployeeTasks;

@@ -187,17 +187,32 @@ const recalculateMainTask = async (connection, mainTaskId) => {
   const completedSubtasks = Number(rows[0]?.completed_subtasks || 0);
 
   let progress = 0;
-  let nextStatus = "not_started";
 
-  if (totalSubtasks > 0) {
-    progress = Math.round((completedSubtasks / totalSubtasks) * 100);
+if (totalSubtasks > 0) {
+  progress = Math.round((completedSubtasks / totalSubtasks) * 100);
+}
 
-    if (completedSubtasks === totalSubtasks) {
-      nextStatus = "completed";
-    } else {
-      nextStatus = "ongoing";
-    }
-  }
+/*
+Do not auto-change task status here.
+
+Newly added tasks must remain To Do until
+the employee explicitly clicks Start
+from the Employee Tasks page.
+*/
+const [currentTaskRows] = await connection.query(
+  `
+  SELECT status
+  FROM tasks
+  WHERE task_id = ?
+  LIMIT 1
+  `,
+  [mainTaskId]
+);
+
+const nextStatus =
+  currentTaskRows.length > 0
+    ? currentTaskRows[0].status
+    : "not_started";
 
   await safeUpdateTaskStatus(connection, mainTaskId, nextStatus, progress);
 

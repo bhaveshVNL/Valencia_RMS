@@ -2938,3 +2938,25 @@ body,
 main {
   min-height: 100vh;
 }
+
+.employee-kanban-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.employee-kanban-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.employee-kanban-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.employee-kanban-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.employee-kanban-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
