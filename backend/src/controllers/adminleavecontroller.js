@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { sendMail } = require("../emailservice");
 
 const LEAVE_LIMITS = {
   sick: 7,
@@ -6,250 +7,132 @@ const LEAVE_LIMITS = {
   mandatory: 18,
 };
 
-const normalizeLeaveType = (value) => {
-  const type = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-
-  if (
-    type === "sick" ||
-    type === "sick_leave"
-  ) {
-    return "sick";
-  }
-
-  if (
-    type === "casual" ||
-    type === "casual_leave"
-  ) {
-    return "casual";
-  }
-
-  if (
-    type === "mandatory" ||
-    type === "mandatory_leave"
-  ) {
-    return "mandatory";
-  }
-
-  return "";
-};
-
 const getLeaveLabel = (type) => {
-  if (type === "sick") {
-    return "Sick Leave";
-  }
-
-  if (type === "casual") {
-    return "Casual Leave";
-  }
-
-  if (type === "mandatory") {
-    return "Mandatory Leave";
-  }
+  if (type === "sick") return "Sick Leave";
+  if (type === "casual") return "Casual Leave";
+  if (type === "mandatory") return "Privileged Leave";
 
   return "Leave";
 };
 
-const calculateInclusiveDays = (
-  startDate,
-  endDate
-) => {
-  if (!startDate || !endDate) {
-    return 0;
-  }
-
-  const startParts = String(startDate)
-    .split("-")
-    .map(Number);
-
-  const endParts = String(endDate)
-    .split("-")
-    .map(Number);
-
-  if (
-    startParts.length !== 3 ||
-    endParts.length !== 3
-  ) {
-    return 0;
-  }
-
-  const start = Date.UTC(
-    startParts[0],
-    startParts[1] - 1,
-    startParts[2]
-  );
-
-  const end = Date.UTC(
-    endParts[0],
-    endParts[1] - 1,
-    endParts[2]
-  );
-
-  if (
-    Number.isNaN(start) ||
-    Number.isNaN(end) ||
-    end < start
-  ) {
-    return 0;
-  }
-
-  const millisecondsPerDay =
-    24 * 60 * 60 * 1000;
-
-  return (
-    Math.floor(
-      (end - start) /
-        millisecondsPerDay
-    ) + 1
-  );
-};
-
-const getUsedLeave = async (
-  employeeId,
-  year
-) => {
+const getLoggedInAdmin = async (userId) => {
   const [rows] = await db.query(
     `
     SELECT
-      leave_type,
-      COALESCE(
-        SUM(total_days),
-        0
-      ) AS used_days
+      u.user_id,
+      u.full_name,
+      u.email,
+      u.department_id,
+      d.department_name,
+      r.role_name
+    FROM users u
 
-    FROM leave_applications
+    LEFT JOIN departments d
+      ON d.department_id = u.department_id
 
-    WHERE employee_id = ?
-      AND status = 'approved'
-      AND YEAR(start_date) = ?
+    LEFT JOIN roles r
+      ON r.role_id = u.role_id
 
-    GROUP BY leave_type
+    WHERE u.user_id = ?
+    LIMIT 1
     `,
-    [employeeId, year]
+    [userId]
   );
 
-  const used = {
-    sick: 0,
-    casual: 0,
-    mandatory: 0,
-  };
+  if (!rows.length) {
+    return {
+      error: {
+        status: 404,
+        message: "Admin account not found.",
+      },
+    };
+  }
 
-  rows.forEach((row) => {
-    const leaveType =
-      normalizeLeaveType(
-        row.leave_type
-      );
+  const admin = rows[0];
 
-    if (leaveType) {
-      used[leaveType] =
-        Number(row.used_days || 0);
-    }
-  });
+  if (
+    String(admin.role_name || "")
+      .trim()
+      .toLowerCase() !== "admin"
+  ) {
+    return {
+      error: {
+        status: 403,
+        message:
+          "Only Admin can review leave applications.",
+      },
+    };
+  }
 
-  return used;
-};
+  if (!admin.department_id) {
+    return {
+      error: {
+        status: 400,
+        message:
+          "Admin department is not assigned.",
+      },
+    };
+  }
 
-const buildLeaveBalances = (used) => {
-  return {
-    sick: {
-      label: "Sick Leave",
-      total: LEAVE_LIMITS.sick,
-
-      used: Number(
-        used.sick || 0
-      ),
-
-      remaining: Math.max(
-        0,
-        LEAVE_LIMITS.sick -
-          Number(used.sick || 0)
-      ),
-    },
-
-    casual: {
-      label: "Casual Leave",
-      total: LEAVE_LIMITS.casual,
-
-      used: Number(
-        used.casual || 0
-      ),
-
-      remaining: Math.max(
-        0,
-        LEAVE_LIMITS.casual -
-          Number(used.casual || 0)
-      ),
-    },
-
-    mandatory: {
-      label: "Mandatory Leave",
-      total: LEAVE_LIMITS.mandatory,
-
-      used: Number(
-        used.mandatory || 0
-      ),
-
-      remaining: Math.max(
-        0,
-        LEAVE_LIMITS.mandatory -
-          Number(
-            used.mandatory || 0
-          )
-      ),
-    },
-  };
+  return { admin };
 };
 
 /*
 ========================================================
-GET EMPLOYEE LEAVE SUMMARY
+GET ADMIN DEPARTMENT LEAVE APPLICATIONS
 ========================================================
-
-GET /api/employee-leaves/summary
+GET /api/admin-leaves
 */
-const getEmployeeLeaveSummary = async (
+const getAdminLeaveApplications = async (
   req,
   res
 ) => {
   try {
-    const employeeId =
-      req.user.user_id;
+    const userId = req.user.user_id;
 
-    const requestedYear =
-      Number(req.query.year);
+    const { admin, error } =
+      await getLoggedInAdmin(userId);
 
-    const currentYear =
-      new Date().getFullYear();
+    if (error) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
+    }
 
-    const year =
-      Number.isFinite(
-        requestedYear
-      ) &&
-      requestedYear >= 2000
-        ? requestedYear
-        : currentYear;
+    const requestedStatus = String(
+      req.query.status || "all"
+    )
+      .trim()
+      .toLowerCase();
 
-    /*
-    ----------------------------------------------------
-    CALCULATE APPROVED LEAVE USED
-    ----------------------------------------------------
-    */
-    const used =
-      await getUsedLeave(
-        employeeId,
-        year
+    const validStatuses = [
+      "pending",
+      "approved",
+      "rejected",
+    ];
+
+    const statusFilter =
+      validStatuses.includes(requestedStatus)
+        ? requestedStatus
+        : null;
+
+    const whereParts = [
+      "employee.department_id = ?",
+    ];
+
+    const values = [
+      admin.department_id,
+    ];
+
+    if (statusFilter) {
+      whereParts.push(
+        "la.status = ?"
       );
 
-    const balances =
-      buildLeaveBalances(used);
+      values.push(statusFilter);
+    }
 
-    /*
-    ----------------------------------------------------
-    GET LEAVE HISTORY
-    ----------------------------------------------------
-    */
     const [applications] =
       await db.query(
         `
@@ -269,20 +152,35 @@ const getEmployeeLeaveSummary = async (
           ) AS end_date,
 
           la.total_days,
+
+          la.duration_type,
+          la.half_day_session,
+
           la.reason,
           la.status,
+          la.review_remark,
 
-          la.reviewed_by,
+          DATE_FORMAT(
+            la.applied_at,
+            '%Y-%m-%d %H:%i:%s'
+          ) AS applied_at,
 
           DATE_FORMAT(
             la.reviewed_at,
             '%Y-%m-%d %H:%i:%s'
           ) AS reviewed_at,
 
-          DATE_FORMAT(
-            la.applied_at,
-            '%Y-%m-%d %H:%i:%s'
-          ) AS applied_at,
+          employee.full_name
+            AS employee_name,
+
+          employee.email
+            AS employee_email,
+
+          employee.employee_code,
+          employee.designation,
+          employee.department_id,
+
+          d.department_name,
 
           reviewer.full_name
             AS reviewed_by_name,
@@ -292,37 +190,109 @@ const getEmployeeLeaveSummary = async (
 
         FROM leave_applications la
 
+        INNER JOIN users employee
+          ON employee.user_id =
+            la.employee_id
+
+        LEFT JOIN departments d
+          ON d.department_id =
+            employee.department_id
+
         LEFT JOIN users reviewer
           ON reviewer.user_id =
             la.reviewed_by
 
-        WHERE la.employee_id = ?
-          AND YEAR(
-            la.start_date
-          ) = ?
+        WHERE ${whereParts.join(
+          " AND "
+        )}
 
         ORDER BY
+          CASE
+            WHEN la.status = 'pending'
+            THEN 1
+
+            WHEN la.status = 'approved'
+            THEN 2
+
+            WHEN la.status = 'rejected'
+            THEN 3
+
+            ELSE 4
+          END,
+
           la.applied_at DESC,
           la.leave_id DESC
         `,
-        [
-          employeeId,
-          year,
-        ]
+        values
       );
+
+    const [summaryRows] =
+      await db.query(
+        `
+        SELECT
+          COUNT(*) AS total,
+
+          SUM(
+            CASE
+              WHEN la.status = 'pending'
+              THEN 1
+              ELSE 0
+            END
+          ) AS pending,
+
+          SUM(
+            CASE
+              WHEN la.status = 'approved'
+              THEN 1
+              ELSE 0
+            END
+          ) AS approved,
+
+          SUM(
+            CASE
+              WHEN la.status = 'rejected'
+              THEN 1
+              ELSE 0
+            END
+          ) AS rejected
+
+        FROM leave_applications la
+
+        INNER JOIN users employee
+          ON employee.user_id =
+            la.employee_id
+
+        WHERE
+          employee.department_id = ?
+        `,
+        [admin.department_id]
+      );
+
+    const summary =
+      summaryRows[0] || {};
 
     return res.json({
       success: true,
 
-      year,
+      admin,
 
-      limits: {
-        sick: 7,
-        casual: 7,
-        mandatory: 18,
+      summary: {
+        total: Number(
+          summary.total || 0
+        ),
+
+        pending: Number(
+          summary.pending || 0
+        ),
+
+        approved: Number(
+          summary.approved || 0
+        ),
+
+        rejected: Number(
+          summary.rejected || 0
+        ),
       },
-
-      balances,
 
       applications:
         applications.map(
@@ -338,7 +308,7 @@ const getEmployeeLeaveSummary = async (
     });
   } catch (error) {
     console.error(
-      "Get employee leave summary error:",
+      "Get admin leave applications error:",
       error
     );
 
@@ -346,7 +316,7 @@ const getEmployeeLeaveSummary = async (
       success: false,
 
       message:
-        "Failed to fetch leave information.",
+        "Failed to fetch leave applications.",
 
       error: error.message,
 
@@ -358,451 +328,523 @@ const getEmployeeLeaveSummary = async (
 
 /*
 ========================================================
-APPLY EMPLOYEE LEAVE
+APPROVE / REJECT
 ========================================================
-
-POST /api/employee-leaves/apply
+PATCH /api/admin-leaves/:leaveId/status
 */
-const applyEmployeeLeave = async (
+const reviewLeaveApplication = async (
   req,
   res
 ) => {
+  const connection =
+    await db.getConnection();
+
   try {
-    const employeeId =
+    const adminUserId =
       req.user.user_id;
 
-    /*
-    ----------------------------------------------------
-    REQUEST VALUES
-    ----------------------------------------------------
-    */
-    const leaveType =
-      normalizeLeaveType(
-        req.body.leave_type
-      );
-
-    const startDate = String(
-      req.body.start_date || ""
-    ).trim();
-
-    const endDate = String(
-      req.body.end_date || ""
-    ).trim();
-
-    const reason = String(
-      req.body.reason || ""
-    ).trim();
-
-    /*
-    ----------------------------------------------------
-    VALIDATION
-    ----------------------------------------------------
-    */
-    if (!leaveType) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Please select a valid leave type.",
-      });
-    }
-
-    if (
-      !startDate ||
-      !endDate
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Start date and end date are required.",
-      });
-    }
-
-    const datePattern =
-      /^\d{4}-\d{2}-\d{2}$/;
-
-    if (
-      !datePattern.test(
-        startDate
-      ) ||
-      !datePattern.test(endDate)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid leave date format.",
-      });
-    }
-
-    if (endDate < startDate) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Leave end date cannot be before start date.",
-      });
-    }
-
-    if (!reason) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Please enter a reason for leave.",
-      });
-    }
-
-    /*
-    ----------------------------------------------------
-    CALCULATE NUMBER OF DAYS
-    ----------------------------------------------------
-    */
-    const totalDays =
-      calculateInclusiveDays(
-        startDate,
-        endDate
-      );
-
-    if (totalDays <= 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Unable to calculate leave days.",
-      });
-    }
-
-    const leaveYear = Number(
-      startDate.slice(0, 4)
+    const leaveId = Number(
+      req.params.leaveId
     );
 
-    /*
-    ----------------------------------------------------
-    CHECK APPROVED LEAVE BALANCE
-    ----------------------------------------------------
-    */
-    const used =
-      await getUsedLeave(
-        employeeId,
-        leaveYear
-      );
+    let status = String(
+      req.body.status ||
+        req.body.action ||
+        ""
+    )
+      .trim()
+      .toLowerCase();
 
-    const balances =
-      buildLeaveBalances(used);
+    const reviewRemark = String(
+      req.body.review_remark ||
+        req.body.remark ||
+        ""
+    ).trim();
 
-    const selectedBalance =
-      balances[leaveType];
+    if (status === "approve") {
+      status = "approved";
+    }
+
+    if (status === "reject") {
+      status = "rejected";
+    }
 
     if (
-      totalDays >
-      selectedBalance.remaining
+      ![
+        "approved",
+        "rejected",
+      ].includes(status)
     ) {
       return res.status(400).json({
         success: false,
-
         message:
-          `You only have ${selectedBalance.remaining} ${getLeaveLabel(
-            leaveType
-          )} day(s) remaining.`,
+          "Status must be approved or rejected.",
       });
     }
 
-    /*
-    ----------------------------------------------------
-    CHECK PENDING LEAVE OF SAME TYPE
-
-    Pending leave does not reduce approved balance,
-    but employee should not submit more pending leave
-    than they could ultimately use.
-    ----------------------------------------------------
-    */
-    const [pendingRows] =
-      await db.query(
-        `
-        SELECT
-          COALESCE(
-            SUM(total_days),
-            0
-          ) AS pending_days
-
-        FROM leave_applications
-
-        WHERE employee_id = ?
-          AND leave_type = ?
-          AND status = 'pending'
-          AND YEAR(start_date) = ?
-        `,
-        [
-          employeeId,
-          leaveType,
-          leaveYear,
-        ]
-      );
-
-    const pendingDays = Number(
-      pendingRows[0]?.pending_days ||
-        0
-    );
-
     if (
-      pendingDays +
-        totalDays >
-      selectedBalance.remaining
+      status === "rejected" &&
+      !reviewRemark
     ) {
       return res.status(400).json({
         success: false,
-
         message:
-          `You already have ${pendingDays} pending ${getLeaveLabel(
-            leaveType
-          )} day(s). Only ${selectedBalance.remaining} day(s) are currently available.`,
+          "Please enter a reason before rejecting the leave application.",
       });
     }
 
-    /*
-    ----------------------------------------------------
-    PREVENT OVERLAPPING PENDING / APPROVED LEAVES
-    ----------------------------------------------------
-    */
-    const [overlappingRows] =
-      await db.query(
+    const { admin, error } =
+      await getLoggedInAdmin(
+        adminUserId
+      );
+
+    if (error) {
+      return res.status(
+        error.status
+      ).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    await connection.beginTransaction();
+
+    const [leaveRows] =
+      await connection.query(
         `
         SELECT
-          leave_id,
-          leave_type,
-          status,
+          la.leave_id,
+          la.employee_id,
+          la.leave_type,
+          la.total_days,
+          la.reason,
+          la.status,
+
+          la.duration_type,
+          la.half_day_session,
 
           DATE_FORMAT(
-            start_date,
+            la.start_date,
             '%Y-%m-%d'
           ) AS start_date,
 
           DATE_FORMAT(
-            end_date,
+            la.end_date,
             '%Y-%m-%d'
-          ) AS end_date
+          ) AS end_date,
 
-        FROM leave_applications
+          employee.full_name
+            AS employee_name,
 
-        WHERE employee_id = ?
+          employee.email
+            AS employee_email,
 
-          AND status IN (
-            'pending',
-            'approved'
-          )
+          employee.department_id
 
-          AND NOT (
-            end_date < ?
-            OR start_date > ?
-          )
+        FROM leave_applications la
+
+        INNER JOIN users employee
+          ON employee.user_id =
+            la.employee_id
+
+        WHERE
+          la.leave_id = ?
+
+          AND employee.department_id = ?
 
         LIMIT 1
+
+        FOR UPDATE
         `,
         [
-          employeeId,
-          startDate,
-          endDate,
+          leaveId,
+          admin.department_id,
         ]
       );
 
+    if (!leaveRows.length) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message:
+          "Leave application not found.",
+      });
+    }
+
+    const leave =
+      leaveRows[0];
+
     if (
-      overlappingRows.length >
-      0
+      String(
+        leave.status || ""
+      ).toLowerCase() !==
+      "pending"
     ) {
+      await connection.rollback();
+
       return res.status(400).json({
         success: false,
 
         message:
-          "You already have a pending or approved leave application for these dates.",
+          `This leave application is already ${leave.status}.`,
       });
     }
 
+    let remainingBalance = null;
+
     /*
-    ----------------------------------------------------
-    GET EMPLOYEE + DEPARTMENT ADMIN
-
-    This is what fills the To: field in the employee's
-    email application.
-    ----------------------------------------------------
+    ================================================
+    VALIDATE BALANCE BEFORE APPROVAL
+    ================================================
     */
-    const [employeeRows] =
-      await db.query(
-        `
-        SELECT
-          u.user_id,
-          u.full_name,
-          u.email,
-          u.department_id,
+    if (status === "approved") {
+      let limit =
+        LEAVE_LIMITS[
+          leave.leave_type
+        ];
 
-          d.department_name,
+      /*
+      Privileged Leave:
+      1.5 days earned for every month of
+      the current year, max 18.
+      */
+      if (
+        leave.leave_type ===
+        "mandatory"
+      ) {
+        const currentMonth =
+          new Date().getMonth() + 1;
 
-          admin_user.user_id
-            AS admin_id,
+        limit = Math.min(
+          18,
+          currentMonth * 1.5
+        );
+      }
 
-          admin_user.full_name
-            AS admin_name,
-
-          admin_user.email
-            AS admin_email
-
-        FROM users u
-
-        LEFT JOIN departments d
-          ON d.department_id =
-            u.department_id
-
-        LEFT JOIN users admin_user
-          ON admin_user.user_id = (
+      if (limit !== undefined) {
+        const [usedRows] =
+          await connection.query(
+            `
             SELECT
-              a.user_id
+              COALESCE(
+                SUM(total_days),
+                0
+              ) AS used_days
 
-            FROM users a
-
-            INNER JOIN roles ar
-              ON ar.role_id =
-                a.role_id
+            FROM leave_applications
 
             WHERE
-              a.department_id =
-                u.department_id
+              employee_id = ?
 
-              AND LOWER(
-                COALESCE(
-                  ar.role_name,
-                  ''
-                )
-              ) = 'admin'
+              AND leave_type = ?
 
-              AND a.user_id <>
-                u.user_id
+              AND status = 'approved'
 
-            ORDER BY
-              a.user_id ASC
+              AND YEAR(start_date) =
+                YEAR(?)
 
-            LIMIT 1
-          )
+              AND leave_id <> ?
+            `,
+            [
+              leave.employee_id,
+              leave.leave_type,
+              leave.start_date,
+              leaveId,
+            ]
+          );
 
-        WHERE u.user_id = ?
+        const alreadyUsed =
+          Number(
+            usedRows[0]
+              ?.used_days || 0
+          );
 
-        LIMIT 1
-        `,
-        [employeeId]
-      );
+        const requestedDays =
+          Number(
+            leave.total_days || 0
+          );
 
-    if (
-      !employeeRows.length
-    ) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Employee account not found.",
-      });
+        if (
+          alreadyUsed +
+            requestedDays >
+          limit
+        ) {
+          await connection.rollback();
+
+          return res
+            .status(400)
+            .json({
+              success: false,
+
+              message:
+                `Cannot approve. Employee only has ${Math.max(
+                  0,
+                  limit -
+                    alreadyUsed
+                )} ${getLeaveLabel(
+                  leave.leave_type
+                )} day(s) remaining.`,
+            });
+        }
+
+        remainingBalance =
+          limit -
+          alreadyUsed -
+          requestedDays;
+      }
     }
 
-    const employee =
-      employeeRows[0];
+    /*
+    ================================================
+    SAVE REVIEW
+    ================================================
+    */
+    await connection.query(
+      `
+      UPDATE leave_applications
+
+      SET
+        status = ?,
+        review_remark = ?,
+        reviewed_by = ?,
+        reviewed_at = NOW()
+
+      WHERE leave_id = ?
+      `,
+      [
+        status,
+        reviewRemark || null,
+        admin.user_id,
+        leaveId,
+      ]
+    );
+
+    await connection.commit();
 
     /*
-    ----------------------------------------------------
-    SAVE LEAVE APPLICATION
-    ----------------------------------------------------
+    ================================================
+    EMAIL EMPLOYEE
+    ================================================
     */
-    const [result] =
-      await db.query(
-        `
-        INSERT INTO leave_applications (
-          employee_id,
-          leave_type,
-          start_date,
-          end_date,
-          total_days,
-          reason,
-          status
-        )
+    let emailResult = {
+      sent: false,
+      skipped: true,
+    };
 
-        VALUES (
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          'pending'
-        )
-        `,
-        [
-          employeeId,
-          leaveType,
-          startDate,
-          endDate,
-          totalDays,
-          reason,
-        ]
-      );
+    if (leave.employee_email) {
+      try {
+        const leaveLabel =
+          getLeaveLabel(
+            leave.leave_type
+          );
 
-    /*
-    ----------------------------------------------------
-    SEND RESPONSE TO FRONTEND
-    ----------------------------------------------------
-    */
-    return res.status(201).json({
+        const approved =
+          status === "approved";
+
+        const subject =
+          approved
+            ? `${leaveLabel} Application Approved`
+            : `${leaveLabel} Application Rejected`;
+
+        const balanceLine =
+          approved &&
+          remainingBalance !== null
+            ? `Remaining ${leaveLabel} Balance: ${remainingBalance} day(s)`
+            : "";
+
+        const remarkLine =
+          reviewRemark
+            ? `Admin Remark: ${reviewRemark}`
+            : "";
+
+        const text = `
+Hello ${leave.employee_name || "Employee"},
+
+Your ${leaveLabel} application has been ${status}.
+
+From: ${leave.start_date}
+To: ${leave.end_date}
+Days: ${leave.total_days}
+Reason: ${leave.reason || "-"}
+
+Reviewed By: ${admin.full_name || "Admin"}
+${remarkLine}
+${balanceLine}
+
+Please login to Valencia RMS to view the updated leave status.
+
+Regards,
+Valencia RMS
+`;
+
+        const html = `
+          <div style="
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #111827;
+          ">
+            <h2 style="
+              color: ${
+                approved
+                  ? "#15803d"
+                  : "#dc2626"
+              };
+            ">
+              Leave Application ${
+                approved
+                  ? "Approved"
+                  : "Rejected"
+              }
+            </h2>
+
+            <p>
+              Hello
+              <strong>
+                ${leave.employee_name || "Employee"}
+              </strong>,
+            </p>
+
+            <p>
+              Your
+              <strong>
+                ${leaveLabel}
+              </strong>
+              application has been
+              <strong>
+                ${status}
+              </strong>.
+            </p>
+
+            <p>
+              <strong>From:</strong>
+              ${leave.start_date}
+              <br />
+
+              <strong>To:</strong>
+              ${leave.end_date}
+              <br />
+
+              <strong>Days:</strong>
+              ${leave.total_days}
+              <br />
+
+              <strong>Reason:</strong>
+              ${leave.reason || "-"}
+            </p>
+
+            ${
+              reviewRemark
+                ? `
+                  <p>
+                    <strong>
+                      Admin Remark:
+                    </strong>
+                    ${reviewRemark}
+                  </p>
+                `
+                : ""
+            }
+
+            ${
+              balanceLine
+                ? `
+                  <p>
+                    <strong>
+                      ${balanceLine}
+                    </strong>
+                  </p>
+                `
+                : ""
+            }
+
+            <p>
+              Reviewed by
+              <strong>
+                ${admin.full_name || "Admin"}
+              </strong>
+            </p>
+
+            <p>
+              Login to Valencia RMS to view the updated leave status.
+            </p>
+
+            <p>
+              Regards,<br />
+              Valencia RMS
+            </p>
+          </div>
+        `;
+
+        const result =
+          await sendMail({
+            to:
+              leave.employee_email,
+
+            subject,
+
+            text,
+
+            html,
+
+            replyTo:
+              admin.email ||
+              undefined,
+          });
+
+        emailResult = {
+          sent:
+            !result?.skipped,
+
+          skipped:
+            Boolean(
+              result?.skipped
+            ),
+        };
+      } catch (emailError) {
+        console.error(
+          "Leave review email failed:",
+          emailError
+        );
+
+        emailResult = {
+          sent: false,
+          skipped: false,
+          error:
+            emailError.message,
+        };
+      }
+    }
+
+    return res.json({
       success: true,
 
       message:
-        "Leave application submitted successfully.",
+        status === "approved"
+          ? "Leave approved successfully."
+          : "Leave rejected successfully.",
 
-      application: {
-        leave_id:
-          result.insertId,
+      status,
 
-        employee_id:
-          employeeId,
+      leave_id:
+        leaveId,
 
-        employee_name:
-          employee.full_name || "",
+      remaining_balance:
+        remainingBalance,
 
-        employee_email:
-          employee.email || "",
+      review_remark:
+        reviewRemark,
 
-        department_id:
-          employee.department_id ||
-          null,
-
-        department_name:
-          employee.department_name ||
-          "",
-
-        admin_id:
-          employee.admin_id || null,
-
-        admin_name:
-          employee.admin_name || "",
-
-        admin_email:
-          employee.admin_email || "",
-
-        leave_type:
-          leaveType,
-
-        leave_label:
-          getLeaveLabel(
-            leaveType
-          ),
-
-        start_date:
-          startDate,
-
-        end_date:
-          endDate,
-
-        total_days:
-          totalDays,
-
-        reason,
-
-        status:
-          "pending",
-      },
+      email:
+        emailResult,
     });
   } catch (error) {
+    try {
+      await connection.rollback();
+    } catch {}
+
     console.error(
-      "Apply employee leave error:",
+      "Review leave application error:",
       error
     );
 
@@ -810,17 +852,20 @@ const applyEmployeeLeave = async (
       success: false,
 
       message:
-        "Failed to submit leave application.",
+        "Failed to review leave application.",
 
-      error: error.message,
+      error:
+        error.message,
 
       sqlMessage:
         error.sqlMessage || null,
     });
+  } finally {
+    connection.release();
   }
 };
 
 module.exports = {
-  getEmployeeLeaveSummary,
-  applyEmployeeLeave,
+  getAdminLeaveApplications,
+  reviewLeaveApplication,
 };

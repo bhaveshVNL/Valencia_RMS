@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   BarChart3,
+  CalendarDays,
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
@@ -128,6 +129,16 @@ const AdminLayout = () => {
           >
             <CalendarCheck size={20} />
             <span>Attendance</span>
+          </NavLink>
+
+          <NavLink
+            to="/admin/leave-applications"
+            className={({ isActive }) =>
+              isActive ? "active" : ""
+            }
+          >
+            <CalendarDays size={18} />
+            <span>Leave Applications</span>
           </NavLink>
         </nav>
 

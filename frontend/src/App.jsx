@@ -26,7 +26,7 @@ import AdminTasks from "./pages/admin/adminTasks";
 import AdminProfile from "./pages/admin/adminProfile";
 import AdminUsers from "./pages/admin/adminUsers";
 import AdminAttendance from "./pages/admin/adminAttendance";
-
+import AdminLeaveApplications from "./pages/admin/adminLeaveApplications";
 import SuperadminLayout from "./layouts/Superadminlayout";
 import SuperadminOverview from "./pages/superadmin/superadminOverview";
 import SuperadminUsers from "./pages/superadmin/superadminUsers";
@@ -126,6 +126,7 @@ const App = () => {
         <Route path="profile" element={<AdminProfile />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="attendance" element={<AdminAttendance />} />
+        <Route path="leave-applications" element={<AdminLeaveApplications />} />
       </Route>
 
       <Route
