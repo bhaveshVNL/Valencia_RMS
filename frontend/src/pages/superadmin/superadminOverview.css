@@ -835,3 +835,100 @@
     grid-column: span 1;
   }
 }
+
+/* =====================================================
+   ACTIVE TASK MODAL - SEARCH + CASCADING FILTERS
+===================================================== */
+
+.sa-ov-task-filter-panel {
+  display: grid;
+  grid-template-columns:
+    minmax(280px, 1.5fr)
+    minmax(190px, 0.75fr)
+    minmax(210px, 0.9fr);
+  gap: 12px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.sa-ov-task-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sa-ov-task-search-icon {
+  position: absolute;
+  left: 14px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.sa-ov-task-search-input {
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  border: 1px solid #d8dee8;
+  border-radius: 13px;
+  background: #ffffff;
+  color: #111827;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 14px 0 43px;
+  outline: none;
+}
+
+.sa-ov-task-search-input:focus {
+  border-color: #ff5733;
+}
+
+.sa-ov-task-filter-select {
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  border: 1px solid #d8dee8;
+  border-radius: 13px;
+  background: #ffffff;
+  color: #111827;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.sa-ov-task-filter-select:focus {
+  border-color: #ff5733;
+}
+
+.sa-ov-task-filter-select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.sa-ov-task-filter-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.sa-ov-task-filter-info strong {
+  color: #111827;
+}
+
+@media (max-width: 900px) {
+  .sa-ov-task-filter-panel {
+    grid-template-columns: 1fr;
+  }
+}

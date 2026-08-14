@@ -635,8 +635,11 @@ const SuperadminOverview = () => {
             <UserList users={modal.data} openUserDetails={openUserDetails} />
           )}
           {modal.type === "taskList" && (
-            <TaskList tasks={modal.data} openTaskDetails={openTaskDetails} />
-          )}
+  <FilterableTaskList
+    tasks={modal.data}
+    openTaskDetails={openTaskDetails}
+  />
+)}
           {modal.type === "projectList" && (
             <ProjectList
               projects={modal.data}
@@ -924,6 +927,339 @@ const UserList = ({ users = [], openUserDetails }) => {
   );
 };
 
+const FilterableTaskList = ({
+  tasks = [],
+  openTaskDetails,
+}) => {
+  const [taskSearch, setTaskSearch] =
+    useState("");
+
+  const [
+    departmentFilter,
+    setDepartmentFilter,
+  ] = useState("");
+
+  const [
+    projectFilter,
+    setProjectFilter,
+  ] = useState("");
+
+  /*
+  ==========================================
+  DEPARTMENTS
+  ==========================================
+  */
+  const departments =
+    useMemo(() => {
+      return Array.from(
+        new Set(
+          tasks
+            .map(
+              (task) =>
+                task.department_name ||
+                "No Department"
+            )
+            .filter(Boolean)
+        )
+      ).sort((a, b) =>
+        a.localeCompare(b)
+      );
+    }, [tasks]);
+
+  /*
+  ==========================================
+  TASKS AFTER DEPARTMENT FILTER
+  ==========================================
+  */
+  const departmentTasks =
+    useMemo(() => {
+      if (!departmentFilter) {
+        return tasks;
+      }
+
+      return tasks.filter(
+        (task) =>
+          (task.department_name ||
+            "No Department") ===
+          departmentFilter
+      );
+    }, [
+      tasks,
+      departmentFilter,
+    ]);
+
+  /*
+  ==========================================
+  PROJECTS BELONGING TO SELECTED DEPARTMENT
+  ==========================================
+  */
+  const projectOptions =
+    useMemo(() => {
+      if (!departmentFilter) {
+        return [];
+      }
+
+      const projectMap =
+        new Map();
+
+      departmentTasks.forEach(
+        (task) => {
+          if (!task.project_id) {
+            return;
+          }
+
+          const projectId =
+            String(
+              task.project_id
+            );
+
+          if (
+            !projectMap.has(
+              projectId
+            )
+          ) {
+            projectMap.set(
+              projectId,
+              {
+                project_id:
+                  task.project_id,
+
+                project_title:
+                  task.project_title ||
+                  "Untitled Project",
+              }
+            );
+          }
+        }
+      );
+
+      return Array.from(
+        projectMap.values()
+      ).sort((a, b) =>
+        String(
+          a.project_title
+        ).localeCompare(
+          String(
+            b.project_title
+          )
+        )
+      );
+    }, [
+      departmentTasks,
+      departmentFilter,
+    ]);
+
+  /*
+  Whenever department changes,
+  reset project.
+  */
+  useEffect(() => {
+    setProjectFilter("");
+  }, [departmentFilter]);
+
+  /*
+  ==========================================
+  FINAL TASK FILTER
+  ==========================================
+  */
+  const filteredTasks =
+    useMemo(() => {
+      const query =
+        taskSearch
+          .trim()
+          .toLowerCase();
+
+      return departmentTasks.filter(
+        (task) => {
+          if (
+            projectFilter &&
+            String(
+              task.project_id
+            ) !==
+              String(
+                projectFilter
+              )
+          ) {
+            return false;
+          }
+
+          if (!query) {
+            return true;
+          }
+
+          const searchable =
+            [
+              task.task_title,
+              task.task_description,
+              task.project_title,
+              task.department_name,
+              task.assignee_name,
+              task.assignee_email,
+              task.assigned_by_name,
+              task.assigned_by_email,
+              statusLabel(
+                task.status_group
+              ),
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+
+          return searchable.includes(
+            query
+          );
+        }
+      );
+    }, [
+      departmentTasks,
+      projectFilter,
+      taskSearch,
+    ]);
+
+  return (
+    <div className="sa-ov-modal-content">
+      <div className="sa-ov-task-filter-panel">
+
+        {/* SEARCH */}
+        <div className="sa-ov-task-search-wrap">
+          <Search
+            size={18}
+            className="sa-ov-task-search-icon"
+          />
+
+          <input
+            type="text"
+            value={taskSearch}
+            onChange={(event) =>
+              setTaskSearch(
+                event.target.value
+              )
+            }
+            placeholder="Search task, employee, project..."
+            className="sa-ov-task-search-input"
+          />
+        </div>
+
+        {/* DEPARTMENT */}
+        <select
+          className="sa-ov-task-filter-select"
+          value={
+            departmentFilter
+          }
+          onChange={(event) =>
+            setDepartmentFilter(
+              event.target.value
+            )
+          }
+        >
+          <option value="">
+            All Departments
+          </option>
+
+          {departments.map(
+            (department) => (
+              <option
+                key={
+                  department
+                }
+                value={
+                  department
+                }
+              >
+                {department}
+              </option>
+            )
+          )}
+        </select>
+
+        {/* PROJECT */}
+        <select
+          className="sa-ov-task-filter-select"
+          value={
+            projectFilter
+          }
+          disabled={
+            !departmentFilter
+          }
+          onChange={(event) =>
+            setProjectFilter(
+              event.target.value
+            )
+          }
+        >
+          <option value="">
+            {departmentFilter
+              ? "All Projects"
+              : "Select Department First"}
+          </option>
+
+          {projectOptions.map(
+            (project) => (
+              <option
+                key={
+                  project.project_id
+                }
+                value={
+                  project.project_id
+                }
+              >
+                {
+                  project.project_title
+                }
+              </option>
+            )
+          )}
+        </select>
+      </div>
+
+      <div className="sa-ov-task-filter-info">
+        <span>
+          Department:{" "}
+          <strong>
+            {departmentFilter ||
+              "All"}
+          </strong>
+        </span>
+
+        <span>
+          Project:{" "}
+          <strong>
+            {projectFilter
+              ? projectOptions.find(
+                  (project) =>
+                    String(
+                      project.project_id
+                    ) ===
+                    String(
+                      projectFilter
+                    )
+                )
+                  ?.project_title ||
+                "-"
+              : "All"}
+          </strong>
+        </span>
+
+        <span>
+          Showing:{" "}
+          <strong>
+            {
+              filteredTasks.length
+            }
+          </strong>{" "}
+          task(s)
+        </span>
+      </div>
+
+      <TaskList
+        tasks={filteredTasks}
+        openTaskDetails={
+          openTaskDetails
+        }
+      />
+    </div>
+  );
+};
 const TaskList = ({ tasks = [], openTaskDetails }) => {
   if (!tasks.length) return <div className="sa-ov-empty">No tasks found.</div>;
 
