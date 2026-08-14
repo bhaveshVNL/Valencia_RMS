@@ -1,5 +1,9 @@
 const db = require("../config/db");
 
+const {
+  sendMail,
+} = require("../utils/emailservice");
+
 const LEAVE_LIMITS = {
   sick: 7,
   casual: 7,
@@ -120,10 +124,6 @@ const calculateInclusiveDays = (
 /*
 ========================================================
 GET ACTUAL COLUMNS FROM leave_applications
-
-This keeps the backend working even if
-duration_type / half_day_session were not yet
-added to the database.
 ========================================================
 */
 
@@ -142,15 +142,6 @@ const getLeaveColumns = async () => {
 /*
 ========================================================
 PRIVILEGED LEAVE EARNED
-
-Current year:
-1.5 days x current month
-
-Example:
-August = 8 x 1.5 = 12 days
-
-Past years = maximum 18
-Future years = 0
 ========================================================
 */
 
@@ -285,9 +276,6 @@ const buildLeaveBalances = async (
       year
     );
 
-  /*
-  Sick Leave
-  */
   const sickUsed =
     Number(
       usage.sick.used || 0
@@ -306,9 +294,6 @@ const buildLeaveBalances = async (
         sickPending
     );
 
-  /*
-  Casual Leave
-  */
   const casualUsed =
     Number(
       usage.casual.used || 0
@@ -327,9 +312,6 @@ const buildLeaveBalances = async (
         casualPending
     );
 
-  /*
-  Privileged Leave
-  */
   const privilegedEarned =
     getPrivilegedEarned(year);
 
@@ -354,7 +336,6 @@ const buildLeaveBalances = async (
   return {
     sick: {
       label: "Sick Leave",
-
       total: 7,
       earned: 7,
 
@@ -381,7 +362,6 @@ const buildLeaveBalances = async (
 
     casual: {
       label: "Casual Leave",
-
       total: 7,
       earned: 7,
 
@@ -414,10 +394,6 @@ const buildLeaveBalances = async (
 
       annual_entitlement: 18,
 
-      /*
-      This is what your frontend
-      currently uses as Total.
-      */
       earned:
         formatNumber(
           privilegedEarned
@@ -485,10 +461,6 @@ const getEmployeeLeaveSummary = async (
     const columns =
       await getLeaveColumns();
 
-    /*
-    Some databases may not yet contain these
-    newer columns, so select them safely.
-    */
     const durationSelect =
       columns.has(
         "duration_type"
@@ -759,9 +731,6 @@ const applyEmployeeLeave = async (
       });
     }
 
-    /*
-    Half-day uses only one date.
-    */
     if (
       durationType ===
       "half_day"
@@ -1017,10 +986,6 @@ const applyEmployeeLeave = async (
     /*
     ----------------------------------------------------
     SAVE APPLICATION FIRST
-
-    IMPORTANT:
-    Admin email lookup cannot stop the employee
-    from submitting leave.
     ----------------------------------------------------
     */
 
@@ -1077,9 +1042,7 @@ const applyEmployeeLeave = async (
 
     /*
     ----------------------------------------------------
-    TRY TO FIND ADMIN
-
-    If this fails, LEAVE STILL REMAINS SUBMITTED.
+    FIND DEPARTMENT ADMIN
     ----------------------------------------------------
     */
 
@@ -1110,6 +1073,12 @@ const applyEmployeeLeave = async (
               )
             ) = 'admin'
 
+            AND a.status = 'active'
+
+            AND a.email IS NOT NULL
+
+            AND a.email != ''
+
           ORDER BY
             a.user_id ASC
 
@@ -1129,11 +1098,327 @@ const applyEmployeeLeave = async (
         adminError.message
       );
 
-      /*
-      Do NOT fail the leave application.
-      */
       admin = {};
     }
+
+    /*
+    ========================================================
+    AUTOMATIC LEAVE APPLICATION EMAIL
+    ========================================================
+    */
+
+    let emailResult = {
+      sent: false,
+      skipped: true,
+    };
+
+    if (admin.email) {
+      try {
+        const leaveLabel =
+          getLeaveLabel(
+            leaveType
+          );
+
+        const durationLabel =
+          durationType ===
+          "half_day"
+            ? halfDaySession ===
+              "first_half"
+              ? "Half Day - First Half"
+              : "Half Day - Second Half"
+            : totalDays === 1
+            ? "Full Day"
+            : `${totalDays} Full Days`;
+
+        const subject =
+          `${leaveLabel} Application - ${
+            employee.full_name ||
+            "Employee"
+          }`;
+
+        const text = `
+Dear ${admin.full_name || "Sir/Ma'am"},
+
+A leave application has been submitted through Valencia RMS.
+
+Employee Name: ${employee.full_name || "-"}
+Employee Email: ${employee.email || "-"}
+Department: ${employee.department_name || "-"}
+
+Leave Type: ${leaveLabel}
+From Date: ${startDate}
+To Date: ${endDate}
+Duration: ${durationLabel}
+Leave Days: ${totalDays}
+
+Reason:
+${reason}
+
+The leave application is currently Pending and requires your review.
+
+Regards,
+Valencia RMS
+`;
+
+        const html = `
+          <div style="
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #111827;
+          ">
+            <h2 style="
+              color: #ff5733;
+            ">
+              Leave Application
+            </h2>
+
+            <p>
+              Dear
+              <strong>
+                ${admin.full_name || "Sir/Ma'am"}
+              </strong>,
+            </p>
+
+            <p>
+              A leave application has been submitted
+              through Valencia RMS.
+            </p>
+
+            <table style="
+              border-collapse: collapse;
+              width: 100%;
+              max-width: 650px;
+            ">
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>Employee</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${employee.full_name || "-"}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>Employee Email</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${employee.email || "-"}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>Department</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${employee.department_name || "-"}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>Leave Type</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${leaveLabel}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>From</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${startDate}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>To</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${endDate}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>Duration</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${durationLabel}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>Leave Days</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${totalDays}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  <strong>Reason</strong>
+                </td>
+
+                <td style="
+                  padding: 8px;
+                  border: 1px solid #dddddd;
+                ">
+                  ${reason}
+                </td>
+              </tr>
+            </table>
+
+            <p>
+              This application is currently
+              <strong>Pending</strong>
+              and requires your review.
+            </p>
+
+            <p>
+              Regards,<br />
+              Valencia RMS
+            </p>
+          </div>
+        `;
+
+        const mailResponse =
+          await sendMail({
+            to:
+              admin.email,
+
+            cc: [
+              "manish.turakhia@valencianutrition.com",
+              "rathika.haleangadi@valencianutrition.com",
+            ],
+
+            subject,
+
+            text,
+
+            html,
+
+            replyTo:
+              employee.email ||
+              undefined,
+          });
+
+        emailResult = {
+          sent:
+            !mailResponse
+              ?.skipped,
+
+          skipped:
+            Boolean(
+              mailResponse
+                ?.skipped
+            ),
+
+          messageId:
+            mailResponse
+              ?.messageId ||
+            null,
+        };
+      } catch (emailError) {
+        console.error(
+          "Leave application email failed:",
+          emailError
+        );
+
+        /*
+        Important:
+        email failure must NOT undo leave submission.
+        */
+        emailResult = {
+          sent: false,
+          skipped: false,
+          error:
+            emailError.message,
+        };
+      }
+    } else {
+      console.warn(
+        "Leave email skipped: department admin email not found."
+      );
+
+      emailResult = {
+        sent: false,
+        skipped: true,
+        error:
+          "Department admin email not found.",
+      };
+    }
+
+    /*
+    ========================================================
+    RESPONSE
+    ========================================================
+    */
 
     return res.status(
       201
@@ -1209,6 +1494,9 @@ const applyEmployeeLeave = async (
         status:
           "pending",
       },
+
+      email:
+        emailResult,
     });
   } catch (error) {
     console.error(

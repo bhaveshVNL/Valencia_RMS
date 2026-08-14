@@ -220,7 +220,7 @@ const EmployeeLeaveApplications = () => {
     setError("");
   };
 
-  const handleApply = async () => {
+ const handleApply = async () => {
   if (!selectedLeaveType) return;
 
   setError("");
@@ -326,118 +326,36 @@ const EmployeeLeaveApplications = () => {
       }
     );
 
-    /*
-    ==========================================
-    APPLICATION RETURNED FROM BACKEND
-    ==========================================
-    */
-    const application =
-      response.data?.application || {};
+    const email =
+      response.data?.email;
 
-    const employeeName =
-      application.employee_name ||
-      "Employee";
-
-    const adminEmail =
-      application.admin_email || "";
-
-    const adminName =
-      application.admin_name ||
-      "Sir/Ma'am";
-
-    const leaveLabel =
-      getLeaveLabel(
-        selectedLeaveType
+    if (
+      email &&
+      email.sent === false &&
+      email.skipped === false
+    ) {
+      setSuccess(
+        "Leave submitted successfully, but email notification could not be sent."
       );
+    } else if (
+      email &&
+      email.sent === false &&
+      email.skipped === true
+    ) {
+      setSuccess(
+        "Leave submitted successfully. Email notification was skipped."
+      );
+    } else {
+      setSuccess(
+        response.data?.message ||
+          "Leave application submitted successfully."
+      );
+    }
 
-    const endDate =
-      form.duration_type === "half_day"
-        ? form.start_date
-        : form.end_date;
-
-    const durationText =
-      form.duration_type === "half_day"
-        ? form.half_day_session ===
-          "first_half"
-          ? "Half Day - First Half"
-          : "Half Day - Second Half"
-        : calculateDays === 1
-        ? "Full Day"
-        : `${formatDays(
-            calculateDays
-          )} Full Days`;
-
-    /*
-    ==========================================
-    EMAIL SUBJECT
-    ==========================================
-    */
-    const subject =
-      `${leaveLabel} Application - ${employeeName}`;
-
-    /*
-    ==========================================
-    PRE-WRITTEN EMAIL BODY
-    ==========================================
-    */
-    const body = [
-      `Dear ${adminName},`,
-      "",
-      `I would like to apply for ${leaveLabel}.`,
-      "",
-      `From: ${formatDisplayDate(
-        form.start_date
-      )}`,
-      `To: ${formatDisplayDate(
-        endDate
-      )}`,
-      `Duration: ${durationText}`,
-      `Leave Days: ${formatDays(
-        calculateDays
-      )}`,
-      "",
-      `Reason: ${form.reason.trim()}`,
-      "",
-      "The leave application has also been submitted through Valencia RMS and is awaiting your approval.",
-      "",
-      "Kindly review and approve my leave application.",
-      "",
-      "Regards,",
-      employeeName,
-    ].join("\n");
-
-    /*
-    ==========================================
-    OPEN DEFAULT EMAIL APPLICATION
-    ==========================================
-    */
-    const mailLink =
-      `mailto:${encodeURIComponent(
-        adminEmail
-      )}?subject=${encodeURIComponent(
-        subject
-      )}&body=${encodeURIComponent(
-        body
-      )}`;
-
-    setSuccess(
-      response.data?.message ||
-        "Leave application submitted successfully."
-    );
-
-    /*
-    Refresh RMS so request immediately appears
-    as Pending.
-    */
     await fetchLeaveData();
 
     setSelectedLeaveType(null);
     resetForm();
-
-    /*
-    Open Outlook / Gmail / default mail client.
-    */
-    window.location.href = mailLink;
   } catch (err) {
     console.error(
       "Apply employee leave error:",

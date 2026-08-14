@@ -1,5 +1,4 @@
 const db = require("../config/db");
-const { sendMail } = require("../emailservice");
 
 const LEAVE_LIMITS = {
   sick: 7,
@@ -8,9 +7,17 @@ const LEAVE_LIMITS = {
 };
 
 const getLeaveLabel = (type) => {
-  if (type === "sick") return "Sick Leave";
-  if (type === "casual") return "Casual Leave";
-  if (type === "mandatory") return "Privileged Leave";
+  if (type === "sick") {
+    return "Sick Leave";
+  }
+
+  if (type === "casual") {
+    return "Casual Leave";
+  }
+
+  if (type === "mandatory") {
+    return "Privileged Leave";
+  }
 
   return "Leave";
 };
@@ -25,6 +32,7 @@ const getLoggedInAdmin = async (userId) => {
       u.department_id,
       d.department_name,
       r.role_name
+
     FROM users u
 
     LEFT JOIN departments d
@@ -34,6 +42,7 @@ const getLoggedInAdmin = async (userId) => {
       ON r.role_id = u.role_id
 
     WHERE u.user_id = ?
+
     LIMIT 1
     `,
     [userId]
@@ -74,14 +83,18 @@ const getLoggedInAdmin = async (userId) => {
     };
   }
 
-  return { admin };
+  return {
+    admin,
+  };
 };
 
 /*
 ========================================================
 GET ADMIN DEPARTMENT LEAVE APPLICATIONS
 ========================================================
+
 GET /api/admin-leaves
+GET /api/admin-leaves/applications
 */
 const getAdminLeaveApplications = async (
   req,
@@ -94,10 +107,12 @@ const getAdminLeaveApplications = async (
       await getLoggedInAdmin(userId);
 
     if (error) {
-      return res.status(error.status).json({
-        success: false,
-        message: error.message,
-      });
+      return res
+        .status(error.status)
+        .json({
+          success: false,
+          message: error.message,
+        });
     }
 
     const requestedStatus = String(
@@ -113,7 +128,9 @@ const getAdminLeaveApplications = async (
     ];
 
     const statusFilter =
-      validStatuses.includes(requestedStatus)
+      validStatuses.includes(
+        requestedStatus
+      )
         ? requestedStatus
         : null;
 
@@ -265,7 +282,9 @@ const getAdminLeaveApplications = async (
         WHERE
           employee.department_id = ?
         `,
-        [admin.department_id]
+        [
+          admin.department_id,
+        ]
       );
 
     const summary =
@@ -312,40 +331,62 @@ const getAdminLeaveApplications = async (
       error
     );
 
-    return res.status(500).json({
-      success: false,
+    return res
+      .status(500)
+      .json({
+        success: false,
 
-      message:
-        "Failed to fetch leave applications.",
+        message:
+          "Failed to fetch leave applications.",
 
-      error: error.message,
+        error:
+          error.message,
 
-      sqlMessage:
-        error.sqlMessage || null,
-    });
+        sqlMessage:
+          error.sqlMessage || null,
+      });
   }
 };
 
 /*
 ========================================================
-APPROVE / REJECT
+APPROVE / REJECT LEAVE
 ========================================================
+
 PATCH /api/admin-leaves/:leaveId/status
 */
 const reviewLeaveApplication = async (
   req,
   res
 ) => {
-  const connection =
-    await db.getConnection();
+  let connection;
 
   try {
+    connection =
+      await db.getConnection();
+
     const adminUserId =
       req.user.user_id;
 
-    const leaveId = Number(
-      req.params.leaveId
-    );
+    const leaveId =
+      Number(
+        req.params.leaveId
+      );
+
+    if (
+      !Number.isFinite(
+        leaveId
+      ) ||
+      leaveId <= 0
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message:
+            "Invalid leave application ID.",
+        });
+    }
 
     let status = String(
       req.body.status ||
@@ -361,11 +402,15 @@ const reviewLeaveApplication = async (
         ""
     ).trim();
 
-    if (status === "approve") {
+    if (
+      status === "approve"
+    ) {
       status = "approved";
     }
 
-    if (status === "reject") {
+    if (
+      status === "reject"
+    ) {
       status = "rejected";
     }
 
@@ -375,22 +420,29 @@ const reviewLeaveApplication = async (
         "rejected",
       ].includes(status)
     ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Status must be approved or rejected.",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+
+          message:
+            "Status must be approved or rejected.",
+        });
     }
 
     if (
-      status === "rejected" &&
+      status ===
+        "rejected" &&
       !reviewRemark
     ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Please enter a reason before rejecting the leave application.",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+
+          message:
+            "Please enter a reason before rejecting the leave application.",
+        });
     }
 
     const { admin, error } =
@@ -399,15 +451,19 @@ const reviewLeaveApplication = async (
       );
 
     if (error) {
-      return res.status(
-        error.status
-      ).json({
-        success: false,
-        message: error.message,
-      });
+      return res
+        .status(
+          error.status
+        )
+        .json({
+          success: false,
+          message:
+            error.message,
+        });
     }
 
-    await connection.beginTransaction();
+    await connection
+      .beginTransaction();
 
     const [leaveRows] =
       await connection.query(
@@ -450,7 +506,8 @@ const reviewLeaveApplication = async (
         WHERE
           la.leave_id = ?
 
-          AND employee.department_id = ?
+          AND
+          employee.department_id = ?
 
         LIMIT 1
 
@@ -462,14 +519,20 @@ const reviewLeaveApplication = async (
         ]
       );
 
-    if (!leaveRows.length) {
-      await connection.rollback();
+    if (
+      !leaveRows.length
+    ) {
+      await connection
+        .rollback();
 
-      return res.status(404).json({
-        success: false,
-        message:
-          "Leave application not found.",
-      });
+      return res
+        .status(404)
+        .json({
+          success: false,
+
+          message:
+            "Leave application not found.",
+        });
     }
 
     const leave =
@@ -478,27 +541,36 @@ const reviewLeaveApplication = async (
     if (
       String(
         leave.status || ""
-      ).toLowerCase() !==
+      )
+        .trim()
+        .toLowerCase() !==
       "pending"
     ) {
-      await connection.rollback();
+      await connection
+        .rollback();
 
-      return res.status(400).json({
-        success: false,
+      return res
+        .status(400)
+        .json({
+          success: false,
 
-        message:
-          `This leave application is already ${leave.status}.`,
-      });
+          message:
+            `This leave application is already ${leave.status}.`,
+        });
     }
 
-    let remainingBalance = null;
+    let remainingBalance =
+      null;
 
     /*
-    ================================================
+    ====================================================
     VALIDATE BALANCE BEFORE APPROVAL
-    ================================================
+    ====================================================
     */
-    if (status === "approved") {
+    if (
+      status ===
+      "approved"
+    ) {
       let limit =
         LEAVE_LIMITS[
           leave.leave_type
@@ -506,23 +578,30 @@ const reviewLeaveApplication = async (
 
       /*
       Privileged Leave:
-      1.5 days earned for every month of
-      the current year, max 18.
+      1.5 days earned every month,
+      maximum 18 days.
       */
       if (
         leave.leave_type ===
         "mandatory"
       ) {
         const currentMonth =
-          new Date().getMonth() + 1;
+          new Date()
+            .getMonth() +
+          1;
 
-        limit = Math.min(
-          18,
-          currentMonth * 1.5
-        );
+        limit =
+          Math.min(
+            18,
+            currentMonth *
+              1.5
+          );
       }
 
-      if (limit !== undefined) {
+      if (
+        limit !==
+        undefined
+      ) {
         const [usedRows] =
           await connection.query(
             `
@@ -537,14 +616,18 @@ const reviewLeaveApplication = async (
             WHERE
               employee_id = ?
 
-              AND leave_type = ?
+              AND
+              leave_type = ?
 
-              AND status = 'approved'
+              AND
+              status = 'approved'
 
-              AND YEAR(start_date) =
-                YEAR(?)
+              AND
+              YEAR(start_date) =
+              YEAR(?)
 
-              AND leave_id <> ?
+              AND
+              leave_id <> ?
             `,
             [
               leave.employee_id,
@@ -557,12 +640,14 @@ const reviewLeaveApplication = async (
         const alreadyUsed =
           Number(
             usedRows[0]
-              ?.used_days || 0
+              ?.used_days ||
+              0
           );
 
         const requestedDays =
           Number(
-            leave.total_days || 0
+            leave.total_days ||
+              0
           );
 
         if (
@@ -570,7 +655,8 @@ const reviewLeaveApplication = async (
             requestedDays >
           limit
         ) {
-          await connection.rollback();
+          await connection
+            .rollback();
 
           return res
             .status(400)
@@ -596,9 +682,9 @@ const reviewLeaveApplication = async (
     }
 
     /*
-    ================================================
-    SAVE REVIEW
-    ================================================
+    ====================================================
+    UPDATE LEAVE APPLICATION
+    ====================================================
     */
     await connection.query(
       `
@@ -614,213 +700,42 @@ const reviewLeaveApplication = async (
       `,
       [
         status,
-        reviewRemark || null,
+        reviewRemark ||
+          null,
         admin.user_id,
         leaveId,
       ]
     );
 
-    await connection.commit();
+    await connection
+      .commit();
 
     /*
-    ================================================
-    EMAIL EMPLOYEE
-    ================================================
+    ====================================================
+    EMAIL TEMPORARILY DISABLED
+    ====================================================
+
+    The previous version required:
+    ../emailservice
+
+    That file is currently missing,
+    so email sending is disabled
+    to prevent the entire backend
+    from crashing.
     */
-    let emailResult = {
+    const emailResult = {
       sent: false,
       skipped: true,
+      message:
+        "Email service is temporarily disabled.",
     };
-
-    if (leave.employee_email) {
-      try {
-        const leaveLabel =
-          getLeaveLabel(
-            leave.leave_type
-          );
-
-        const approved =
-          status === "approved";
-
-        const subject =
-          approved
-            ? `${leaveLabel} Application Approved`
-            : `${leaveLabel} Application Rejected`;
-
-        const balanceLine =
-          approved &&
-          remainingBalance !== null
-            ? `Remaining ${leaveLabel} Balance: ${remainingBalance} day(s)`
-            : "";
-
-        const remarkLine =
-          reviewRemark
-            ? `Admin Remark: ${reviewRemark}`
-            : "";
-
-        const text = `
-Hello ${leave.employee_name || "Employee"},
-
-Your ${leaveLabel} application has been ${status}.
-
-From: ${leave.start_date}
-To: ${leave.end_date}
-Days: ${leave.total_days}
-Reason: ${leave.reason || "-"}
-
-Reviewed By: ${admin.full_name || "Admin"}
-${remarkLine}
-${balanceLine}
-
-Please login to Valencia RMS to view the updated leave status.
-
-Regards,
-Valencia RMS
-`;
-
-        const html = `
-          <div style="
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #111827;
-          ">
-            <h2 style="
-              color: ${
-                approved
-                  ? "#15803d"
-                  : "#dc2626"
-              };
-            ">
-              Leave Application ${
-                approved
-                  ? "Approved"
-                  : "Rejected"
-              }
-            </h2>
-
-            <p>
-              Hello
-              <strong>
-                ${leave.employee_name || "Employee"}
-              </strong>,
-            </p>
-
-            <p>
-              Your
-              <strong>
-                ${leaveLabel}
-              </strong>
-              application has been
-              <strong>
-                ${status}
-              </strong>.
-            </p>
-
-            <p>
-              <strong>From:</strong>
-              ${leave.start_date}
-              <br />
-
-              <strong>To:</strong>
-              ${leave.end_date}
-              <br />
-
-              <strong>Days:</strong>
-              ${leave.total_days}
-              <br />
-
-              <strong>Reason:</strong>
-              ${leave.reason || "-"}
-            </p>
-
-            ${
-              reviewRemark
-                ? `
-                  <p>
-                    <strong>
-                      Admin Remark:
-                    </strong>
-                    ${reviewRemark}
-                  </p>
-                `
-                : ""
-            }
-
-            ${
-              balanceLine
-                ? `
-                  <p>
-                    <strong>
-                      ${balanceLine}
-                    </strong>
-                  </p>
-                `
-                : ""
-            }
-
-            <p>
-              Reviewed by
-              <strong>
-                ${admin.full_name || "Admin"}
-              </strong>
-            </p>
-
-            <p>
-              Login to Valencia RMS to view the updated leave status.
-            </p>
-
-            <p>
-              Regards,<br />
-              Valencia RMS
-            </p>
-          </div>
-        `;
-
-        const result =
-          await sendMail({
-            to:
-              leave.employee_email,
-
-            subject,
-
-            text,
-
-            html,
-
-            replyTo:
-              admin.email ||
-              undefined,
-          });
-
-        emailResult = {
-          sent:
-            !result?.skipped,
-
-          skipped:
-            Boolean(
-              result?.skipped
-            ),
-        };
-      } catch (emailError) {
-        console.error(
-          "Leave review email failed:",
-          emailError
-        );
-
-        emailResult = {
-          sent: false,
-          skipped: false,
-          error:
-            emailError.message,
-        };
-      }
-    }
 
     return res.json({
       success: true,
 
       message:
-        status === "approved"
+        status ===
+        "approved"
           ? "Leave approved successfully."
           : "Leave rejected successfully.",
 
@@ -839,29 +754,39 @@ Valencia RMS
         emailResult,
     });
   } catch (error) {
-    try {
-      await connection.rollback();
-    } catch {}
+    if (connection) {
+      try {
+        await connection
+          .rollback();
+      } catch {
+        // Ignore rollback error.
+      }
+    }
 
     console.error(
       "Review leave application error:",
       error
     );
 
-    return res.status(500).json({
-      success: false,
+    return res
+      .status(500)
+      .json({
+        success: false,
 
-      message:
-        "Failed to review leave application.",
+        message:
+          "Failed to review leave application.",
 
-      error:
-        error.message,
+        error:
+          error.message,
 
-      sqlMessage:
-        error.sqlMessage || null,
-    });
+        sqlMessage:
+          error.sqlMessage ||
+          null,
+      });
   } finally {
-    connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
 

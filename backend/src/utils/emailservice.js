@@ -26,7 +26,14 @@ const createTransporter = () => {
   });
 };
 
-const sendMail = async ({ to, subject, html, text, replyTo }) => {
+const sendMail = async ({
+  to,
+  cc,
+  subject,
+  html,
+  text,
+  replyTo,
+}) => {
   if (!isEmailConfigured()) {
     console.warn("Email skipped: SMTP is not configured properly.");
     return {
@@ -57,15 +64,15 @@ const sendMail = async ({ to, subject, html, text, replyTo }) => {
         </div>
       `;
 
-  const result = await transporter.sendMail({
-    from: `"${fromName}" <${process.env.SMTP_USER}>`,
-    to,
-    replyTo: replyTo || process.env.SMTP_USER,
-    subject,
-    text: safeText,
-    html: safeHtml,
-  });
-
+ const result = await transporter.sendMail({
+  from: `"${fromName}" <${process.env.SMTP_USER}>`,
+  to,
+  cc: cc || undefined,
+  replyTo: replyTo || process.env.SMTP_USER,
+  subject,
+  text: safeText,
+  html: safeHtml,
+});
   return {
     skipped: false,
     messageId: result.messageId,
