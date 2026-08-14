@@ -6,6 +6,8 @@ import {
   X,
 } from "lucide-react";
 
+import HolidayCalendarModal from "../../components/employee/HolidayCalendarModal";
+import LeaveInstructionsModal from "../../components/employee/LeaveInstructionsModal";
 import api from "../../api/axios";
 
 const EMPTY_FORM = {
@@ -57,6 +59,12 @@ const EmployeeLeaveApplications = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const [showInstructions, setShowInstructions] =
+    useState(false);
+
+  const [showHolidayCalendar, setShowHolidayCalendar] =
+    useState(false);
 
   const getTomorrowDate = () => {
     const date = new Date();
@@ -357,10 +365,15 @@ const EmployeeLeaveApplications = () => {
     setSelectedLeaveType(null);
     resetForm();
   } catch (err) {
-    console.error(
-      "Apply employee leave error:",
-      err
-    );
+    if (
+      !err?.response ||
+      err.response.status >= 500
+    ) {
+      console.error(
+        "Apply employee leave error:",
+        err
+      );
+    }
 
     setError(
       err?.response?.data?.sqlMessage ||
@@ -399,29 +412,56 @@ const EmployeeLeaveApplications = () => {
       )
     : 0;
 
+  
   return (
     <div style={styles.page}>
       <div style={styles.topBar}>
-        <div>
-          <h1 style={styles.pageTitle}>
-            Leave Applications
-          </h1>
+  <div>
+    <h1 style={styles.pageTitle}>
+      Leave Applications
+    </h1>
 
-          <p style={styles.pageSubtitle}>
-            Apply for leave and track your available balance.
-          </p>
-        </div>
+    <p style={styles.pageSubtitle}>
+      Apply for leave and track your available balance.
+    </p>
+  </div>
 
-        <button
-          type="button"
-          style={styles.refreshBtn}
-          onClick={fetchLeaveData}
-          disabled={loading}
-        >
-          <RefreshCw size={18} />
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
-      </div>
+  <div style={styles.topActions}>
+    <button
+      type="button"
+      style={styles.calendarIconBtn}
+      onClick={() =>
+        setShowHolidayCalendar(true)
+      }
+      title="Holiday Calendar"
+    >
+      <CalendarDays size={20} />
+    </button>
+
+    <button
+      type="button"
+      style={styles.instructionBtn}
+      onClick={() =>
+        setShowInstructions(true)
+      }
+    >
+      Leave Instructions
+    </button>
+
+    <button
+      type="button"
+      style={styles.refreshBtn}
+      onClick={fetchLeaveData}
+      disabled={loading}
+    >
+      <RefreshCw size={18} />
+
+      {loading
+        ? "Refreshing..."
+        : "Refresh"}
+    </button>
+  </div>
+</div>
 
       {error && !selectedLeaveType && (
         <div style={styles.errorBox}>{error}</div>
@@ -530,13 +570,27 @@ const EmployeeLeaveApplications = () => {
 
               <button
                 type="button"
-                style={styles.applyBtn}
-                onClick={() =>
-                  openApplyModal(leave.key)
-                }
+                disabled={available <= 0}
+                style={{
+                  ...styles.applyBtn,
+                  ...(available <= 0
+                    ? {
+                      opacity: 0.45,
+                      cursor: "not-allowed",
+                    }
+                    : {}),
+                }}
+                onClick={() => {
+                  if (available <= 0) return;
+
+                  openApplyModal(leave.key);
+                }}
               >
                 <Send size={18} />
-                Apply Leave
+
+                {available <= 0
+                  ? "No Leave Available"
+                  : "Apply Leave"}
               </button>
             </div>
           );
@@ -747,6 +801,20 @@ const EmployeeLeaveApplications = () => {
         )}
       </section>
 
+      <HolidayCalendarModal
+  open={showHolidayCalendar}
+  onClose={() =>
+    setShowHolidayCalendar(false)
+  }
+/>
+
+<LeaveInstructionsModal
+  open={showInstructions}
+  onClose={() =>
+    setShowInstructions(false)
+  }
+/>
+       
       {selectedLeaveType && (
         <div
           style={styles.modalOverlay}
@@ -1054,6 +1122,35 @@ const styles = {
     gap: "8px",
     cursor: "pointer",
   },
+
+  topActions: {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+},
+
+calendarIconBtn: {
+  width: "46px",
+  height: "46px",
+  border: "1px solid #ff5733",
+  background: "#ffffff",
+  color: "#ff5733",
+  borderRadius: "14px",
+  display: "grid",
+  placeItems: "center",
+  cursor: "pointer",
+},
+
+instructionBtn: {
+  height: "46px",
+  border: "1px solid #ff5733",
+  background: "#ffffff",
+  color: "#ff5733",
+  borderRadius: "14px",
+  padding: "0 18px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
 
   leaveGrid: {
     display: "grid",

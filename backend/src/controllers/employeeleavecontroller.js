@@ -1522,7 +1522,346 @@ Valencia RMS
   }
 };
 
+const HOLIDAYS_2026 = [
+  {
+    date: "2026-01-26",
+    name: "Republic Day",
+    type: "fixed",
+  },
+  {
+    date: "2026-02-15",
+    name: "Mahashivratri",
+    type: "optional",
+  },
+  {
+    date: "2026-02-19",
+    name: "Chhatrapati Shivaji Maharaj Jayanti",
+    type: "optional",
+  },
+  {
+    date: "2026-03-03",
+    name: "Holi",
+    type: "optional",
+  },
+  {
+    date: "2026-03-19",
+    name: "Gudhi Padwa",
+    type: "optional",
+  },
+  {
+    date: "2026-03-21",
+    name: "Ramzan Eid",
+    type: "optional",
+  },
+  {
+    date: "2026-03-26",
+    name: "Ram Navami",
+    type: "optional",
+  },
+  {
+    date: "2026-03-31",
+    name: "Mahavir Jayanti",
+    type: "optional",
+  },
+  {
+    date: "2026-04-03",
+    name: "Good Friday",
+    type: "optional",
+  },
+  {
+    date: "2026-04-14",
+    name: "Dr. Babasaheb Ambedkar Jayanti",
+    type: "optional",
+  },
+  {
+    date: "2026-05-01",
+    name: "Maharashtra Day / Buddha Pournima",
+    type: "fixed",
+  },
+  {
+    date: "2026-05-28",
+    name: "Bakri Eid",
+    type: "optional",
+  },
+  {
+    date: "2026-06-26",
+    name: "Moharram",
+    type: "optional",
+  },
+  {
+    date: "2026-08-15",
+    name: "Independence Day / Parsi New Year",
+    type: "fixed",
+  },
+  {
+    date: "2026-08-26",
+    name: "Eid-e-Milad",
+    type: "optional",
+  },
+  {
+    date: "2026-09-14",
+    name: "Ganesh Chaturthi",
+    type: "optional",
+  },
+  {
+    date: "2026-10-02",
+    name: "Gandhi Jayanti",
+    type: "fixed",
+  },
+  {
+    date: "2026-10-20",
+    name: "Dasara",
+    type: "optional",
+  },
+  {
+    date: "2026-11-08",
+    name: "Diwali - Laxmi Pujan",
+    type: "optional",
+  },
+  {
+    date: "2026-11-10",
+    name: "Diwali - Bali Pratipada",
+    type: "optional",
+  },
+  {
+    date: "2026-11-24",
+    name: "Guru Nanak Jayanti",
+    type: "optional",
+  },
+  {
+    date: "2026-12-25",
+    name: "Christmas",
+    type: "optional",
+  },
+];
+
+const getIndiaToday = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const values = {};
+
+  parts.forEach((part) => {
+    values[part.type] = part.value;
+  });
+
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+
+/*
+========================================================
+GET HOLIDAY CALENDAR
+GET /api/employee-leaves/holidays
+========================================================
+*/
+const getEmployeeHolidayCalendar = async (req, res) => {
+  try {
+    const employeeId = req.user.user_id;
+
+    const [selectedRows] = await db.query(
+      `
+      SELECT
+        DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date,
+        holiday_name
+      FROM employee_optional_holidays
+      WHERE employee_id = ?
+        AND holiday_year = 2026
+      ORDER BY holiday_date ASC
+      `,
+      [employeeId]
+    );
+
+    const selectedDates = new Set(
+      selectedRows.map((row) => row.holiday_date)
+    );
+
+    const holidays = HOLIDAYS_2026.map((holiday) => ({
+      ...holiday,
+      selected: selectedDates.has(holiday.date),
+    }));
+
+    return res.json({
+      success: true,
+      year: 2026,
+      max_optional: 4,
+      selected_count: selectedRows.length,
+      holidays,
+    });
+  } catch (error) {
+    console.error(
+      "Get employee holiday calendar error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load holiday calendar.",
+      error: error.message,
+    });
+  }
+};
+
+
+/*
+========================================================
+SELECT / REMOVE OPTIONAL HOLIDAY
+POST /api/employee-leaves/holidays/toggle
+========================================================
+*/
+const toggleEmployeeOptionalHoliday = async (req, res) => {
+  try {
+    const employeeId = req.user.user_id;
+
+    const holidayDate = String(
+      req.body.holiday_date || ""
+    ).trim();
+
+    const holiday = HOLIDAYS_2026.find(
+      (item) => item.date === holidayDate
+    );
+
+    if (!holiday) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid holiday.",
+      });
+    }
+
+    if (holiday.type === "fixed") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This is already a fixed company holiday.",
+      });
+    }
+
+    const today = getIndiaToday();
+
+    if (holidayDate < today) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Past holidays cannot be selected.",
+      });
+    }
+
+    /*
+    Sunday is already weekly off.
+    Show it in calendar but don't consume
+    one of the employee's 4 optional holidays.
+    */
+    const holidayDay = new Date(
+      `${holidayDate}T00:00:00`
+    ).getDay();
+
+    if (holidayDay === 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This festival falls on Sunday, which is already a weekly off.",
+      });
+    }
+
+    const [existingRows] = await db.query(
+      `
+      SELECT selection_id
+      FROM employee_optional_holidays
+      WHERE employee_id = ?
+        AND holiday_date = ?
+      LIMIT 1
+      `,
+      [employeeId, holidayDate]
+    );
+
+    /*
+    Already selected -> remove it.
+    */
+    if (existingRows.length > 0) {
+      await db.query(
+        `
+        DELETE FROM employee_optional_holidays
+        WHERE employee_id = ?
+          AND holiday_date = ?
+        `,
+        [employeeId, holidayDate]
+      );
+
+      return res.json({
+        success: true,
+        selected: false,
+        message:
+          "Optional holiday removed.",
+      });
+    }
+
+    const [countRows] = await db.query(
+      `
+      SELECT COUNT(*) AS selected_count
+      FROM employee_optional_holidays
+      WHERE employee_id = ?
+        AND holiday_year = 2026
+      `,
+      [employeeId]
+    );
+
+    const selectedCount = Number(
+      countRows[0]?.selected_count || 0
+    );
+
+    if (selectedCount >= 4) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "You have already selected all 4 optional holidays.",
+      });
+    }
+
+    await db.query(
+      `
+      INSERT INTO employee_optional_holidays (
+        employee_id,
+        holiday_date,
+        holiday_name,
+        holiday_year
+      )
+      VALUES (?, ?, ?, 2026)
+      `,
+      [
+        employeeId,
+        holiday.date,
+        holiday.name,
+      ]
+    );
+
+    return res.json({
+      success: true,
+      selected: true,
+      message:
+        `${holiday.name} selected as an optional holiday.`,
+    });
+  } catch (error) {
+    console.error(
+      "Toggle optional holiday error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to update optional holiday.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getEmployeeLeaveSummary,
   applyEmployeeLeave,
+  getEmployeeHolidayCalendar,
+  toggleEmployeeOptionalHoliday,
 };

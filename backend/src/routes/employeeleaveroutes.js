@@ -13,6 +13,8 @@ const {
 const {
   getEmployeeLeaveSummary,
   applyEmployeeLeave,
+  getEmployeeHolidayCalendar,
+  toggleEmployeeOptionalHoliday,
 } = require(
   "../controllers/employeeleavecontroller"
 );
@@ -50,5 +52,27 @@ router.post(
   ),
   applyEmployeeLeave
 );
+router.get(
+  "/holidays",
+  authMiddleware,
+  requireRole(
+    "employee",
+    "administrator",
+    "admin",
+    "superadmin"
+  ),
+  getEmployeeHolidayCalendar
+);
 
+router.post(
+  "/holidays/toggle",
+  authMiddleware,
+  requireRole(
+    "employee",
+    "administrator",
+    "admin",
+    "superadmin"
+  ),
+  toggleEmployeeOptionalHoliday
+);
 module.exports = router;
