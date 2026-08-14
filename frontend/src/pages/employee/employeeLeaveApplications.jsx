@@ -221,119 +221,239 @@ const EmployeeLeaveApplications = () => {
   };
 
   const handleApply = async () => {
-    if (!selectedLeaveType) return;
+  if (!selectedLeaveType) return;
 
-    setError("");
-    setSuccess("");
+  setError("");
+  setSuccess("");
 
-    if (!form.start_date) {
-      setError("Please select the leave date.");
+  if (!form.start_date) {
+    setError("Please select the leave date.");
+    return;
+  }
+
+  if (form.start_date < minimumLeaveDate) {
+    setError(
+      "Leave must be applied for at least 1 day in advance."
+    );
+    return;
+  }
+
+  if (form.duration_type === "full_day") {
+    if (!form.end_date) {
+      setError("Please select the end date.");
       return;
     }
 
-    if (form.start_date < minimumLeaveDate) {
+    if (form.end_date < form.start_date) {
       setError(
-        "Leave must be applied for at least 1 day in advance."
+        "Leave end date cannot be before start date."
       );
       return;
     }
+  }
 
-    if (form.duration_type === "full_day") {
-      if (!form.end_date) {
-        setError("Please select the end date.");
-        return;
+  if (
+    form.duration_type === "half_day" &&
+    !["first_half", "second_half"].includes(
+      form.half_day_session
+    )
+  ) {
+    setError(
+      "Please select First Half or Second Half."
+    );
+    return;
+  }
+
+  if (!form.reason.trim()) {
+    setError(
+      "Please enter the reason for leave."
+    );
+    return;
+  }
+
+  if (calculateDays <= 0) {
+    setError(
+      "Unable to calculate leave days."
+    );
+    return;
+  }
+
+  const currentBalance =
+    balances[selectedLeaveType];
+
+  const available = Number(
+    currentBalance?.available ??
+      currentBalance?.remaining ??
+      0
+  );
+
+  if (calculateDays > available) {
+    setError(
+      `You only have ${formatDays(
+        available
+      )} day(s) currently available.`
+    );
+    return;
+  }
+
+  try {
+    setSubmitting(true);
+
+    const response = await api.post(
+      "/employee-leaves/apply",
+      {
+        leave_type:
+          selectedLeaveType,
+
+        start_date:
+          form.start_date,
+
+        end_date:
+          form.duration_type === "half_day"
+            ? form.start_date
+            : form.end_date,
+
+        duration_type:
+          form.duration_type,
+
+        half_day_session:
+          form.duration_type === "half_day"
+            ? form.half_day_session
+            : null,
+
+        reason:
+          form.reason.trim(),
       }
-
-      if (form.end_date < form.start_date) {
-        setError(
-          "Leave end date cannot be before start date."
-        );
-        return;
-      }
-    }
-
-    if (
-      form.duration_type === "half_day" &&
-      !["first_half", "second_half"].includes(
-        form.half_day_session
-      )
-    ) {
-      setError(
-        "Please select First Half or Second Half."
-      );
-      return;
-    }
-
-    if (!form.reason.trim()) {
-      setError("Please enter the reason for leave.");
-      return;
-    }
-
-    if (calculateDays <= 0) {
-      setError("Unable to calculate leave days.");
-      return;
-    }
-
-    const currentBalance = balances[selectedLeaveType];
-
-    const available = Number(
-      currentBalance?.available ??
-        currentBalance?.remaining ??
-        0
     );
 
-    if (calculateDays > available) {
-      setError(
-        `You only have ${formatDays(
-          available
-        )} day(s) currently available.`
-      );
-      return;
-    }
+    /*
+    ==========================================
+    APPLICATION RETURNED FROM BACKEND
+    ==========================================
+    */
+    const application =
+      response.data?.application || {};
 
-    try {
-      setSubmitting(true);
+    const employeeName =
+      application.employee_name ||
+      "Employee";
 
-      const response = await api.post(
-        "/employee-leaves/apply",
-        {
-          leave_type: selectedLeaveType,
-          start_date: form.start_date,
-          end_date:
-            form.duration_type === "half_day"
-              ? form.start_date
-              : form.end_date,
-          duration_type: form.duration_type,
-          half_day_session:
-            form.duration_type === "half_day"
-              ? form.half_day_session
-              : null,
-          reason: form.reason.trim(),
-        }
+    const adminEmail =
+      application.admin_email || "";
+
+    const adminName =
+      application.admin_name ||
+      "Sir/Ma'am";
+
+    const leaveLabel =
+      getLeaveLabel(
+        selectedLeaveType
       );
 
-      setSuccess(
-        response.data?.message ||
-          "Leave application submitted successfully."
-      );
+    const endDate =
+      form.duration_type === "half_day"
+        ? form.start_date
+        : form.end_date;
 
-      await fetchLeaveData();
+    const durationText =
+      form.duration_type === "half_day"
+        ? form.half_day_session ===
+          "first_half"
+          ? "Half Day - First Half"
+          : "Half Day - Second Half"
+        : calculateDays === 1
+        ? "Full Day"
+        : `${formatDays(
+            calculateDays
+          )} Full Days`;
 
-      setSelectedLeaveType(null);
-      resetForm();
-    } catch (err) {
-      console.error("Apply employee leave error:", err);
+    /*
+    ==========================================
+    EMAIL SUBJECT
+    ==========================================
+    */
+    const subject =
+      `${leaveLabel} Application - ${employeeName}`;
 
-      setError(
-        err?.response?.data?.sqlMessage ||
-          err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          "Failed to submit leave application."
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    /*
+    ==========================================
+    PRE-WRITTEN EMAIL BODY
+    ==========================================
+    */
+    const body = [
+      `Dear ${adminName},`,
+      "",
+      `I would like to apply for ${leaveLabel}.`,
+      "",
+      `From: ${formatDisplayDate(
+        form.start_date
+      )}`,
+      `To: ${formatDisplayDate(
+        endDate
+      )}`,
+      `Duration: ${durationText}`,
+      `Leave Days: ${formatDays(
+        calculateDays
+      )}`,
+      "",
+      `Reason: ${form.reason.trim()}`,
+      "",
+      "The leave application has also been submitted through Valencia RMS and is awaiting your approval.",
+      "",
+      "Kindly review and approve my leave application.",
+      "",
+      "Regards,",
+      employeeName,
+    ].join("\n");
+
+    /*
+    ==========================================
+    OPEN DEFAULT EMAIL APPLICATION
+    ==========================================
+    */
+    const mailLink =
+      `mailto:${encodeURIComponent(
+        adminEmail
+      )}?subject=${encodeURIComponent(
+        subject
+      )}&body=${encodeURIComponent(
+        body
+      )}`;
+
+    setSuccess(
+      response.data?.message ||
+        "Leave application submitted successfully."
+    );
+
+    /*
+    Refresh RMS so request immediately appears
+    as Pending.
+    */
+    await fetchLeaveData();
+
+    setSelectedLeaveType(null);
+    resetForm();
+
+    /*
+    Open Outlook / Gmail / default mail client.
+    */
+    window.location.href = mailLink;
+  } catch (err) {
+    console.error(
+      "Apply employee leave error:",
+      err
+    );
+
+    setError(
+      err?.response?.data?.sqlMessage ||
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to submit leave application."
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const leaveCards = [
     {

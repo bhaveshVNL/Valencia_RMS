@@ -281,23 +281,44 @@ const recalculateProjectFromMainTasks = async (connection, projectId) => {
   let nextProjectStatus = "not_started";
 
   if (activeAssignees.length > 0) {
-    const completedActiveAssignees = activeAssignees.filter((row) => {
-      const totalSubtasks = Number(row.total_subtasks || 0);
-      const completedSubtasks = Number(row.completed_subtasks || 0);
+  const completedActiveAssignees = activeAssignees.filter(
+    (row) => {
+      const totalSubtasks = Number(
+        row.total_subtasks || 0
+      );
 
-      return totalSubtasks > 0 && completedSubtasks === totalSubtasks;
-    }).length;
+      const completedSubtasks = Number(
+        row.completed_subtasks || 0
+      );
 
-    projectProgress = Math.round(
-      (completedActiveAssignees / activeAssignees.length) * 100
-    );
-
-    if (completedActiveAssignees === activeAssignees.length) {
-      nextProjectStatus = "under_review";
-    } else {
-      nextProjectStatus = "ongoing";
+      return (
+        totalSubtasks > 0 &&
+        completedSubtasks === totalSubtasks
+      );
     }
+  ).length;
+
+  projectProgress = Math.round(
+    (
+      completedActiveAssignees /
+      activeAssignees.length
+    ) *
+      100
+  );
+
+  /*
+  Do not automatically start the project
+  just because tasks exist.
+  */
+  if (
+    completedActiveAssignees ===
+    activeAssignees.length
+  ) {
+    nextProjectStatus = "under_review";
+  } else {
+    nextProjectStatus = currentProjectStatus;
   }
+}
 
   if (
     currentProjectStatus === "done" ||
