@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+
 import {
   CalendarDays,
   CheckCircle2,
@@ -16,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import api from "../../api/axios";
+import * as XLSX from "xlsx";
 
 const asArray = (value) => {
   if (Array.isArray(value)) return value;
@@ -1037,143 +1039,304 @@ const fetchUsers = async () => {
       setReviewActionLoading(false);
     }
   };
+  const formatExportDuration = (seconds) => {
+  const s = Math.max(0, Number(seconds || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h) return `${h}h ${m}m`;
+  if (m) return `${m}m ${sec}s`;
+  return `${sec}s`;
+};
 
-  const exportProjectData = () => {
-  if (!projects.length) {
-    setError("No project data available to export.");
-    return;
-  }
+const formatExportDate = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
 
-  setError("");
+const formatExportTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+};
 
-  const escapeCsv = (value) => {
-    const text = String(value ?? "");
+const exportProjectData = async () => {
+  try {
+    setActionLoading(true);
+    setError("");
+    setSuccessMessage("");
 
-    if (
-      text.includes(",") ||
-      text.includes('"') ||
-      text.includes("\n")
-    ) {
-      return `"${text.replace(/"/g, '""')}"`;
-    }
+    const usersResponse = await api.get("/admin/users");
+    const departmentUsers = usersResponse?.data?.users || [];
 
-    return text;
-  };
+    const responses = await Promise.all(
+      departmentUsers.map(async (user) => {
+        const userId = user.user_id || user.id;
+        if (!userId) return null;
 
-  const rows = [];
+        try {
+          const response = await api.get(
+            `/admin/users/${userId}/time-summary`
+          );
+          return response?.data || null;
+        } catch (error) {
+          console.error(`Could not load time for employee ${userId}`, error);
+          return null;
+        }
+      })
+    );
 
-  projects.forEach((project) => {
-    const projectAssignees = (project.assignees || [])
-      .map((user) => getUserName(user))
-      .join(", ");
+    const summaries = responses.filter(Boolean);
+    const projectMap = new Map();
 
-    if (!project.main_tasks?.length) {
-      rows.push({
-        project_title: project.project_title,
-        project_status: getStatusLabel(project.status),
-        project_progress: `${project.overall_progress || 0}%`,
+    projects.forEach((project) => {
+      projectMap.set(String(project.project_id), {
+        project_id: project.project_id,
+        project_title: project.project_title || "Untitled Project",
+        status: getStatusLabel(project.status),
+        start_date: project.start_date || "",
+        end_date: project.end_date || "",
         department: project.department_name || "-",
-        start_date: project.start_date || "-",
-        end_date: project.end_date || "-",
-        created_by: project.created_by_name || "-",
-        project_assignees: projectAssignees || "-",
-        task_title: "-",
-        task_status: "-",
-        task_progress: "-",
-        task_assignees: "-",
-      });
-
-      return;
-    }
-
-    project.main_tasks.forEach((task) => {
-      rows.push({
-        project_title: project.project_title,
-        project_status: getStatusLabel(project.status),
-        project_progress: `${project.overall_progress || 0}%`,
-        department: project.department_name || "-",
-        start_date: project.start_date || "-",
-        end_date: project.end_date || "-",
-        created_by: project.created_by_name || "-",
-        project_assignees: projectAssignees || "-",
-
-        task_title: task.task_title || "-",
-        task_status: getStatusLabel(task.status),
-        task_progress: `${task.progress || 0}%`,
-
-        task_assignees:
-          (task.assignees || [])
-            .map((user) => getUserName(user))
-            .join(", ") || "-",
+        total_seconds: 0,
+        employees: new Map(),
+        tasks: new Map(),
+        sessions: [],
       });
     });
-  });
 
-  const headers = [
-    "Project",
-    "Project Status",
-    "Project Progress",
-    "Department",
-    "Start Date",
-    "End Date",
-    "Created By",
-    "Project Assignees",
-    "Task",
-    "Task Status",
-    "Task Progress",
-    "Task Assignees",
-  ];
+    summaries.forEach((summary) => {
+      const employee = summary.employee || {};
 
-  const csvRows = [
-    headers.map(escapeCsv).join(","),
+      (summary.projects || []).forEach((project) => {
+        const key = String(project.project_id);
 
-    ...rows.map((row) =>
-      [
-        row.project_title,
-        row.project_status,
-        row.project_progress,
-        row.department,
-        row.start_date,
-        row.end_date,
-        row.created_by,
-        row.project_assignees,
-        row.task_title,
-        row.task_status,
-        row.task_progress,
-        row.task_assignees,
-      ]
-        .map(escapeCsv)
-        .join(",")
-    ),
-  ];
+        if (!projectMap.has(key)) {
+          projectMap.set(key, {
+            project_id: project.project_id,
+            project_title: project.project_title || "Untitled Project",
+            status: "-",
+            start_date: "",
+            end_date: "",
+            department: employee.department_name || "-",
+            total_seconds: 0,
+            employees: new Map(),
+            tasks: new Map(),
+            sessions: [],
+          });
+        }
 
-  const csvContent = csvRows.join("\n");
+        const p = projectMap.get(key);
 
-  const blob = new Blob([csvContent], {
-    type: "text/csv;charset=utf-8;",
-  });
+        (project.tasks || []).forEach((task) => {
+          const taskSeconds = Number(task.total_seconds || 0);
+          p.total_seconds += taskSeconds;
 
-  const url = URL.createObjectURL(blob);
+          const employeeKey = String(
+            employee.user_id || employee.employee_code || employee.full_name
+          );
 
-  const link = document.createElement("a");
+          if (!p.employees.has(employeeKey)) {
+            p.employees.set(employeeKey, {
+              name: employee.full_name || "-",
+              code: employee.employee_code || "-",
+              seconds: 0,
+            });
+          }
 
-  const today = new Date()
-    .toISOString()
-    .slice(0, 10);
+          p.employees.get(employeeKey).seconds += taskSeconds;
 
-  link.href = url;
-  link.setAttribute(
-    "download",
-    `admin-projects-${today}.csv`
-  );
+          const taskKey = String(task.task_id);
 
-  document.body.appendChild(link);
+          if (!p.tasks.has(taskKey)) {
+            p.tasks.set(taskKey, {
+              title: task.task_title || "Untitled Task",
+              status: getStatusLabel(task.status),
+              seconds: 0,
+            });
+          }
 
-  link.click();
+          p.tasks.get(taskKey).seconds += taskSeconds;
 
-  document.body.removeChild(link);
+          (task.sessions || []).forEach((session) => {
+            p.sessions.push({
+              Project: p.project_title,
+              Employee: employee.full_name || "-",
+              "Employee Code": employee.employee_code || "-",
+              Task: task.task_title || "-",
+              "Task Status": getStatusLabel(task.status),
+              Date: formatExportDate(session.started_at),
+              "Start Time": formatExportTime(session.started_at),
+              "End Time": session.currently_running
+                ? "Running"
+                : formatExportTime(session.ended_at),
+              Duration: formatExportDuration(session.seconds_worked),
+              "Duration Seconds": Number(session.seconds_worked || 0),
+              Reason: session.currently_running
+                ? "Running"
+                : String(session.end_reason || "-").replace(/_/g, " "),
+              "Session ID": session.session_id,
+            });
+          });
+        });
+      });
+    });
 
-  URL.revokeObjectURL(url);
+    const workbook = XLSX.utils.book_new();
+    const summaryRows = [];
+
+    Array.from(projectMap.values()).forEach((project, index) => {
+      if (index) summaryRows.push([], []);
+
+      summaryRows.push([`PROJECT: ${project.project_title}`]);
+      summaryRows.push([]);
+      summaryRows.push(["Project Status", project.status]);
+      summaryRows.push(["Start Date", project.start_date || "-"]);
+      summaryRows.push(["End Date", project.end_date || "-"]);
+      summaryRows.push(["Department", project.department || "-"]);
+      summaryRows.push([]);
+      summaryRows.push([
+        "Total Tracked Time",
+        formatExportDuration(project.total_seconds),
+      ]);
+      summaryRows.push(["Employees Worked", project.employees.size]);
+      summaryRows.push(["Tasks Worked", project.tasks.size]);
+      summaryRows.push([]);
+      summaryRows.push(["EMPLOYEE BREAKDOWN"]);
+      summaryRows.push(["Employee", "Employee Code", "Tracked Time"]);
+
+      const employees = Array.from(project.employees.values()).sort(
+        (a, b) => b.seconds - a.seconds
+      );
+
+      if (!employees.length) {
+        summaryRows.push(["No employee time recorded", "-", "0s"]);
+      } else {
+        employees.forEach((employee) => {
+          summaryRows.push([
+            employee.name,
+            employee.code,
+            formatExportDuration(employee.seconds),
+          ]);
+        });
+      }
+
+      summaryRows.push([]);
+      summaryRows.push(["TASK BREAKDOWN"]);
+      summaryRows.push(["Task", "Status", "Tracked Time"]);
+
+      const tasks = Array.from(project.tasks.values()).sort(
+        (a, b) => b.seconds - a.seconds
+      );
+
+      if (!tasks.length) {
+        summaryRows.push(["No task time recorded", "-", "0s"]);
+      } else {
+        tasks.forEach((task) => {
+          summaryRows.push([
+            task.title,
+            task.status,
+            formatExportDuration(task.seconds),
+          ]);
+        });
+      }
+    });
+
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+    summarySheet["!cols"] = [
+      { wch: 38 },
+      { wch: 24 },
+      { wch: 20 },
+    ];
+
+    const allSessions = Array.from(projectMap.values()).flatMap(
+      (project) => project.sessions
+    );
+
+    const sessionsSheet = XLSX.utils.json_to_sheet(
+      allSessions.length
+        ? allSessions
+        : [
+            {
+              Project: "No work sessions recorded",
+              Employee: "-",
+              "Employee Code": "-",
+              Task: "-",
+              "Task Status": "-",
+              Date: "-",
+              "Start Time": "-",
+              "End Time": "-",
+              Duration: "0s",
+              "Duration Seconds": 0,
+              Reason: "-",
+              "Session ID": "-",
+            },
+          ]
+    );
+
+    sessionsSheet["!cols"] = [
+      { wch: 30 },
+      { wch: 24 },
+      { wch: 16 },
+      { wch: 30 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 12 },
+    ];
+
+    if (sessionsSheet["!ref"]) {
+      sessionsSheet["!autofilter"] = {
+        ref: sessionsSheet["!ref"],
+      };
+    }
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      summarySheet,
+      "Project Summary"
+    );
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      sessionsSheet,
+      "Work Sessions"
+    );
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    XLSX.writeFile(
+      workbook,
+      `Valencia-Project-Time-Report-${today}.xlsx`
+    );
+
+    setSuccessMessage("Project time report exported successfully.");
+  } catch (error) {
+    console.error("Export project data error:", error);
+
+    setError(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to export project time report."
+    );
+  } finally {
+    setActionLoading(false);
+  }
 };
 
   const kanbanColumns = [
@@ -1247,9 +1410,13 @@ const fetchUsers = async () => {
           type="button"
           style={styles.exportButton}
           onClick={exportProjectData}
+          disabled={actionLoading}
         >
           <Download size={19} />
-          Export Data
+
+          {actionLoading
+            ? "Preparing..."
+            : "Export Data"}
         </button>
       </div>
 
@@ -3098,8 +3265,7 @@ disabledReviewButton: {
     fontSize: "12px",
     fontWeight: 900,
   },
-
-  exportButton: {
+exportButton: {
   border: "1px solid #111827",
   background: "#111827",
   color: "#ffffff",
