@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, LogIn, Mail } from "lucide-react";
+import { Eye, EyeOff, Lock, LogIn, Mail } from "lucide-react";
 import api from "../api/axios";
 
 const getDashboardRoute = (roleName) => {
@@ -22,6 +22,7 @@ const LoginPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -163,121 +164,159 @@ const LoginPage = () => {
         )}
 
         <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                color: "#333333",
-                fontSize: "14px",
-                fontWeight: 800,
-              }}
-            >
-              Email
-            </label>
+  <div style={{ marginBottom: "16px" }}>
+    <label
+      style={{
+        display: "block",
+        marginBottom: "8px",
+        color: "#333333",
+        fontSize: "14px",
+        fontWeight: 800,
+      }}
+    >
+      Email
+    </label>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                border: "1px solid #e5e5e5",
-                borderRadius: "16px",
-                padding: "0 14px",
-                background: "#ffffff",
-              }}
-            >
-              <Mail size={18} color="#777777" />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        border: "1px solid #e5e5e5",
+        borderRadius: "16px",
+        padding: "0 14px",
+        background: "#ffffff",
+        height: "54px",
+      }}
+    >
+      <Mail
+        size={18}
+        color="#777777"
+        style={{ flexShrink: 0 }}
+      />
 
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                required
-                style={{
-                  width: "100%",
-                  border: "0",
-                  outline: "none",
-                  padding: "15px 0",
-                  fontSize: "15px",
-                  fontWeight: 700,
-                  background: "transparent",
-                }}
-              />
-            </div>
-          </div>
+      <input
+        type="email"
+        name="email"
+        value={formData.email}
+        onChange={handleChange}
+        placeholder="Enter your email"
+        required
+        autoComplete="email"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: "0",
+          outline: "none",
+          padding: "0 12px",
+          height: "100%",
+          fontSize: "15px",
+          fontWeight: 700,
+          background: "transparent",
+          color: "#111111",
+        }}
+      />
+    </div>
+  </div>
 
-          <div style={{ marginBottom: "22px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                color: "#333333",
-                fontSize: "14px",
-                fontWeight: 800,
-              }}
-            >
-              Password
-            </label>
+  <div style={{ marginBottom: "22px" }}>
+    <label
+      style={{
+        display: "block",
+        marginBottom: "8px",
+        color: "#333333",
+        fontSize: "14px",
+        fontWeight: 800,
+      }}
+    >
+      Password
+    </label>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                border: "1px solid #e5e5e5",
-                borderRadius: "16px",
-                padding: "0 14px",
-                background: "#ffffff",
-              }}
-            >
-              <Lock size={18} color="#777777" />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        border: "1px solid #e5e5e5",
+        borderRadius: "16px",
+        padding: "0 10px 0 14px",
+        background: "#ffffff",
+        height: "54px",
+      }}
+    >
+      <Lock
+        size={18}
+        color="#777777"
+        style={{ flexShrink: 0 }}
+      />
 
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                required
-                style={{
-                  width: "100%",
-                  border: "0",
-                  outline: "none",
-                  padding: "15px 0",
-                  fontSize: "15px",
-                  fontWeight: 700,
-                  background: "transparent",
-                }}
-              />
-            </div>
-          </div>
+      <input
+        type={showPassword ? "text" : "password"}
+        name="password"
+        value={formData.password}
+        onChange={handleChange}
+        placeholder="Enter your password"
+        required
+        autoComplete="current-password"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: "0",
+          outline: "none",
+          padding: "0 12px",
+          height: "100%",
+          fontSize: "15px",
+          fontWeight: 700,
+          background: "transparent",
+          color: "#111111",
+        }}
+      />
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%",
-              border: "0",
-              borderRadius: "16px",
-              background: loading ? "#ff9a82" : "#ff5733",
-              color: "#ffffff",
-              padding: "15px 18px",
-              fontSize: "16px",
-              fontWeight: 900,
-              cursor: loading ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "10px",
-            }}
-          >
-            <LogIn size={18} />
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </form>
+      <button
+        type="button"
+        onClick={() => setShowPassword((previous) => !previous)}
+        aria-label={showPassword ? "Hide password" : "Show password"}
+        style={{
+          width: "38px",
+          height: "38px",
+          flexShrink: 0,
+          border: "0",
+          borderRadius: "10px",
+          background: "transparent",
+          padding: 0,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#777777",
+        }}
+      >
+        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+      </button>
+    </div>
+  </div>
+
+  <button
+    type="submit"
+    disabled={loading}
+    style={{
+      width: "100%",
+      border: "0",
+      borderRadius: "16px",
+      background: loading ? "#ff9a82" : "#ff5733",
+      color: "#ffffff",
+      padding: "15px 18px",
+      fontSize: "16px",
+      fontWeight: 900,
+      cursor: loading ? "not-allowed" : "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+    }}
+  >
+    <LogIn size={18} />
+    {loading ? "Logging in..." : "Login"}
+  </button>
+</form>
       </div>
     </div>
   );
