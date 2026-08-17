@@ -66,6 +66,15 @@ const EmployeeLeaveApplications = () => {
   const [showHolidayCalendar, setShowHolidayCalendar] =
     useState(false);
 
+  const [holidaySummary, setHolidaySummary] = useState({
+    max_optional: 4,
+    selected_count: 0,
+    holidays: [],
+  });
+
+const [holidayLoading, setHolidayLoading] =
+  useState(false);
+
   const getTomorrowDate = () => {
     const date = new Date();
     date.setDate(date.getDate() + 1);
@@ -190,8 +199,42 @@ const EmployeeLeaveApplications = () => {
     }
   };
 
+  const fetchHolidaySummary = async () => {
+  try {
+    setHolidayLoading(true);
+
+    const response = await api.get(
+      "/employee-leaves/holidays"
+    );
+
+    setHolidaySummary({
+      max_optional: Number(
+        response.data?.max_optional || 4
+      ),
+
+      selected_count: Number(
+        response.data?.selected_count || 0
+      ),
+
+      holidays: Array.isArray(
+        response.data?.holidays
+      )
+        ? response.data.holidays
+        : [],
+    });
+  } catch (err) {
+    console.error(
+      "Fetch holiday summary error:",
+      err
+    );
+  } finally {
+    setHolidayLoading(false);
+  }
+};
+
   useEffect(() => {
     fetchLeaveData();
+    fetchHolidaySummary();
   }, []);
 
   const resetForm = () => {
@@ -595,6 +638,100 @@ const EmployeeLeaveApplications = () => {
             </div>
           );
         })}
+        <div style={styles.leaveCard}>
+  <div style={styles.cardIcon}>
+    <CalendarDays size={24} />
+  </div>
+
+  <h2 style={styles.leaveTitle}>
+    Holiday Leave
+  </h2>
+
+  <p style={styles.leaveDescription}>
+    Choose any 4 festival holidays
+  </p>
+
+  <div
+    style={{
+      ...styles.balanceGrid,
+      gridTemplateColumns:
+        "repeat(3, minmax(0, 1fr))",
+    }}
+  >
+    <div style={styles.balanceStat}>
+      <strong style={styles.totalNumber}>
+        {holidaySummary.max_optional}
+      </strong>
+
+      <span>Total</span>
+    </div>
+
+    <div style={styles.balanceStat}>
+      <strong style={styles.totalNumber}>
+        {holidaySummary.selected_count}
+      </strong>
+
+      <span>Selected</span>
+    </div>
+
+    <div style={styles.balanceStat}>
+      <strong style={styles.totalNumber}>
+        {Math.max(
+          0,
+          holidaySummary.max_optional -
+            holidaySummary.selected_count
+        )}
+      </strong>
+
+      <span>Remaining</span>
+    </div>
+  </div>
+
+  <div style={styles.balanceProgressTrack}>
+    <div
+      style={{
+        ...styles.balanceProgressFill,
+
+        width: `${
+          holidaySummary.max_optional > 0
+            ? Math.min(
+                100,
+                (holidaySummary.selected_count /
+                  holidaySummary.max_optional) *
+                  100
+              )
+            : 0
+        }%`,
+      }}
+    />
+  </div>
+
+  <p style={styles.availableText}>
+    {holidaySummary.selected_count} of{" "}
+    {holidaySummary.max_optional} holidays selected
+  </p>
+
+  <div style={styles.privilegedInfo}>
+    <span>
+      Fixed company holidays are separate
+    </span>
+  </div>
+
+  <button
+    type="button"
+    style={styles.applyBtn}
+    onClick={() =>
+      setShowHolidayCalendar(true)
+    }
+    disabled={holidayLoading}
+  >
+    <CalendarDays size={18} />
+
+    {holidayLoading
+      ? "Loading..."
+      : "Choose Holidays"}
+  </button>
+</div>
       </div>
 
       <div style={styles.balanceInfo}>
@@ -1153,9 +1290,9 @@ instructionBtn: {
 },
 
   leaveGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(4, minmax(0, 1fr))",
     gap: "20px",
     marginBottom: "26px",
   },
