@@ -10,115 +10,265 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  HOLIDAYS,
-  HOLIDAY_YEAR,
-} from "../../data/holidays";
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-const WEEK_DAYS = [
-  "Sun",
-  "Mon",
-  "Tue",
-  "Wed",
-  "Thu",
-  "Fri",
-  "Sat",
-];
+import api from "../../api/axios";
 
 const HolidayCalendarModal = ({
   open,
   onClose,
+  onChanged,
 }) => {
-  const defaultMonth =
-    new Date().getFullYear() ===
-    HOLIDAY_YEAR
-      ? new Date().getMonth()
-      : 0;
+  const [calendarMonth, setCalendarMonth] =
+    useState(new Date().getMonth());
 
-  const [month, setMonth] =
-    useState(defaultMonth);
+  const [holidays, setHolidays] =
+    useState([]);
+
+  const [selectedCount, setSelectedCount] =
+    useState(0);
+
+  const [maxOptional, setMaxOptional] =
+    useState(4);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [savingDate, setSavingDate] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  const year = 2026;
+
+  const fetchHolidays = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response =
+        await api.get(
+          "/employee-leaves/holidays"
+        );
+
+      const data =
+        response.data || {};
+
+      const holidayRows =
+        Array.isArray(data.holidays)
+          ? data.holidays
+          : [];
+
+      setHolidays(
+        holidayRows
+      );
+
+      setSelectedCount(
+        Number(
+          data.selected_count || 0
+        )
+      );
+
+      setMaxOptional(
+        Number(
+          data.max_optional || 4
+        )
+      );
+
+      if (onChanged) {
+        onChanged({
+          holidays:
+            holidayRows,
+
+          selected_count:
+            Number(
+              data.selected_count ||
+                0
+            ),
+
+          max_optional:
+            Number(
+              data.max_optional ||
+                4
+            ),
+        });
+      }
+    } catch (err) {
+      console.error(
+        "Holiday calendar load error:",
+        err
+      );
+
+      setError(
+        err?.response?.data?.message ||
+          "Failed to load holiday calendar."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (open) {
-      setMonth(defaultMonth);
+      setMessage("");
+      setError("");
+      setCalendarMonth(
+        new Date().getMonth()
+      );
+
+      fetchHolidays();
     }
-  }, [open, defaultMonth]);
+  }, [open]);
 
-  const calendarDays = useMemo(() => {
-    const firstDay = new Date(
-      HOLIDAY_YEAR,
-      month,
-      1
-    ).getDay();
+  const today = new Date();
 
-    const daysInMonth = new Date(
-      HOLIDAY_YEAR,
-      month + 1,
+  const todayKey =
+    `${today.getFullYear()}-${String(
+      today.getMonth() + 1
+    ).padStart(2, "0")}-${String(
+      today.getDate()
+    ).padStart(2, "0")}`;
+
+  const holidaysByDate =
+    useMemo(
+      () =>
+        new Map(
+          holidays.map(
+            (holiday) => [
+              holiday.date,
+              holiday,
+            ]
+          )
+        ),
+      [holidays]
+    );
+
+  const daysInMonth =
+    new Date(
+      year,
+      calendarMonth + 1,
       0
     ).getDate();
 
-    return [
-      ...Array(firstDay).fill(null),
+  const firstWeekday =
+    new Date(
+      year,
+      calendarMonth,
+      1
+    ).getDay();
 
-      ...Array.from(
-        {
-          length: daysInMonth,
-        },
-        (_, index) =>
-          index + 1
-      ),
-    ];
-  }, [month]);
-
-  const monthHolidays = useMemo(
-    () =>
-      HOLIDAYS.filter(
-        (holiday) => {
-          const holidayMonth =
-            Number(
-              holiday.date.slice(
-                5,
-                7
-              )
-            ) - 1;
-
-          return (
-            holidayMonth === month
-          );
-        }
-      ),
-    [month]
-  );
-
-  const getHolidayForDay = (
-    day
-  ) => {
-    const date = `${HOLIDAY_YEAR}-${String(
-      month + 1
-    ).padStart(2, "0")}-${String(
-      day
-    ).padStart(2, "0")}`;
-
-    return HOLIDAYS.find(
-      (holiday) =>
-        holiday.date === date
+  const monthName =
+    new Date(
+      year,
+      calendarMonth,
+      1
+    ).toLocaleString(
+      "en-IN",
+      {
+        month: "long",
+        year: "numeric",
+      }
     );
-  };
+
+  const monthHolidays =
+    holidays.filter(
+      (holiday) =>
+        Number(
+          holiday.date.slice(
+            5,
+            7
+          )
+        ) ===
+        calendarMonth + 1
+    );
+
+  const toggleHoliday =
+    async (holiday) => {
+      if (!holiday) return;
+
+      setMessage("");
+      setError("");
+
+      if (
+        holiday.type ===
+        "fixed"
+      ) {
+        setError(
+          "This is already a fixed company holiday."
+        );
+
+        return;
+      }
+
+      const isSunday =
+        new Date(
+          `${holiday.date}T00:00:00`
+        ).getDay() === 0;
+
+      if (isSunday) {
+        setError(
+          "This festival falls on Sunday, which is already a weekly off."
+        );
+
+        return;
+      }
+
+      if (
+        holiday.date <
+          todayKey &&
+        !holiday.selected
+      ) {
+        setError(
+          "Past holidays cannot be selected."
+        );
+
+        return;
+      }
+
+      try {
+        setSavingDate(
+          holiday.date
+        );
+
+        const response =
+          await api.post(
+            "/employee-leaves/holidays/toggle",
+            {
+              holiday_date:
+                holiday.date,
+            }
+          );
+
+        setMessage(
+          response.data?.message ||
+            "Holiday selection updated."
+        );
+
+        /*
+        Reload from backend so the
+        green selected state and count
+        always match MySQL.
+        */
+        await fetchHolidays();
+      } catch (err) {
+        console.error(
+          "Toggle holiday error:",
+          err
+        );
+
+        setError(
+          err?.response?.data
+            ?.message ||
+            err?.response?.data
+              ?.error ||
+            "Failed to update holiday."
+        );
+      } finally {
+        setSavingDate("");
+      }
+    };
 
   if (!open) {
     return null;
@@ -140,232 +290,381 @@ const HolidayCalendarModal = ({
           style={styles.closeBtn}
           onClick={onClose}
         >
-          <X size={20} />
+          <X size={19} />
         </button>
 
         <h2 style={styles.title}>
-          Holiday Calendar{" "}
-          {HOLIDAY_YEAR}
+          Holiday Calendar {year}
         </h2>
 
-        <p style={styles.subtitle}>
-          Fixed company holidays and
-          optional festival holidays.
+        <p style={styles.counter}>
+          Festival Holidays Selected:{" "}
+          <strong>
+            {selectedCount} /{" "}
+            {maxOptional}
+          </strong>
         </p>
 
         <div style={styles.legend}>
-          <span
-            style={styles.legendItem}
-          >
-            <span
-              style={styles.fixedDot}
-            />
-
-            Fixed Company Holiday
-          </span>
-
-          <span
-            style={styles.legendItem}
-          >
-            <span
-              style={styles.optionalDot}
-            />
-
-            Optional Festival Holiday
-          </span>
+          <span>🔒 Fixed</span>
+          <span>🟠 Festival Option</span>
+          <span>🟢 Selected</span>
         </div>
 
-        <div
-          style={styles.monthHeader}
-        >
+        {message && (
+          <div style={styles.message}>
+            {message}
+          </div>
+        )}
+
+        {error && (
+          <div style={styles.error}>
+            {error}
+          </div>
+        )}
+
+        <div style={styles.monthNav}>
           <button
             type="button"
             style={styles.navBtn}
-            disabled={month === 0}
+            disabled={
+              calendarMonth === 0
+            }
             onClick={() =>
-              setMonth(
-                (value) =>
+              setCalendarMonth(
+                (month) =>
                   Math.max(
                     0,
-                    value - 1
+                    month - 1
                   )
               )
             }
           >
             <ChevronLeft
-              size={18}
+              size={20}
             />
           </button>
 
-          <strong
-            style={styles.monthTitle}
-          >
-            {MONTH_NAMES[month]}{" "}
-            {HOLIDAY_YEAR}
+          <strong>
+            {monthName}
           </strong>
 
           <button
             type="button"
             style={styles.navBtn}
             disabled={
-              month === 11
+              calendarMonth === 11
             }
             onClick={() =>
-              setMonth(
-                (value) =>
+              setCalendarMonth(
+                (month) =>
                   Math.min(
                     11,
-                    value + 1
+                    month + 1
                   )
               )
             }
           >
             <ChevronRight
-              size={18}
+              size={20}
             />
           </button>
         </div>
 
-        <div
-          style={styles.weekGrid}
-        >
-          {WEEK_DAYS.map(
-            (day) => (
-              <div
-                key={day}
-                style={
-                  styles.weekDay
-                }
-              >
-                {day}
-              </div>
-            )
-          )}
+        <div style={styles.weekRow}>
+          {[
+            "Sun",
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu",
+            "Fri",
+            "Sat",
+          ].map((day) => (
+            <span key={day}>
+              {day}
+            </span>
+          ))}
         </div>
 
-        <div
-          style={styles.calendarGrid}
-        >
-          {calendarDays.map(
-            (day, index) => {
-              if (!day) {
+        {loading ? (
+          <div style={styles.loadingBox}>
+            Loading holidays...
+          </div>
+        ) : (
+          <div style={styles.grid}>
+            {Array.from({
+              length:
+                firstWeekday,
+            }).map(
+              (_, index) => (
+                <div
+                  key={`blank-${index}`}
+                />
+              )
+            )}
+
+            {Array.from({
+              length:
+                daysInMonth,
+            }).map(
+              (_, index) => {
+                const day =
+                  index + 1;
+
+                const date =
+                  `${year}-${String(
+                    calendarMonth +
+                      1
+                  ).padStart(
+                    2,
+                    "0"
+                  )}-${String(
+                    day
+                  ).padStart(
+                    2,
+                    "0"
+                  )}`;
+
+                const holiday =
+                  holidaysByDate.get(
+                    date
+                  );
+
+                const selected =
+                  Boolean(
+                    holiday?.selected
+                  );
+
+                const isSunday =
+                  new Date(
+                    year,
+                    calendarMonth,
+                    day
+                  ).getDay() === 0;
+
+                const isPast =
+                  date <
+                  todayKey;
+
+                const isFixed =
+                  holiday?.type ===
+                  "fixed";
+
+                const canClick =
+                  Boolean(
+                    holiday
+                  ) &&
+                  !isFixed &&
+                  !isSunday &&
+                  (!isPast ||
+                    selected);
+
+                let background =
+                  "#ffffff";
+
+                let border =
+                  "#e5e7eb";
+
+                if (isFixed) {
+                  background =
+                    "#fee2e2";
+
+                  border =
+                    "#fca5a5";
+                } else if (
+                  selected
+                ) {
+                  background =
+                    "#dcfce7";
+
+                  border =
+                    "#22c55e";
+                } else if (
+                  holiday
+                ) {
+                  background =
+                    "#fff7ed";
+
+                  border =
+                    "#fdba74";
+                }
+
                 return (
-                  <div
-                    key={`empty-${index}`}
-                    style={
-                      styles.emptyDay
+                  <button
+                    type="button"
+                    key={date}
+                    disabled={
+                      !canClick ||
+                      savingDate ===
+                        date
                     }
-                  />
+                    onClick={() =>
+                      toggleHoliday(
+                        holiday
+                      )
+                    }
+                    style={{
+                      ...styles.day,
+                      background,
+                      borderColor:
+                        border,
+
+                      cursor:
+                        canClick
+                          ? "pointer"
+                          : "default",
+
+                      opacity:
+                        holiday &&
+                        (isPast ||
+                          isSunday) &&
+                        !selected &&
+                        !isFixed
+                          ? 0.5
+                          : 1,
+                    }}
+                  >
+                    <strong>
+                      {day}
+                    </strong>
+
+                    {holiday && (
+                      <small
+                        style={
+                          styles.holidayName
+                        }
+                      >
+                        {isFixed
+                          ? "🔒 "
+                          : selected
+                          ? "✓ "
+                          : ""}
+
+                        {
+                          holiday.name
+                        }
+
+                        {savingDate ===
+                          date && (
+                          <>
+                            <br />
+                            Saving...
+                          </>
+                        )}
+                      </small>
+                    )}
+                  </button>
                 );
               }
+            )}
+          </div>
+        )}
 
-              const holiday =
-                getHolidayForDay(
-                  day
-                );
-
-              const holidayStyle =
-                holiday?.type ===
-                "fixed"
-                  ? styles.fixedDay
-                  : holiday?.type ===
-                    "optional"
-                  ? styles.optionalDay
-                  : {};
-
-              return (
-                <div
-                  key={day}
-                  style={{
-                    ...styles.dayCell,
-                    ...holidayStyle,
-                  }}
-                >
-                  <strong
-                    style={
-                      styles.dayNumber
-                    }
-                  >
-                    {day}
-                  </strong>
-
-                  {holiday && (
-                    <span
-                      style={
-                        styles.holidayName
-                      }
-                    >
-                      {holiday.name}
-                    </span>
-                  )}
-                </div>
-              );
-            }
-          )}
-        </div>
-
-        <div
-          style={styles.monthList}
-        >
-          <h3
-            style={styles.listTitle}
-          >
+        <div style={styles.monthList}>
+          <strong>
             Holidays this month
-          </h3>
+          </strong>
 
           {monthHolidays.length ===
           0 ? (
             <p
               style={
-                styles.noHoliday
+                styles.emptyText
               }
             >
-              No company or festival
-              holidays this month.
+              No listed holidays this
+              month.
             </p>
           ) : (
             monthHolidays.map(
-              (holiday) => (
-                <div
-                  key={
-                    holiday.date
-                  }
-                  style={
-                    styles.holidayRow
-                  }
-                >
-                  <div>
-                    <strong>
-                      {holiday.date
-                        .split("-")
-                        .reverse()
-                        .join("-")}
-                    </strong>
+              (holiday) => {
+                const isFixed =
+                  holiday.type ===
+                  "fixed";
 
-                    <div
-                      style={
-                        styles.rowName
-                      }
-                    >
-                      {holiday.name}
-                    </div>
-                  </div>
+                const selected =
+                  Boolean(
+                    holiday.selected
+                  );
 
-                  <span
+                const isSunday =
+                  new Date(
+                    `${holiday.date}T00:00:00`
+                  ).getDay() === 0;
+
+                const isPast =
+                  holiday.date <
+                  todayKey;
+
+                return (
+                  <div
+                    key={
+                      holiday.date
+                    }
                     style={
-                      holiday.type ===
-                      "fixed"
-                        ? styles.fixedBadge
-                        : styles.optionalBadge
+                      styles.listRow
                     }
                   >
-                    {holiday.type ===
-                    "fixed"
-                      ? "Fixed"
-                      : "Festival"}
-                  </span>
-                </div>
-              )
+                    <div>
+                      <strong>
+                        {holiday.date
+                          .split("-")
+                          .reverse()
+                          .join("-")}
+                      </strong>
+
+                      <div>
+                        {
+                          holiday.name
+                        }
+                      </div>
+                    </div>
+
+                    {isFixed ? (
+                      <span
+                        style={
+                          styles.fixedBadge
+                        }
+                      >
+                        Fixed
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        style={
+                          selected
+                            ? styles.removeBtn
+                            : styles.selectBtn
+                        }
+                        disabled={
+                          savingDate ===
+                            holiday.date ||
+                          (!selected &&
+                            (isPast ||
+                              isSunday))
+                        }
+                        onClick={() =>
+                          toggleHoliday(
+                            holiday
+                          )
+                        }
+                      >
+                        {savingDate ===
+                        holiday.date
+                          ? "Saving..."
+                          : selected
+                          ? "Remove"
+                          : isSunday
+                          ? "Sunday"
+                          : isPast
+                          ? "Past"
+                          : "Select"}
+                      </button>
+                    )}
+                  </div>
+                );
+              }
             )
           )}
         </div>
@@ -378,335 +677,200 @@ const styles = {
   overlay: {
     position: "fixed",
     inset: 0,
-
-    background:
-      "rgba(15,23,42,0.52)",
-
-    zIndex: 30000,
-
+    zIndex: 20000,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-
     padding: "20px",
+    background:
+      "rgba(15,23,42,0.52)",
   },
 
   modal: {
-    width:
-      "min(820px, 96vw)",
-
+    width: "min(820px, 96vw)",
     maxHeight: "92vh",
-
     overflowY: "auto",
-
-    background: "#ffffff",
-
-    borderRadius: "24px",
-
-    padding: "28px",
-
     position: "relative",
-
+    padding: "28px",
+    borderRadius: "24px",
+    background: "#ffffff",
     boxShadow:
       "0 28px 80px rgba(15,23,42,0.3)",
   },
 
   closeBtn: {
     position: "absolute",
-
-    right: "20px",
     top: "20px",
-
+    right: "20px",
     width: "40px",
     height: "40px",
-
     border: 0,
     borderRadius: "12px",
-
-    background: "#111827",
-    color: "#ffffff",
-
     display: "grid",
     placeItems: "center",
-
+    background: "#111827",
+    color: "#ffffff",
     cursor: "pointer",
   },
 
   title: {
     margin:
-      "0 54px 6px 0",
-
-    fontSize: "27px",
-    fontWeight: 900,
-
+      "0 50px 6px 0",
+    fontSize: "26px",
     color: "#111827",
   },
 
-  subtitle: {
-    margin: "0 0 18px",
-
+  counter: {
+    margin: "0 0 14px",
     color: "#64748b",
-
-    fontSize: "14px",
   },
 
   legend: {
     display: "flex",
-
     flexWrap: "wrap",
-
     gap: "18px",
-
-    padding: "12px 14px",
-
-    borderRadius: "14px",
-
+    padding: "11px 13px",
+    borderRadius: "12px",
     background: "#f8fafc",
-
-    marginBottom: "16px",
-  },
-
-  legendItem: {
-    display: "inline-flex",
-
-    alignItems: "center",
-
-    gap: "7px",
-
-    color: "#334155",
-
     fontSize: "13px",
-
     fontWeight: 800,
   },
 
-  fixedDot: {
-    width: "11px",
-    height: "11px",
-
-    borderRadius: "50%",
-
-    background: "#ff5733",
+  message: {
+    marginTop: "12px",
+    padding: "10px 12px",
+    borderRadius: "10px",
+    background: "#f0fdf4",
+    color: "#166534",
+    fontSize: "13px",
+    fontWeight: 800,
   },
 
-  optionalDot: {
-    width: "11px",
-    height: "11px",
-
-    borderRadius: "50%",
-
-    background: "#f59e0b",
+  error: {
+    marginTop: "12px",
+    padding: "10px 12px",
+    borderRadius: "10px",
+    background: "#fff1f2",
+    color: "#b91c1c",
+    fontSize: "13px",
+    fontWeight: 800,
   },
 
-  monthHeader: {
-    display: "grid",
-
-    gridTemplateColumns:
-      "42px 1fr 42px",
-
+  monthNav: {
+    display: "flex",
     alignItems: "center",
-
-    gap: "12px",
-
-    marginBottom: "14px",
-  },
-
-  monthTitle: {
-    textAlign: "center",
-
-    color: "#111827",
-
+    justifyContent:
+      "space-between",
+    margin: "18px 0 12px",
     fontSize: "18px",
   },
 
   navBtn: {
-    width: "42px",
-    height: "42px",
-
+    width: "40px",
+    height: "40px",
     border:
-      "1px solid #e2e8f0",
-
-    borderRadius: "12px",
-
-    background: "#ffffff",
-
+      "1px solid #e5e7eb",
+    borderRadius: "10px",
     display: "grid",
-
     placeItems: "center",
-
+    background: "#ffffff",
     cursor: "pointer",
   },
 
-  weekGrid: {
+  weekRow: {
     display: "grid",
-
     gridTemplateColumns:
       "repeat(7, 1fr)",
-
-    gap: "7px",
-
-    marginBottom: "7px",
-  },
-
-  weekDay: {
-    textAlign: "center",
-
-    color: "#64748b",
-
-    fontSize: "12px",
-
-    fontWeight: 900,
-
-    padding: "6px 0",
-  },
-
-  calendarGrid: {
-    display: "grid",
-
-    gridTemplateColumns:
-      "repeat(7, 1fr)",
-
-    gap: "7px",
-  },
-
-  emptyDay: {
-    minHeight: "82px",
-  },
-
-  dayCell: {
-    minHeight: "82px",
-
-    border:
-      "1px solid #e2e8f0",
-
-    borderRadius: "12px",
-
-    padding: "9px",
-
-    background: "#ffffff",
-
-    boxSizing: "border-box",
-  },
-
-  fixedDay: {
-    background: "#fff1eb",
-
-    border:
-      "1px solid #ff9d85",
-  },
-
-  optionalDay: {
-    background: "#fff8eb",
-
-    border:
-      "1px solid #fbbf24",
-  },
-
-  dayNumber: {
-    display: "block",
-
-    color: "#111827",
-
-    fontSize: "13px",
-
     marginBottom: "6px",
+    textAlign: "center",
+    color: "#64748b",
+    fontSize: "12px",
+    fontWeight: 900,
+  },
+
+  grid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(7, minmax(0, 1fr))",
+    gap: "7px",
+  },
+
+  day: {
+    minHeight: "82px",
+    padding: "8px",
+    border:
+      "1px solid #e5e7eb",
+    borderRadius: "11px",
+    textAlign: "left",
+    color: "#111827",
+    overflow: "hidden",
   },
 
   holidayName: {
     display: "block",
-
-    color: "#334155",
-
-    fontSize: "10px",
-
+    marginTop: "6px",
+    fontSize: "9px",
+    lineHeight: 1.2,
     fontWeight: 800,
-
-    lineHeight: 1.25,
   },
 
-  monthList: {
-    borderTop:
-      "1px solid #e2e8f0",
-
-    marginTop: "18px",
-
-    paddingTop: "16px",
-  },
-
-  listTitle: {
-    margin: "0 0 10px",
-
-    color: "#111827",
-
-    fontSize: "17px",
-
-    fontWeight: 900,
-  },
-
-  noHoliday: {
-    margin: 0,
-
-    color: "#94a3b8",
-
-    fontSize: "13px",
-  },
-
-  holidayRow: {
-    display: "flex",
-
-    alignItems: "center",
-
-    justifyContent:
-      "space-between",
-
-    gap: "14px",
-
-    padding: "11px 0",
-
-    borderBottom:
-      "1px solid #f1f5f9",
-
-    color: "#111827",
-
-    fontSize: "13px",
-  },
-
-  rowName: {
-    marginTop: "3px",
-
+  loadingBox: {
+    padding: "35px",
+    textAlign: "center",
     color: "#64748b",
   },
 
-  fixedBadge: {
-    borderRadius: "999px",
-
-    background: "#fff1eb",
-
-    color: "#e54424",
-
-    padding: "6px 10px",
-
-    fontSize: "11px",
-
-    fontWeight: 900,
-
-    whiteSpace: "nowrap",
+  monthList: {
+    marginTop: "20px",
+    paddingTop: "15px",
+    borderTop:
+      "1px solid #e5e7eb",
   },
 
-  optionalBadge: {
+  listRow: {
+    display: "flex",
+    justifyContent:
+      "space-between",
+    alignItems: "center",
+    gap: "14px",
+    padding: "11px 0",
+    borderBottom:
+      "1px solid #f1f5f9",
+    fontSize: "13px",
+  },
+
+  fixedBadge: {
+    padding: "7px 11px",
     borderRadius: "999px",
-
-    background: "#fef3c7",
-
-    color: "#92400e",
-
-    padding: "6px 10px",
-
-    fontSize: "11px",
-
+    background: "#fee2e2",
+    color: "#991b1b",
     fontWeight: 900,
+  },
 
-    whiteSpace: "nowrap",
+  selectBtn: {
+    border: 0,
+    borderRadius: "10px",
+    padding: "8px 14px",
+    background: "#ff5733",
+    color: "#ffffff",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  removeBtn: {
+    border:
+      "1px solid #22c55e",
+    borderRadius: "10px",
+    padding: "8px 14px",
+    background: "#f0fdf4",
+    color: "#166534",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  emptyText: {
+    color: "#94a3b8",
+    fontSize: "13px",
   },
 };
 

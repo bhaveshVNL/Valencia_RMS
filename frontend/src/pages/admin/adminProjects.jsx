@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Download,
   Edit,
   Eye,
   FolderKanban,
@@ -1037,6 +1038,144 @@ const fetchUsers = async () => {
     }
   };
 
+  const exportProjectData = () => {
+  if (!projects.length) {
+    setError("No project data available to export.");
+    return;
+  }
+
+  setError("");
+
+  const escapeCsv = (value) => {
+    const text = String(value ?? "");
+
+    if (
+      text.includes(",") ||
+      text.includes('"') ||
+      text.includes("\n")
+    ) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+
+    return text;
+  };
+
+  const rows = [];
+
+  projects.forEach((project) => {
+    const projectAssignees = (project.assignees || [])
+      .map((user) => getUserName(user))
+      .join(", ");
+
+    if (!project.main_tasks?.length) {
+      rows.push({
+        project_title: project.project_title,
+        project_status: getStatusLabel(project.status),
+        project_progress: `${project.overall_progress || 0}%`,
+        department: project.department_name || "-",
+        start_date: project.start_date || "-",
+        end_date: project.end_date || "-",
+        created_by: project.created_by_name || "-",
+        project_assignees: projectAssignees || "-",
+        task_title: "-",
+        task_status: "-",
+        task_progress: "-",
+        task_assignees: "-",
+      });
+
+      return;
+    }
+
+    project.main_tasks.forEach((task) => {
+      rows.push({
+        project_title: project.project_title,
+        project_status: getStatusLabel(project.status),
+        project_progress: `${project.overall_progress || 0}%`,
+        department: project.department_name || "-",
+        start_date: project.start_date || "-",
+        end_date: project.end_date || "-",
+        created_by: project.created_by_name || "-",
+        project_assignees: projectAssignees || "-",
+
+        task_title: task.task_title || "-",
+        task_status: getStatusLabel(task.status),
+        task_progress: `${task.progress || 0}%`,
+
+        task_assignees:
+          (task.assignees || [])
+            .map((user) => getUserName(user))
+            .join(", ") || "-",
+      });
+    });
+  });
+
+  const headers = [
+    "Project",
+    "Project Status",
+    "Project Progress",
+    "Department",
+    "Start Date",
+    "End Date",
+    "Created By",
+    "Project Assignees",
+    "Task",
+    "Task Status",
+    "Task Progress",
+    "Task Assignees",
+  ];
+
+  const csvRows = [
+    headers.map(escapeCsv).join(","),
+
+    ...rows.map((row) =>
+      [
+        row.project_title,
+        row.project_status,
+        row.project_progress,
+        row.department,
+        row.start_date,
+        row.end_date,
+        row.created_by,
+        row.project_assignees,
+        row.task_title,
+        row.task_status,
+        row.task_progress,
+        row.task_assignees,
+      ]
+        .map(escapeCsv)
+        .join(",")
+    ),
+  ];
+
+  const csvContent = csvRows.join("\n");
+
+  const blob = new Blob([csvContent], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+
+  const today = new Date()
+    .toISOString()
+    .slice(0, 10);
+
+  link.href = url;
+  link.setAttribute(
+    "download",
+    `admin-projects-${today}.csv`
+  );
+
+  document.body.appendChild(link);
+
+  link.click();
+
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+};
+
   const kanbanColumns = [
     {
       key: "to_do",
@@ -1102,6 +1241,15 @@ const fetchUsers = async () => {
         >
           <Plus size={19} />
           Assign New Project
+        </button>
+
+        <button
+          type="button"
+          style={styles.exportButton}
+          onClick={exportProjectData}
+        >
+          <Download size={19} />
+          Export Data
         </button>
       </div>
 
@@ -2950,6 +3098,24 @@ disabledReviewButton: {
     fontSize: "12px",
     fontWeight: 900,
   },
+
+  exportButton: {
+  border: "1px solid #111827",
+  background: "#111827",
+  color: "#ffffff",
+  borderRadius: "16px",
+  padding: "15px 24px",
+  fontSize: "16px",
+  fontWeight: 900,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "10px",
+  cursor: "pointer",
+  boxShadow: "0 12px 26px rgba(15, 23, 42, 0.14)",
+},
+
+
 };
 
 export default AdminProjects;

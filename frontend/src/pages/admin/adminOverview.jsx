@@ -11,7 +11,6 @@ import {
 import api from "../../api/axios";
 import AdminReviewPopup from "./AdminReviewPopup";
 
-console.log("YASH_TEST_123");
 
 const statusLabels = {
   todo: "To Do",
@@ -40,6 +39,13 @@ const formatDate = (value) => {
   if (!value) return "-";
   return String(value).slice(0, 10);
 };
+
+const normalizeStatus = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
 
 const styles = {
   page: {
@@ -215,6 +221,80 @@ attendanceBarFill: {
     color: "#667085",
     fontWeight: 800,
   },
+  reviewHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "16px",
+    marginBottom: "18px",
+  },
+  reviewCount: {
+    minWidth: "38px",
+    height: "38px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    background: "#fff1eb",
+    color: "#ff5733",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 900,
+    fontSize: "14px",
+  },
+  reviewList: {
+    display: "grid",
+    gap: "12px",
+    maxHeight: "300px",
+    overflowY: "auto",
+    paddingRight: "6px",
+    scrollbarWidth: "thin",
+  },
+  reviewItem: {
+    border: "1px solid #e5e7eb",
+    background: "#f8fafc",
+    borderRadius: "16px",
+    padding: "16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "16px",
+  },
+  reviewMain: {
+    minWidth: 0,
+  },
+  reviewTaskName: {
+    margin: "0 0 6px",
+    color: "#111827",
+    fontSize: "16px",
+    fontWeight: 900,
+  },
+  reviewMeta: {
+    margin: 0,
+    color: "#667085",
+    fontSize: "13px",
+    lineHeight: 1.55,
+  },
+  reviewStatus: {
+    display: "inline-flex",
+    marginTop: "8px",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    background: "#ede9fe",
+    color: "#6d28d9",
+    fontSize: "11px",
+    fontWeight: 900,
+  },
+  reviewButton: {
+    flexShrink: 0,
+    minHeight: "40px",
+    border: 0,
+    borderRadius: "12px",
+    padding: "0 15px",
+    background: "#ff5733",
+    color: "#ffffff",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
 };
 
 const AdminOverview = () => {
@@ -339,6 +419,78 @@ const AdminOverview = () => {
     });
 
     return projectKeys.size;
+  }, [tasks]);
+
+  /*
+  Main tasks submitted by employees for Admin review.
+  The department-tasks endpoint is already loaded above,
+  so no additional backend request is required here.
+  */
+  const tasksWaitingForReview = useMemo(() => {
+    const reviewMap = new Map();
+
+    tasks.forEach((task) => {
+      const status = normalizeStatus(
+        task.status_group ||
+          task.task_status ||
+          task.status
+      );
+
+      if (status !== "under_review") {
+        return;
+      }
+
+      const key =
+        task.main_task_key ||
+        [
+          task.project_id || "",
+          task.task_title || "",
+          task.task_description || "",
+        ].join("::") ||
+        String(task.task_id || "");
+
+      if (!reviewMap.has(key)) {
+        reviewMap.set(key, {
+          key,
+          task_title:
+            task.task_title ||
+            "Untitled Task",
+          project_title:
+            task.project_title ||
+            "Untitled Project",
+          due_date:
+            task.task_end_date ||
+            task.due_date ||
+            task.project_end_date ||
+            task.end_date ||
+            "",
+          assignees: [],
+        });
+      }
+
+      const reviewTask = reviewMap.get(key);
+
+      const employeeName =
+        task.assigned_name ||
+        task.employee_name ||
+        task.full_name ||
+        "";
+
+      if (
+        employeeName &&
+        !reviewTask.assignees.includes(
+          employeeName
+        )
+      ) {
+        reviewTask.assignees.push(
+          employeeName
+        );
+      }
+    });
+
+    return Array.from(
+      reviewMap.values()
+    );
   }, [tasks]);
 
   const attendancePercentage = useMemo(() => {
@@ -474,6 +626,88 @@ const AdminOverview = () => {
     </strong>
   </div>
 </section>
+
+      <section style={styles.card}>
+        <div style={styles.reviewHeader}>
+          <div>
+            <h2 style={styles.sectionTitle}>
+              <ClipboardList
+                size={22}
+                color="#ff5733"
+              />
+              Tasks Waiting For Review
+            </h2>
+
+            <p
+              style={{
+                ...styles.sectionSubtitle,
+                marginBottom: 0,
+              }}
+            >
+              Main tasks submitted by employees and waiting
+              for your review.
+            </p>
+          </div>
+
+          <span style={styles.reviewCount}>
+            {tasksWaitingForReview.length}
+          </span>
+        </div>
+
+        {tasksWaitingForReview.length > 0 ? (
+          <div style={styles.reviewList}>
+            {tasksWaitingForReview.map(
+              (task) => (
+                <div
+                  key={task.key}
+                  style={styles.reviewItem}
+                >
+                  <div style={styles.reviewMain}>
+                    <h3 style={styles.reviewTaskName}>
+                      {task.task_title}
+                    </h3>
+
+                    <p style={styles.reviewMeta}>
+                      Project:{" "}
+                      <strong>
+                        {task.project_title}
+                      </strong>
+                      {task.assignees.length > 0
+                        ? ` · Employee: ${task.assignees.join(
+                            ", "
+                          )}`
+                        : ""}
+                      {task.due_date
+                        ? ` · Deadline: ${formatDate(
+                            task.due_date
+                          )}`
+                        : ""}
+                    </p>
+
+                    <span style={styles.reviewStatus}>
+                      Under Review
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    style={styles.reviewButton}
+                    onClick={() =>
+                      navigate("/admin/tasks")
+                    }
+                  >
+                    Review Task
+                  </button>
+                </div>
+              )
+            )}
+          </div>
+        ) : (
+          <div style={styles.empty}>
+            No tasks waiting for review.
+          </div>
+        )}
+      </section>
 
       <AdminReviewPopup />
 

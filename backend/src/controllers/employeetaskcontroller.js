@@ -1,5 +1,249 @@
 const db = require("../config/db");
+/*
+========================================================
+EMPLOYEE TASK WORKING TIME RULES
+========================================================
+*/
 
+const WORK_START_TIME = "11:00:00";
+const WORK_END_TIME = "19:30:00";
+
+/*
+Always use India time for task work sessions.
+*/
+const INDIA_NOW_SQL =
+  "CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+05:30')";
+
+/*
+These are the FIXED company holidays already present
+in the Employee Holiday Calendar for 2026.
+*/
+const FIXED_COMPANY_HOLIDAYS_2026 = new Set([
+  "2026-01-26", // Republic Day
+  "2026-05-01", // Maharashtra Day / Buddha Pournima
+  "2026-08-15", // Independence Day / Parsi New Year
+  "2026-10-02", // Gandhi Jayanti
+]);
+
+/*
+Get current India date/time from MySQL.
+*/
+const getIndiaClock = async () => {
+  const [rows] = await db.query(
+    `
+    SELECT
+      DATE_FORMAT(
+        ${INDIA_NOW_SQL},
+        '%Y-%m-%d'
+      ) AS india_date,
+
+      DATE_FORMAT(
+        ${INDIA_NOW_SQL},
+        '%H:%i:%s'
+      ) AS india_time,
+
+      DAYOFWEEK(
+        ${INDIA_NOW_SQL}
+      ) AS day_of_week
+    `
+  );
+
+  return {
+    date: rows[0]?.india_date,
+    time: rows[0]?.india_time,
+    dayOfWeek: Number(rows[0]?.day_of_week || 0),
+  };
+};
+
+/*
+Check whether employee is allowed to Start / Resume
+a task right now.
+*/
+const getEmployeeWorkPermission = async (employeeId) => {
+  const clock = await getIndiaClock();
+
+  /*
+  MySQL DAYOFWEEK:
+  1 = Sunday
+  2 = Monday
+  ...
+  7 = Saturday
+  */
+  if (clock.dayOfWeek === 1) {
+    return {
+      allowed: false,
+      message:
+        "Task timer cannot be started on Sunday. Sunday is a weekly holiday.",
+    };
+  }
+
+  /*
+  Fixed company holiday.
+  */
+  if (FIXED_COMPANY_HOLIDAYS_2026.has(clock.date)) {
+    return {
+      allowed: false,
+      message:
+        "Task timer cannot be started today because today is a company holiday.",
+    };
+  }
+
+  /*
+  Employee-selected optional holiday.
+  */
+  const [optionalHolidayRows] = await db.query(
+    `
+    SELECT
+      selection_id,
+      holiday_name
+    FROM employee_optional_holidays
+    WHERE employee_id = ?
+      AND holiday_date = ?
+    LIMIT 1
+    `,
+    [employeeId, clock.date]
+  );
+
+  if (optionalHolidayRows.length) {
+    return {
+      allowed: false,
+      message: `Task timer cannot be started today because you selected ${
+        optionalHolidayRows[0].holiday_name || "today"
+      } as a holiday.`,
+    };
+  }
+
+  /*
+  Before office hours.
+  */
+  if (clock.time < WORK_START_TIME) {
+    return {
+      allowed: false,
+      message:
+        "Task timer can only be started from 11:00 AM onwards.",
+    };
+  }
+
+  /*
+  Office closed.
+  */
+  if (clock.time >= WORK_END_TIME) {
+    return {
+      allowed: false,
+      message:
+        "Task timer cannot be started after 7:30 PM.",
+    };
+  }
+
+  return {
+    allowed: true,
+    date: clock.date,
+    time: clock.time,
+  };
+};
+
+/*
+========================================================
+CLOSE FORGOTTEN / INVALID OPEN SESSIONS
+========================================================
+
+Examples:
+
+Friday 3:27 PM -> employee forgets to Pause
+The session becomes:
+Friday 3:27 PM -> Friday 7:30 PM
+
+It will NOT continue through:
+Saturday night
+Sunday
+Monday
+etc.
+
+A session created on Sunday / fixed holiday /
+employee optional holiday becomes zero time.
+========================================================
+*/
+const closeExpiredOpenSessions = async (employeeId) => {
+  /*
+  First close any session that was incorrectly opened
+  on a non-working day.
+
+  We close it at started_at, therefore duration = 0.
+  */
+  await db.query(
+    `
+    UPDATE task_work_sessions tws
+
+    SET
+      tws.ended_at = tws.started_at,
+      tws.end_reason = 'paused'
+
+    WHERE
+      tws.employee_id = ?
+      AND tws.ended_at IS NULL
+
+      AND (
+        DAYOFWEEK(tws.started_at) = 1
+
+        OR DATE(tws.started_at) IN (
+          '2026-01-26',
+          '2026-05-01',
+          '2026-08-15',
+          '2026-10-02'
+        )
+
+        OR EXISTS (
+          SELECT 1
+          FROM employee_optional_holidays eoh
+          WHERE eoh.employee_id = tws.employee_id
+            AND eoh.holiday_date = DATE(tws.started_at)
+        )
+      )
+    `,
+    [employeeId]
+  );
+
+  /*
+  Then close normal forgotten sessions.
+
+  Previous day -> close at that day's 7:30 PM
+  Current day after 7:30 PM -> close at 7:30 PM
+  */
+  await db.query(
+    `
+    UPDATE task_work_sessions
+
+    SET
+      ended_at = GREATEST(
+        started_at,
+        TIMESTAMP(
+          DATE(started_at),
+          '${WORK_END_TIME}'
+        )
+      ),
+
+      end_reason = 'paused'
+
+    WHERE
+      employee_id = ?
+      AND ended_at IS NULL
+
+      AND (
+        DATE(started_at) <
+          DATE(${INDIA_NOW_SQL})
+
+        OR (
+          DATE(started_at) =
+            DATE(${INDIA_NOW_SQL})
+
+          AND TIME(${INDIA_NOW_SQL}) >=
+            '${WORK_END_TIME}'
+        )
+      )
+    `,
+    [employeeId]
+  );
+};
 const getTaskTableColumns = async () => {
   const [columns] = await db.query("SHOW COLUMNS FROM tasks");
   return columns;
@@ -262,6 +506,11 @@ const getEmployeeTasks = async (req, res) => {
   try {
     const userId = req.user.user_id;
 
+    /*
+    Automatically close any forgotten old timer.
+    */
+    await closeExpiredOpenSessions(userId);
+
     const [tasks] = await db.query(
       `
       SELECT
@@ -366,6 +615,11 @@ const getEmployeeTaskDetails = async (req, res) => {
   try {
     const userId = req.user.user_id;
     const taskId = Number(req.params.taskId);
+
+    /*
+    Automatically close forgotten old timers.
+    */
+    await closeExpiredOpenSessions(userId);
 
     const [rows] = await db.query(
       `
@@ -725,7 +979,7 @@ const startEmployeeTask = async (req, res) => {
     const userId = req.user.user_id;
     const taskId = Number(req.params.taskId);
 
-    const task = await getOwnedTask(taskId, userId)
+    const task = await getOwnedTask(taskId, userId);
 
     if (!task) {
       return res.status(404).json({
@@ -744,12 +998,32 @@ const startEmployeeTask = async (req, res) => {
     }
 
     /*
-    An employee should not have two project-task timers
-    running simultaneously.
+    Close forgotten session from previous day
+    before checking for another running task.
+    */
+    await closeExpiredOpenSessions(userId);
+
+    /*
+    Check Sunday, holidays and office timing.
+    */
+    const workPermission =
+      await getEmployeeWorkPermission(userId);
+
+    if (!workPermission.allowed) {
+      return res.status(400).json({
+        success: false,
+        message: workPermission.message,
+      });
+    }
+
+    /*
+    Employee can only run one task at a time.
     */
     const [runningRows] = await db.query(
       `
-      SELECT session_id, task_id
+      SELECT
+        session_id,
+        task_id
       FROM task_work_sessions
       WHERE employee_id = ?
         AND ended_at IS NULL
@@ -766,6 +1040,9 @@ const startEmployeeTask = async (req, res) => {
       });
     }
 
+    /*
+    Start timer using India time.
+    */
     await db.query(
       `
       INSERT INTO task_work_sessions (
@@ -773,11 +1050,18 @@ const startEmployeeTask = async (req, res) => {
         employee_id,
         started_at
       )
-      VALUES (?, ?, NOW())
+      VALUES (
+        ?,
+        ?,
+        ${INDIA_NOW_SQL}
+      )
       `,
       [taskId, userId]
     );
 
+    /*
+    Move To Do -> In Progress.
+    */
     await db.query(
       `
       UPDATE tasks
@@ -796,7 +1080,10 @@ const startEmployeeTask = async (req, res) => {
       status: "ongoing",
     });
   } catch (error) {
-    console.error("Start employee task error:", error);
+    console.error(
+      "Start employee task error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -822,13 +1109,21 @@ const pauseEmployeeTask = async (req, res) => {
     if (normalizeStatus(task.status) !== "ongoing") {
       return res.status(400).json({
         success: false,
-        message: "Only an In Progress task can be paused.",
+        message:
+          "Only an In Progress task can be paused.",
       });
     }
 
+    /*
+    First close a timer automatically if office
+    hours/day already ended.
+    */
+    await closeExpiredOpenSessions(userId);
+
     const [runningRows] = await db.query(
       `
-      SELECT session_id
+      SELECT
+        session_id
       FROM task_work_sessions
       WHERE task_id = ?
         AND employee_id = ?
@@ -842,16 +1137,34 @@ const pauseEmployeeTask = async (req, res) => {
     if (!runningRows.length) {
       return res.status(400).json({
         success: false,
-        message: "This task is already paused.",
+        message:
+          "This task is already paused.",
       });
     }
 
+    /*
+    Stop at current time, but never later than 7:30 PM.
+    */
     await db.query(
       `
       UPDATE task_work_sessions
+
       SET
-        ended_at = NOW(),
+        ended_at = GREATEST(
+          started_at,
+
+          LEAST(
+            ${INDIA_NOW_SQL},
+
+            TIMESTAMP(
+              DATE(started_at),
+              '${WORK_END_TIME}'
+            )
+          )
+        ),
+
         end_reason = 'paused'
+
       WHERE session_id = ?
       `,
       [runningRows[0].session_id]
@@ -864,7 +1177,10 @@ const pauseEmployeeTask = async (req, res) => {
       work_state: "paused",
     });
   } catch (error) {
-    console.error("Pause employee task error:", error);
+    console.error(
+      "Pause employee task error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -878,7 +1194,7 @@ const resumeEmployeeTask = async (req, res) => {
     const userId = req.user.user_id;
     const taskId = Number(req.params.taskId);
 
-    const task = await getOwnedTask(taskId, userId)
+    const task = await getOwnedTask(taskId, userId);
 
     if (!task) {
       return res.status(404).json({
@@ -890,7 +1206,27 @@ const resumeEmployeeTask = async (req, res) => {
     if (normalizeStatus(task.status) !== "ongoing") {
       return res.status(400).json({
         success: false,
-        message: "Only an In Progress task can be resumed.",
+        message:
+          "Only an In Progress task can be resumed.",
+      });
+    }
+
+    /*
+    Close forgotten previous session first.
+    */
+    await closeExpiredOpenSessions(userId);
+
+    /*
+    Resume only on a valid working day
+    between 11 AM and 7:30 PM.
+    */
+    const workPermission =
+      await getEmployeeWorkPermission(userId);
+
+    if (!workPermission.allowed) {
+      return res.status(400).json({
+        success: false,
+        message: workPermission.message,
       });
     }
 
@@ -909,13 +1245,16 @@ const resumeEmployeeTask = async (req, res) => {
     if (sameTaskRunning.length) {
       return res.status(400).json({
         success: false,
-        message: "This task is already running.",
+        message:
+          "This task is already running.",
       });
     }
 
     const [otherRunning] = await db.query(
       `
-      SELECT session_id, task_id
+      SELECT
+        session_id,
+        task_id
       FROM task_work_sessions
       WHERE employee_id = ?
         AND ended_at IS NULL
@@ -932,6 +1271,9 @@ const resumeEmployeeTask = async (req, res) => {
       });
     }
 
+    /*
+    Resume = new work session.
+    */
     await db.query(
       `
       INSERT INTO task_work_sessions (
@@ -939,7 +1281,11 @@ const resumeEmployeeTask = async (req, res) => {
         employee_id,
         started_at
       )
-      VALUES (?, ?, NOW())
+      VALUES (
+        ?,
+        ?,
+        ${INDIA_NOW_SQL}
+      )
       `,
       [taskId, userId]
     );
@@ -951,7 +1297,10 @@ const resumeEmployeeTask = async (req, res) => {
       work_state: "running",
     });
   } catch (error) {
-    console.error("Resume employee task error:", error);
+    console.error(
+      "Resume employee task error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -1024,6 +1373,11 @@ const submitEmployeeTaskForReview = async (req, res) => {
     }
 
     /*
+Close any forgotten/expired work session first.
+*/
+    await closeExpiredOpenSessions(userId);
+
+    /*
     If currently running, stop the session.
     If paused, there is simply no open session to close.
     */
@@ -1041,16 +1395,30 @@ const submitEmployeeTaskForReview = async (req, res) => {
     );
 
     if (runningRows.length) {
-      await db.query(
-        `
-        UPDATE task_work_sessions
-        SET
-          ended_at = NOW(),
-          end_reason = 'submitted_for_review'
-        WHERE session_id = ?
-        `,
-        [runningRows[0].session_id]
-      );
+     await db.query(
+  `
+  UPDATE task_work_sessions
+
+  SET
+    ended_at = GREATEST(
+      started_at,
+
+      LEAST(
+        ${INDIA_NOW_SQL},
+
+        TIMESTAMP(
+          DATE(started_at),
+          '${WORK_END_TIME}'
+        )
+      )
+    ),
+
+    end_reason = 'submitted_for_review'
+
+  WHERE session_id = ?
+  `,
+  [runningRows[0].session_id]
+);
     }
 
     await db.query(

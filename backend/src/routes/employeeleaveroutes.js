@@ -21,10 +21,6 @@ const {
 
 const router = express.Router();
 
-/*
-GET LEAVE BALANCE + HISTORY
-/api/employee-leaves/summary
-*/
 router.get(
   "/summary",
   authMiddleware,
@@ -37,21 +33,6 @@ router.get(
   getEmployeeLeaveSummary
 );
 
-/*
-APPLY FOR LEAVE
-/api/employee-leaves/apply
-*/
-router.post(
-  "/apply",
-  authMiddleware,
-  requireRole(
-    "employee",
-    "administrator",
-    "admin",
-    "superadmin"
-  ),
-  applyEmployeeLeave
-);
 router.get(
   "/holidays",
   authMiddleware,
@@ -75,4 +56,17 @@ router.post(
   ),
   toggleEmployeeOptionalHoliday
 );
+
+router.post(
+  "/apply",
+  authMiddleware,
+  requireRole(
+    "employee",
+    "administrator",
+    "admin",
+    "superadmin"
+  ),
+  applyEmployeeLeave
+);
+
 module.exports = router;

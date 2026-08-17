@@ -1,9 +1,10 @@
 const db = require("../config/db");
-
+const { sendMail } = require("../utils/emailservice");
 const LEAVE_LIMITS = {
   sick: 7,
   casual: 7,
   mandatory: 18,
+  festival: 4,
 };
 
 const getLeaveLabel = (type) => {
@@ -17,6 +18,10 @@ const getLeaveLabel = (type) => {
 
   if (type === "mandatory") {
     return "Privileged Leave";
+  }
+
+  if (type === "festival") {
+    return "Holiday Leave";
   }
 
   return "Leave";
@@ -568,40 +573,79 @@ const reviewLeaveApplication = async (
     ====================================================
     */
     if (
-      status ===
-      "approved"
+  status ===
+  "approved"
+) {
+  let limit =
+    LEAVE_LIMITS[
+      leave.leave_type
+    ];
+
+  /*
+  ================================================
+  PRIVILEGED LEAVE
+  1.5 days earned each month,
+  maximum 18 days.
+  ================================================
+  */
+  if (
+    leave.leave_type ===
+    "mandatory"
+  ) {
+    const leaveYear =
+      Number(
+        String(
+          leave.start_date ||
+            ""
+        ).slice(0, 4)
+      );
+
+    const now =
+      new Date();
+
+    const currentYear =
+      now.getFullYear();
+
+    const currentMonth =
+      now.getMonth() + 1;
+
+    if (
+      leaveYear <
+      currentYear
     ) {
-      let limit =
-        LEAVE_LIMITS[
-          leave.leave_type
-        ];
+      limit = 18;
+    } else if (
+      leaveYear ===
+      currentYear
+    ) {
+      limit =
+        Math.min(
+          18,
+          currentMonth *
+            1.5
+        );
+    } else {
+      limit = 0;
+    }
+  }
 
-      /*
-      Privileged Leave:
-      1.5 days earned every month,
-      maximum 18 days.
-      */
-      if (
-        leave.leave_type ===
-        "mandatory"
-      ) {
-        const currentMonth =
-          new Date()
-            .getMonth() +
-          1;
+  /*
+  ================================================
+  HOLIDAY / FESTIVAL LEAVE
 
-        limit =
-          Math.min(
-            18,
-            currentMonth *
-              1.5
-          );
-      }
+  LEAVE_LIMITS.festival = 4
 
-      if (
-        limit !==
-        undefined
-      ) {
+  No special calculation is required here.
+  The normal balance check below will ensure
+  the employee cannot get more than 4 approved
+  Holiday Leaves in the year.
+  ================================================
+  */
+
+  if (
+    limit !==
+    undefined
+  ) {
         const [usedRows] =
           await connection.query(
             `

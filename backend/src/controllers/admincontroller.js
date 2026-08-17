@@ -600,9 +600,277 @@ const createAdminProject = async (req, res) => {
     });
   }
 };
+const getAdminUserTimeSummary = async (req, res) => {
+  try {
+    const { adminUser, error } = await getLoggedInAdmin(req);
 
+    if (error) {
+      return res.status(error.status).json({
+        message: error.message,
+      });
+    }
+
+    const employeeId = Number(req.params.userId);
+
+    if (!employeeId) {
+      return res.status(400).json({
+        message: "Invalid employee.",
+      });
+    }
+
+    /*
+    --------------------------------------------------
+    SECURITY:
+    Admin can only view employees from own department.
+    --------------------------------------------------
+    */
+    const [employeeRows] = await db.query(
+      `
+      SELECT
+        u.user_id,
+        u.employee_code,
+        u.full_name,
+        u.email,
+        u.designation,
+        u.department_id,
+        d.department_name
+      FROM users u
+      LEFT JOIN departments d
+        ON d.department_id = u.department_id
+      WHERE u.user_id = ?
+        AND u.department_id = ?
+      LIMIT 1
+      `,
+      [employeeId, adminUser.department_id]
+    );
+
+    if (!employeeRows.length) {
+      return res.status(404).json({
+        message:
+          "Employee not found in your department.",
+      });
+    }
+
+    const employee = employeeRows[0];
+
+    /*
+    --------------------------------------------------
+    GET ALL WORK SESSIONS
+
+    Rules applied:
+    - Sunday = 0
+    - fixed company holiday = 0
+    - employee optional holiday = 0
+    - before 11 AM ignored
+    - after 7:30 PM ignored
+    - forgotten open timer capped at 7:30 PM
+    --------------------------------------------------
+    */
+    const [sessionRows] = await db.query(
+      `
+      SELECT
+        tws.session_id,
+        tws.task_id,
+        tws.employee_id,
+        tws.started_at,
+        tws.ended_at,
+        tws.end_reason,
+
+        t.task_title,
+        t.status AS task_status,
+        t.project_id,
+
+        p.project_title,
+
+        CASE
+          WHEN DAYOFWEEK(tws.started_at) = 1
+          THEN 0
+
+          WHEN DATE(tws.started_at) IN (
+            '2026-01-26',
+            '2026-05-01',
+            '2026-08-15',
+            '2026-10-02'
+          )
+          THEN 0
+
+          WHEN EXISTS (
+            SELECT 1
+            FROM employee_optional_holidays eoh
+            WHERE eoh.employee_id = tws.employee_id
+              AND eoh.holiday_date = DATE(tws.started_at)
+          )
+          THEN 0
+
+          ELSE GREATEST(
+            0,
+
+            TIMESTAMPDIFF(
+              SECOND,
+
+              GREATEST(
+                tws.started_at,
+                TIMESTAMP(
+                  DATE(tws.started_at),
+                  '11:00:00'
+                )
+              ),
+
+              LEAST(
+                COALESCE(
+                  tws.ended_at,
+                  CONVERT_TZ(
+                    UTC_TIMESTAMP(),
+                    '+00:00',
+                    '+05:30'
+                  )
+                ),
+
+                TIMESTAMP(
+                  DATE(tws.started_at),
+                  '19:30:00'
+                )
+              )
+            )
+          )
+        END AS seconds_worked
+
+      FROM task_work_sessions tws
+
+      INNER JOIN tasks t
+        ON t.task_id = tws.task_id
+
+      LEFT JOIN projects p
+        ON p.project_id = t.project_id
+
+      WHERE tws.employee_id = ?
+
+      ORDER BY
+        p.project_title ASC,
+        t.task_title ASC,
+        tws.started_at DESC
+      `,
+      [employeeId]
+    );
+
+    /*
+    --------------------------------------------------
+    BUILD:
+    Employee
+      -> Projects
+          -> Tasks
+              -> Sessions
+    --------------------------------------------------
+    */
+
+    let totalSeconds = 0;
+
+    const projectMap = new Map();
+
+    for (const row of sessionRows) {
+      const secondsWorked =
+        Number(row.seconds_worked || 0);
+
+      totalSeconds += secondsWorked;
+
+      const projectId =
+        row.project_id || `no-project-${row.task_id}`;
+
+      if (!projectMap.has(projectId)) {
+        projectMap.set(projectId, {
+          project_id: row.project_id || null,
+          project_title:
+            row.project_title || "No Project",
+          total_seconds: 0,
+          tasks: new Map(),
+        });
+      }
+
+      const project = projectMap.get(projectId);
+
+      project.total_seconds += secondsWorked;
+
+      if (!project.tasks.has(row.task_id)) {
+        project.tasks.set(row.task_id, {
+          task_id: row.task_id,
+          task_title:
+            row.task_title || "Untitled Task",
+          status: row.task_status || "",
+          total_seconds: 0,
+          currently_running: false,
+          sessions: [],
+        });
+      }
+
+      const task = project.tasks.get(row.task_id);
+
+      task.total_seconds += secondsWorked;
+
+      if (!row.ended_at) {
+        task.currently_running = true;
+      }
+
+      task.sessions.push({
+        session_id: row.session_id,
+        started_at: row.started_at,
+        ended_at: row.ended_at,
+        end_reason: row.end_reason,
+        seconds_worked: secondsWorked,
+        currently_running: !row.ended_at,
+      });
+    }
+
+    const projects = Array.from(
+      projectMap.values()
+    ).map((project) => ({
+      project_id: project.project_id,
+      project_title: project.project_title,
+      total_seconds: project.total_seconds,
+      tasks: Array.from(project.tasks.values()),
+    }));
+
+    return res.status(200).json({
+      success: true,
+
+      employee: {
+        user_id: employee.user_id,
+        employee_code: employee.employee_code,
+        full_name: employee.full_name,
+        email: employee.email,
+        designation: employee.designation,
+        department_id: employee.department_id,
+        department_name: employee.department_name,
+      },
+
+      total_seconds: totalSeconds,
+
+      total_projects: projects.length,
+
+      total_tasks: projects.reduce(
+        (sum, project) =>
+          sum + project.tasks.length,
+        0
+      ),
+
+      projects,
+    });
+  } catch (error) {
+    console.error(
+      "Get admin user time summary error:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Failed to fetch employee time summary.",
+      error: error.message,
+      sqlMessage: error.sqlMessage || null,
+    });
+  }
+};
 module.exports = {
   getAdminDepartmentUsers,
   getAdminAssignableUsers,
   createAdminProject,
+  getAdminUserTimeSummary,
 };

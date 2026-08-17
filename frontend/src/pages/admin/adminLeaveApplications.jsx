@@ -104,20 +104,13 @@ const AdminLeaveApplications = () => {
   };
 
   const getLeaveLabel = (type) => {
-    if (type === "sick") {
-      return "Sick Leave";
-    }
+  if (type === "sick") return "Sick Leave";
+  if (type === "casual") return "Casual Leave";
+  if (type === "mandatory") return "Privileged Leave";
+  if (type === "festival") return "Holiday Leave";
 
-    if (type === "casual") {
-      return "Casual Leave";
-    }
-
-    if (type === "mandatory") {
-      return "Privileged Leave";
-    }
-
-    return type || "-";
-  };
+  return type || "-";
+};
 
   const getDurationLabel = (
     leave
@@ -130,15 +123,13 @@ const AdminLeaveApplications = () => {
       ) === 0.5
     ) {
       if (
-        leave.half_day_session ===
-        "first_half"
+        leave.half_day_session === "first_half"
       ) {
         return "Half Day · First Half";
       }
 
       if (
-        leave.half_day_session ===
-        "second_half"
+        leave.half_day_session === "second_half"
       ) {
         return "Half Day · Second Half";
       }
@@ -275,15 +266,18 @@ const AdminLeaveApplications = () => {
         ) ||
         new Date().getFullYear();
 
-      let earned =
-        leaveType === "mandatory"
-          ? Math.min(
-              18,
-              (new Date().getMonth() +
-                1) *
-                1.5
-            )
-          : 7;
+      let earned;
+
+      if (leaveType === "mandatory") {
+        earned = Math.min(
+          18,
+          (new Date().getMonth() + 1) * 1.5
+        );
+      } else if (leaveType === "festival") {
+        earned = 4;
+      } else {
+        earned = 7;
+      }
 
       const matching =
         applications.filter(
