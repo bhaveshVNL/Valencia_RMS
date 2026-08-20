@@ -49,9 +49,9 @@ const normalizeStatus = (value) =>
 
 const styles = {
   page: {
-    paddingBottom: "40px",
-    marginTop: "-45px",
-  },
+  paddingTop: "38px",
+  paddingBottom: "40px",
+},
   warning: {
     background: "#fff7ed",
     color: "#9a3412",
@@ -302,21 +302,24 @@ const AdminOverview = () => {
 
   const [profile, setProfile] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [miniTasks, setMiniTasks] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState({});
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [selectedReviewProject, setSelectedReviewProject] = useState(null);
 
   const fetchOverview = async () => {
     try {
       setLoading(true);
       setMessage("");
 
-      const [profileResult, tasksResult, attendanceResult] =
+      const [profileResult, tasksResult, attendanceResult, miniTasksResult] =
         await Promise.allSettled([
           api.get("/admin-profile/me"),
           api.get("/admin-tasks/department-tasks"),
           api.get("/admin-attendance/department-attendance"),
+          api.get("/admin-mini-tasks/department"),
         ]);
 
       if (profileResult.status === "fulfilled") {
@@ -334,6 +337,12 @@ const AdminOverview = () => {
       if (tasksResult.status === "fulfilled") {
         setTasks(tasksResult.value.data?.tasks || []);
       }
+
+      if (miniTasksResult.status === "fulfilled") {
+  setMiniTasks(
+    miniTasksResult.value.data?.mini_tasks || []
+  );
+}
 
       if (attendanceResult.status === "fulfilled") {
         const attendanceData = attendanceResult.value.data || {};
@@ -427,71 +436,65 @@ const AdminOverview = () => {
   so no additional backend request is required here.
   */
   const tasksWaitingForReview = useMemo(() => {
-    const reviewMap = new Map();
-
-    tasks.forEach((task) => {
+  return tasks
+    .filter((task) => {
       const status = normalizeStatus(
         task.status_group ||
           task.task_status ||
           task.status
       );
 
-      if (status !== "under_review") {
-        return;
-      }
+      return status === "under_review";
+    })
+    .map((task) => {
+      const assignees = Array.isArray(
+        task.main_task_assignees ||
+          task.assignees
+      )
+        ? task.main_task_assignees ||
+          task.assignees
+        : [];
 
-      const key =
-        task.main_task_key ||
-        [
-          task.project_id || "",
-          task.task_title || "",
-          task.task_description || "",
-        ].join("::") ||
-        String(task.task_id || "");
+      return {
+        task_id: Number(
+          task.task_id || 0
+        ),
 
-      if (!reviewMap.has(key)) {
-        reviewMap.set(key, {
-          key,
-          task_title:
-            task.task_title ||
-            "Untitled Task",
-          project_title:
-            task.project_title ||
-            "Untitled Project",
-          due_date:
-            task.task_end_date ||
-            task.due_date ||
-            task.project_end_date ||
-            task.end_date ||
-            "",
-          assignees: [],
-        });
-      }
+        key: String(
+          task.task_id ||
+            task.main_task_key ||
+            ""
+        ),
 
-      const reviewTask = reviewMap.get(key);
+        task_title:
+          task.task_title ||
+          "Untitled Main Task",
 
-      const employeeName =
-        task.assigned_name ||
-        task.employee_name ||
-        task.full_name ||
-        "";
+        project_title:
+          task.project_title ||
+          "Untitled Project",
 
-      if (
-        employeeName &&
-        !reviewTask.assignees.includes(
-          employeeName
-        )
-      ) {
-        reviewTask.assignees.push(
-          employeeName
-        );
-      }
-    });
+        due_date:
+          task.task_end_date ||
+          task.due_date ||
+          task.project_end_date ||
+          task.end_date ||
+          "",
 
-    return Array.from(
-      reviewMap.values()
+        assignees: assignees
+          .map(
+            (employee) =>
+              employee.full_name ||
+              employee.assigned_name
+          )
+          .filter(Boolean),
+      };
+    })
+    .filter(
+      (task) =>
+        task.task_id
     );
-  }, [tasks]);
+}, [tasks]);
 
   const attendancePercentage = useMemo(() => {
     const totalRecords = getNumber(attendanceSummary.total_records);
@@ -693,7 +696,15 @@ const AdminOverview = () => {
                     type="button"
                     style={styles.reviewButton}
                     onClick={() =>
-                      navigate("/admin/tasks")
+                      navigate(
+                        "/admin/tasks",
+                        {
+                          state: {
+                            openTaskId:
+                              task.task_id,
+                          },
+                        }
+                      )
                     }
                   >
                     Review Task
@@ -710,6 +721,46 @@ const AdminOverview = () => {
       </section>
 
       <AdminReviewPopup />
+      <section style={styles.card}>
+  <h2 style={styles.sectionTitle}>
+    <ClipboardList size={22} color="#ff5733" />
+    Employee Mini Tasks
+  </h2>
+
+  <p style={styles.sectionSubtitle}>
+    Mini tasks created by employees.
+  </p>
+
+  {miniTasks.length > 0 ? (
+    <div style={styles.activityList}>
+      {miniTasks.map((task, index) => (
+        <div style={styles.activityItem} key={index}>
+          <div style={styles.dot} />
+
+          <div>
+           <h3 style={styles.activityTitle}>
+  {task.mini_task_title || "Mini Task"}
+</h3>
+
+<p style={styles.activityDesc}>
+  {task.mini_task_description || "-"}
+</p>
+
+            <p style={styles.activityMeta}>
+              Employee: {task.employee_name || "-"}
+              {" · "}
+              Date: {formatDate(task.task_date)}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div style={styles.empty}>
+      No mini tasks found.
+    </div>
+  )}
+</section>
 
       <section style={styles.gridTwo}>
         <div style={styles.card}>

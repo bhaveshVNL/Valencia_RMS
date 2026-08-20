@@ -159,38 +159,41 @@ const formatSessionTime = (value) => {
 
   return (
     <div className="admin-users-page">
+
       <div className="admin-users-header-card">
-        <div>
-          <h2>Department Users</h2>
+  <div className="admin-users-title-wrap">
+    <h2 className="admin-users-main-title">
+      Employee Management
+    </h2>
 
-          <p>
-            Showing employees from{" "}
-            <strong>{department || "your department"}</strong> only.
-          </p>
-        </div>
+    <p className="admin-users-department-label">
+      {department || "Department"} Users
+    </p>
+  </div>
 
-        <button
-          type="button"
-          className="admin-refresh-btn"
-          onClick={fetchDepartmentUsers}
-        >
-          Refresh
-        </button>
+  <div className="admin-users-header-row">
+    <div className="admin-users-toolbar">
+      <input
+        type="text"
+        placeholder="Search employee, email, code, designation..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+
+      <div className="admin-users-count">
+        Total: {filteredUsers.length}
       </div>
+    </div>
 
-      <div className="admin-users-toolbar">
-        <input
-          type="text"
-          placeholder="Search employee, email, code, designation..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-
-        <div className="admin-users-count">
-          Total: {filteredUsers.length}
-        </div>
-      </div>
-
+    <button
+      type="button"
+      className="admin-refresh-btn"
+      onClick={fetchDepartmentUsers}
+    >
+      Refresh
+    </button>
+  </div>
+</div>
       {loading && (
         <div className="admin-users-message-card">
           Loading department users...
@@ -556,6 +559,7 @@ const formatSessionTime = (value) => {
 };
 
 const styles = {
+  
   modalOverlay: {
     position: "fixed",
     inset: 0,
@@ -901,6 +905,7 @@ noSessions: {
   color: "#64748b",
   fontSize: "13px",
 },
+
 };
 
 export default AdminUsers;

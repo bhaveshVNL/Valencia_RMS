@@ -6,69 +6,27 @@ const {
   sendMainTaskAssignmentEmails,
 } = require("../utils/projectemailnotifications");
 
-const safeTableName = (tableName) => {
-  if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
-    throw new Error(`Invalid table name: ${tableName}`);
-  }
+/*
+========================================================
+HELPERS
+========================================================
+*/
 
-  return `\`${tableName}\``;
-};
-
-const getColumns = async (tableName, connection = db) => {
-  const [columns] = await connection.query(
-    `SHOW COLUMNS FROM ${safeTableName(tableName)}`
+const getLoggedInUserId = (req) => {
+  return Number(
+    req.user?.user_id ||
+      req.user?.id ||
+      req.userId ||
+      0
   );
-
-  return columns.map((column) => ({
-    name: column.Field,
-    type: column.Type,
-  }));
 };
 
-const getColumnNames = async (tableName, connection = db) => {
-  const columns = await getColumns(tableName, connection);
-  return columns.map((column) => column.name);
-};
-
-const hasColumn = (columns, columnName) => {
-  return columns.includes(columnName);
-};
-
-const findColumn = (columns, possibleColumns) => {
-  return possibleColumns.find((column) => columns.includes(column));
-};
-
-const parseEnumValues = (type = "") => {
-  const match = String(type).match(/^enum\((.*)\)$/i);
-
-  if (!match) return [];
-
-  return match[1]
-    .split(",")
-    .map((value) => value.trim().replace(/^'/, "").replace(/'$/, ""));
-};
-
-const getBestEnumValue = async (
-  tableName,
-  columnName,
-  preferredValues,
-  fallbackValue,
-  connection = db
-) => {
-  const columns = await getColumns(tableName, connection);
-  const column = columns.find((item) => item.name === columnName);
-
-  if (!column) return fallbackValue;
-
-  const enumValues = parseEnumValues(column.type);
-
-  if (!enumValues.length) return fallbackValue;
-
-  const matchedValue = preferredValues.find((value) =>
-    enumValues.includes(value)
+const getLoggedInDepartmentId = (req) => {
+  return Number(
+    req.user?.department_id ||
+      req.user?.departmentId ||
+      0
   );
-
-  return matchedValue || enumValues[0] || fallbackValue;
 };
 
 const normalizeIdArray = (value) => {
@@ -78,7 +36,11 @@ const normalizeIdArray = (value) => {
     ...new Set(
       value
         .map((item) => Number(item))
-        .filter((item) => Number.isInteger(item) && item > 0)
+        .filter(
+          (item) =>
+            Number.isInteger(item) &&
+            item > 0
+        )
     ),
   ];
 };
@@ -92,164 +54,236 @@ const formatDateOnly = (value) => {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return null;
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
 
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, "0");
+
+  const day = String(
+    date.getDate()
+  ).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 };
 
-const getLoggedInUserId = (req) => {
-  return Number(req.user?.user_id || req.user?.id || req.userId || 0);
-};
+const normalizeStatus = (status) => {
+  const value = String(status || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
 
-const getLoggedInDepartmentId = (req) => {
-  return Number(req.user?.department_id || req.user?.departmentId || 0);
-};
-
-const getProjectAssignmentUserColumn = async (connection = db) => {
-  const columns = await getColumnNames("project_assignments", connection);
-
-  const userColumn = findColumn(columns, [
-    "assigned_to_user_id",
-    "user_id",
-    "employee_id",
-    "assignee_id",
-    "assigned_user_id",
-  ]);
-
-  if (!userColumn) {
-    throw new Error(
-      "No user column found in project_assignments table. Expected assigned_to_user_id, user_id, employee_id, assignee_id, or assigned_user_id."
-    );
+  if (
+    [
+      "",
+      "todo",
+      "to_do",
+      "not_started",
+      "pending",
+    ].includes(value)
+  ) {
+    return "not_started";
   }
 
-  return userColumn;
+  if (
+    [
+      "ongoing",
+      "in_progress",
+      "progress",
+    ].includes(value)
+  ) {
+    return "ongoing";
+  }
+
+  if (
+    [
+      "under_review",
+      "review",
+      "pending_review",
+    ].includes(value)
+  ) {
+    return "under_review";
+  }
+
+  if (
+    [
+      "completed",
+      "done",
+      "complete",
+    ].includes(value)
+  ) {
+    return "completed";
+  }
+
+  if (
+    ["rejected", "reject"].includes(value)
+  ) {
+    return "rejected";
+  }
+
+  if (
+    ["on_hold", "hold"].includes(value)
+  ) {
+    return "on_hold";
+  }
+
+  return value || "not_started";
 };
 
-const getProjectColumnsMap = async (connection = db) => {
-  const columns = await getColumnNames("projects", connection);
+/*
+========================================================
+PROJECT ASSIGNMENTS
 
-  return {
-    columns,
-    id: "project_id",
-    title: findColumn(columns, ["project_title", "title", "project_name"]),
-    description: findColumn(columns, [
-      "project_description",
-      "description",
-      "project_details",
-    ]),
-    startDate: findColumn(columns, ["start_date", "project_start_date"]),
-    endDate: findColumn(columns, ["end_date", "due_date", "project_end_date"]),
-    status: findColumn(columns, ["status", "project_status"]),
-    progress: findColumn(columns, ["overall_progress", "progress"]),
-    departmentId: findColumn(columns, ["department_id"]),
-    createdBy: findColumn(columns, [
-      "created_by_user_id",
-      "created_by",
-      "admin_id",
-      "assigned_by_user_id",
-    ]),
-    createdAt: findColumn(columns, ["created_at"]),
-    updatedAt: findColumn(columns, ["updated_at"]),
-  };
-};
+Project assignment and Main Task assignment are separate.
 
-const getTaskColumnsMap = async (connection = db) => {
-  const columns = await getColumnNames("tasks", connection);
+project_assignments
+= employees who belong to / can see the project
 
-  return {
-    columns,
-    id: "task_id",
-    projectId: findColumn(columns, ["project_id"]),
-    parentTaskId: findColumn(columns, ["parent_task_id"]),
-    title: findColumn(columns, ["task_title", "title", "main_task_title"]),
-    description: findColumn(columns, [
-      "task_description",
-      "description",
-      "main_task_description",
-    ]),
-    assignedTo: findColumn(columns, [
-      "assigned_to_user_id",
-      "assignee_id",
-      "employee_id",
-      "user_id",
-    ]),
-    createdBy: findColumn(columns, ["created_by_user_id", "created_by"]),
-    taskType: findColumn(columns, ["task_type"]),
-    status: findColumn(columns, ["status", "task_status"]),
-    progress: findColumn(columns, ["progress", "task_progress"]),
-    startDate: findColumn(columns, ["start_date"]),
-    dueDate: findColumn(columns, ["due_date", "end_date"]),
-    isChecked: findColumn(columns, ["is_checked"]),
-    createdAt: findColumn(columns, ["created_at"]),
-    updatedAt: findColumn(columns, ["updated_at"]),
-  };
-};
+task_assignments
+= employees assigned to one specific Main Task
+========================================================
+*/
 
 const syncProjectAssignments = async (
   connection,
   projectId,
-  assigneeIds,
+  employeeIds,
   assignedByUserId
 ) => {
-  const columns = await getColumnNames("project_assignments", connection);
-  const assignmentUserColumn = await getProjectAssignmentUserColumn(connection);
-
   await connection.query(
     `
-      DELETE FROM project_assignments
-      WHERE project_id = ?
+    DELETE FROM project_assignments
+    WHERE project_id = ?
     `,
     [projectId]
   );
 
-  for (const userId of assigneeIds) {
-    const insertColumns = ["project_id", assignmentUserColumn];
-    const values = [projectId, userId];
-
-    if (hasColumn(columns, "assigned_by_user_id")) {
-      insertColumns.push("assigned_by_user_id");
-      values.push(assignedByUserId || null);
-    }
-
-    if (hasColumn(columns, "created_by_user_id")) {
-      insertColumns.push("created_by_user_id");
-      values.push(assignedByUserId || null);
-    }
-
-    if (hasColumn(columns, "assigned_at")) {
-      insertColumns.push("assigned_at");
-      values.push(new Date());
-    }
-
-    if (hasColumn(columns, "created_at")) {
-      insertColumns.push("created_at");
-      values.push(new Date());
-    }
-
-    if (hasColumn(columns, "updated_at")) {
-      insertColumns.push("updated_at");
-      values.push(new Date());
-    }
-
-    const placeholders = insertColumns.map(() => "?").join(", ");
-
+  for (const employeeId of employeeIds) {
     await connection.query(
       `
-        INSERT INTO project_assignments (${insertColumns.join(", ")})
-        VALUES (${placeholders})
+      INSERT INTO project_assignments (
+        project_id,
+        employee_id,
+        assigned_by_user_id,
+        assignment_status,
+        employee_progress,
+        assigned_at
+      )
+      VALUES (
+        ?,
+        ?,
+        ?,
+        'assigned',
+        0,
+        NOW()
+      )
       `,
-      values
+      [
+        projectId,
+        employeeId,
+        assignedByUserId || null,
+      ]
     );
   }
 };
 
-const getAssignableUsersForAdminProjects = async (req, res) => {
+/*
+========================================================
+MAIN TASK ASSIGNMENTS
+
+IMPORTANT:
+One Main Task row only.
+
+Multiple employees are linked through task_assignments.
+========================================================
+*/
+
+const syncMainTaskAssignments = async (
+  connection,
+  taskId,
+  employeeIds,
+  assignedByUserId
+) => {
+  await connection.query(
+    `
+    DELETE FROM task_assignments
+    WHERE task_id = ?
+    `,
+    [taskId]
+  );
+
+  for (const employeeId of employeeIds) {
+    await connection.query(
+      `
+      INSERT INTO task_assignments (
+        task_id,
+        employee_id,
+        assigned_by_user_id,
+        assigned_at
+      )
+      VALUES (
+        ?,
+        ?,
+        ?,
+        NOW()
+      )
+      `,
+      [
+        taskId,
+        employeeId,
+        assignedByUserId || null,
+      ]
+    );
+  }
+
+  /*
+  Keep assigned_to_user_id populated for old parts
+  of the RMS that may still depend on it.
+
+  It represents the first / primary employee only.
+
+  task_assignments remains the real multi-user source.
+  */
+  const primaryEmployeeId =
+    employeeIds.length > 0
+      ? employeeIds[0]
+      : null;
+
+  await connection.query(
+    `
+    UPDATE tasks
+    SET assigned_to_user_id = ?
+    WHERE task_id = ?
+    `,
+    [
+      primaryEmployeeId,
+      taskId,
+    ]
+  );
+};
+
+/*
+========================================================
+ASSIGNABLE USERS
+
+Admin should see employees from their own department
+while creating / editing projects.
+========================================================
+*/
+
+const getAssignableUsersForAdminProjects = async (
+  req,
+  res
+) => {
   try {
-    const [users] = await db.query(`
+    const values = [];
+const departmentCondition = "";
+    const [users] = await db.query(
+      `
       SELECT
         u.user_id,
         u.full_name,
@@ -257,450 +291,961 @@ const getAssignableUsersForAdminProjects = async (req, res) => {
         u.employee_code,
         u.designation,
         u.status,
+        u.department_id,
+
         d.department_name,
+
+        r.role_id,
         r.role_name
+
       FROM users u
-      LEFT JOIN departments d ON d.department_id = u.department_id
-      LEFT JOIN roles r ON r.role_id = u.role_id
-      WHERE LOWER(COALESCE(u.status, 'active')) = 'active'
-      ORDER BY d.department_name ASC, u.full_name ASC
-    `);
+
+      LEFT JOIN departments d
+        ON d.department_id =
+           u.department_id
+
+      LEFT JOIN roles r
+        ON r.role_id =
+           u.role_id
+
+      WHERE
+        LOWER(
+          COALESCE(
+            u.status,
+            'active'
+          )
+        ) = 'active'
+
+        ${departmentCondition}
+
+        AND LOWER(
+  COALESCE(
+    r.role_name,
+    ''
+  )
+) IN ('employee', 'administrator', 'admin')
+
+      ORDER BY
+        u.full_name ASC
+      `,
+      values
+    );
 
     return res.status(200).json({
       success: true,
       users,
     });
   } catch (error) {
-    console.error("Get assignable users error:", error);
+    console.error(
+      "Get assignable project users error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch assignable users.",
+      message:
+  "Failed to fetch assignable employees.",
       error: error.message,
     });
   }
 };
 
-const getAdminProjects = async (req, res) => {
+/*
+========================================================
+GET ADMIN PROJECTS
+========================================================
+*/
+
+const getAdminProjects = async (
+  req,
+  res
+) => {
   try {
-    const adminUserId = getLoggedInUserId(req);
-    const adminDepartmentId = getLoggedInDepartmentId(req);
+    const adminUserId =
+      getLoggedInUserId(req);
 
-    const projectMap = await getProjectColumnsMap();
-    const taskMap = await getTaskColumnsMap();
-    const assignmentUserColumn = await getProjectAssignmentUserColumn();
-
-    const projectSelect = [
-      `p.project_id AS project_id`,
-      projectMap.title
-        ? `p.${projectMap.title} AS project_title`
-        : `'Untitled Project' AS project_title`,
-      projectMap.description
-        ? `p.${projectMap.description} AS project_description`
-        : `'' AS project_description`,
-      projectMap.startDate
-        ? `p.${projectMap.startDate} AS start_date`
-        : `NULL AS start_date`,
-      projectMap.endDate
-        ? `p.${projectMap.endDate} AS end_date`
-        : `NULL AS end_date`,
-      projectMap.status ? `p.${projectMap.status} AS status` : `'to_do' AS status`,
-      projectMap.progress
-        ? `p.${projectMap.progress} AS overall_progress`
-        : `0 AS overall_progress`,
-      projectMap.departmentId
-        ? `p.${projectMap.departmentId} AS department_id`
-        : `NULL AS department_id`,
-      projectMap.createdBy
-        ? `p.${projectMap.createdBy} AS created_by_user_id`
-        : `NULL AS created_by_user_id`,
-      `creator.full_name AS created_by_name`,
-      `creator.email AS created_by_email`,
-      `d.department_name AS department_name`,
-    ];
+    const adminDepartmentId =
+      getLoggedInDepartmentId(req);
 
     const whereParts = [];
     const whereValues = [];
 
-    if (projectMap.departmentId && adminDepartmentId) {
-      whereParts.push(`p.${projectMap.departmentId} = ?`);
-      whereValues.push(adminDepartmentId);
+    /*
+    Department admin should normally see:
+    - projects in their department
+    - projects created by them
+
+    OR is intentional here because older records
+    may not have department_id populated.
+    */
+    if (
+      adminDepartmentId &&
+      adminUserId
+    ) {
+      whereParts.push(
+        `
+        (
+          p.department_id = ?
+          OR p.created_by_user_id = ?
+        )
+        `
+      );
+
+      whereValues.push(
+        adminDepartmentId,
+        adminUserId
+      );
+    } else if (adminDepartmentId) {
+      whereParts.push(
+        "p.department_id = ?"
+      );
+
+      whereValues.push(
+        adminDepartmentId
+      );
+    } else if (adminUserId) {
+      whereParts.push(
+        "p.created_by_user_id = ?"
+      );
+
+      whereValues.push(
+        adminUserId
+      );
     }
 
-    if (projectMap.createdBy && adminUserId) {
-      whereParts.push(`p.${projectMap.createdBy} = ?`);
-      whereValues.push(adminUserId);
-    }
+    const whereClause =
+      whereParts.length > 0
+        ? `WHERE ${whereParts.join(" AND ")}`
+        : "";
 
-    const whereClause = whereParts.length
-      ? `WHERE (${whereParts.join(" OR ")})`
-      : "";
-
-    const [projectRows] = await db.query(
+    const [projects] = await db.query(
       `
-        SELECT
-          ${projectSelect.join(",\n          ")}
-        FROM projects p
-        LEFT JOIN users creator
-          ON ${
-            projectMap.createdBy
-              ? `creator.user_id = p.${projectMap.createdBy}`
-              : "1 = 0"
-          }
-        LEFT JOIN departments d
-          ON ${
-            projectMap.departmentId
-              ? `d.department_id = p.${projectMap.departmentId}`
-              : "1 = 0"
-          }
-        ${whereClause}
-        ORDER BY p.project_id DESC
+      SELECT
+        p.project_id,
+        p.created_by_user_id,
+        p.department_id,
+        p.project_title,
+        p.project_description,
+        p.priority,
+        p.status,
+
+        DATE_FORMAT(
+          p.start_date,
+          '%Y-%m-%d'
+        ) AS start_date,
+
+        DATE_FORMAT(
+          p.due_date,
+          '%Y-%m-%d'
+        ) AS due_date,
+
+        DATE_FORMAT(
+          p.due_date,
+          '%Y-%m-%d'
+        ) AS end_date,
+
+        p.completed_at,
+
+        COALESCE(
+          p.overall_progress,
+          0
+        ) AS overall_progress,
+
+        p.created_at,
+        p.updated_at,
+
+        creator.full_name
+          AS created_by_name,
+
+        creator.email
+          AS created_by_email,
+
+        d.department_name
+
+      FROM projects p
+
+      LEFT JOIN users creator
+        ON creator.user_id =
+           p.created_by_user_id
+
+      LEFT JOIN departments d
+        ON d.department_id =
+           p.department_id
+
+      ${whereClause}
+
+      ORDER BY
+        p.project_id DESC
       `,
       whereValues
     );
 
-    if (!projectRows.length) {
+    if (!projects.length) {
       return res.status(200).json({
         success: true,
         projects: [],
       });
     }
 
-    const projectIds = projectRows.map((project) => project.project_id);
+    const projectIds = projects.map(
+      (project) =>
+        Number(project.project_id)
+    );
 
-    const [assignmentRows] = await db.query(
-      `
+    /*
+    ----------------------------------------------
+    PROJECT ASSIGNEES
+    ----------------------------------------------
+    */
+
+    const [projectAssignmentRows] =
+      await db.query(
+        `
         SELECT
+          pa.assignment_id,
           pa.project_id,
-          u.user_id,
+          pa.employee_id,
+          pa.assignment_status,
+          pa.employee_progress,
+          pa.assigned_at,
+
           u.full_name,
           u.email,
           u.employee_code,
           u.designation,
-          u.status,
+
           d.department_name,
+
           r.role_name
+
         FROM project_assignments pa
-        INNER JOIN users u ON u.user_id = pa.${assignmentUserColumn}
-        LEFT JOIN departments d ON d.department_id = u.department_id
-        LEFT JOIN roles r ON r.role_id = u.role_id
-        WHERE pa.project_id IN (?)
-        ORDER BY u.full_name ASC
-      `,
-      [projectIds]
-    );
 
-    let taskRows = [];
+        INNER JOIN users u
+          ON u.user_id =
+             pa.employee_id
 
-    if (taskMap.projectId) {
-      const topLevelWhere = taskMap.parentTaskId
-        ? `AND (t.${taskMap.parentTaskId} IS NULL OR t.${taskMap.parentTaskId} = 0)`
-        : "";
+        LEFT JOIN departments d
+          ON d.department_id =
+             u.department_id
 
-      const [tasks] = await db.query(
-        `
-          SELECT
-            t.task_id,
-            t.${taskMap.projectId} AS project_id,
-            ${
-              taskMap.title
-                ? `t.${taskMap.title} AS task_title`
-                : `'Main Task' AS task_title`
-            },
-            ${
-              taskMap.description
-                ? `t.${taskMap.description} AS task_description`
-                : `'' AS task_description`
-            },
-            ${
-              taskMap.status
-                ? `t.${taskMap.status} AS status`
-                : `'to_do' AS status`
-            },
-            ${
-              taskMap.progress
-                ? `t.${taskMap.progress} AS progress`
-                : `0 AS progress`
-            },
-            ${
-              taskMap.assignedTo
-                ? `t.${taskMap.assignedTo} AS assigned_to_user_id`
-                : `NULL AS assigned_to_user_id`
-            },
-            ${
-              taskMap.createdBy
-                ? `t.${taskMap.createdBy} AS created_by_user_id`
-                : `NULL AS created_by_user_id`
-            },
-            ${
-              taskMap.startDate
-                ? `t.${taskMap.startDate} AS start_date`
-                : `NULL AS start_date`
-            },
-            ${
-              taskMap.dueDate
-                ? `t.${taskMap.dueDate} AS due_date`
-                : `NULL AS due_date`
-            },
-            au.full_name AS assignee_name,
-            au.email AS assignee_email,
-            au.employee_code AS assignee_employee_code,
-            au.designation AS assignee_designation,
-            ad.department_name AS assignee_department_name
-          FROM tasks t
-          LEFT JOIN users au
-            ON ${
-              taskMap.assignedTo
-                ? `au.user_id = t.${taskMap.assignedTo}`
-                : "1 = 0"
-            }
-          LEFT JOIN departments ad ON ad.department_id = au.department_id
-          WHERE t.${taskMap.projectId} IN (?)
-          ${topLevelWhere}
-          ORDER BY t.task_id DESC
+        LEFT JOIN roles r
+          ON r.role_id =
+             u.role_id
+
+        WHERE
+          pa.project_id IN (?)
+
+          AND COALESCE(
+            pa.assignment_status,
+            'assigned'
+          ) <> 'removed'
+
+        ORDER BY
+          u.full_name ASC
         `,
         [projectIds]
       );
 
-      taskRows = tasks;
+    /*
+    ----------------------------------------------
+    MAIN TASKS
+    ----------------------------------------------
+    */
+
+    const [mainTaskRows] =
+      await db.query(
+        `
+        SELECT
+          t.task_id,
+          t.project_id,
+          t.parent_task_id,
+          t.created_by_user_id,
+          t.assigned_to_user_id,
+          t.task_title,
+          t.task_description,
+          t.task_type,
+          t.status,
+          t.priority,
+
+          COALESCE(
+            t.progress,
+            0
+          ) AS progress,
+
+          COALESCE(
+            t.is_checked,
+            0
+          ) AS is_checked,
+
+          DATE_FORMAT(
+            t.start_date,
+            '%Y-%m-%d'
+          ) AS start_date,
+
+          DATE_FORMAT(
+            t.due_date,
+            '%Y-%m-%d'
+          ) AS due_date,
+
+          t.review_status,
+          t.reviewed_by_user_id,
+          t.reviewed_at,
+          t.review_note,
+
+          t.created_at,
+          t.updated_at,
+
+          creator.full_name
+            AS created_by_name,
+
+          creator.email
+            AS created_by_email,
+
+          (
+            SELECT COUNT(*)
+            FROM tasks st
+            WHERE
+              st.parent_task_id =
+              t.task_id
+          ) AS total_subtasks,
+
+          (
+            SELECT COUNT(*)
+            FROM tasks st
+            WHERE
+              st.parent_task_id =
+              t.task_id
+
+              AND (
+                COALESCE(
+                  st.is_checked,
+                  0
+                ) = 1
+
+                OR LOWER(
+                  REPLACE(
+                    COALESCE(
+                      st.status,
+                      ''
+                    ),
+                    ' ',
+                    '_'
+                  )
+                ) IN (
+                  'completed',
+                  'done',
+                  'complete'
+                )
+              )
+          ) AS completed_subtasks
+
+        FROM tasks t
+
+        LEFT JOIN users creator
+          ON creator.user_id =
+             t.created_by_user_id
+
+        WHERE
+          t.project_id IN (?)
+
+          AND (
+            t.parent_task_id IS NULL
+            OR t.parent_task_id = 0
+          )
+
+        ORDER BY
+          t.task_id DESC
+        `,
+        [projectIds]
+      );
+
+    /*
+    ----------------------------------------------
+    MAIN TASK ASSIGNEES
+    ----------------------------------------------
+    */
+
+    const mainTaskIds =
+      mainTaskRows.map(
+        (task) =>
+          Number(task.task_id)
+      );
+
+    let taskAssignmentRows = [];
+
+    if (mainTaskIds.length > 0) {
+      const [rows] = await db.query(
+        `
+        SELECT
+          ta.task_assignment_id,
+          ta.task_id,
+          ta.employee_id,
+          ta.assigned_by_user_id,
+          ta.assigned_at,
+
+          u.full_name,
+          u.email,
+          u.employee_code,
+          u.designation,
+
+          d.department_name
+
+        FROM task_assignments ta
+
+        INNER JOIN users u
+          ON u.user_id =
+             ta.employee_id
+
+        LEFT JOIN departments d
+          ON d.department_id =
+             u.department_id
+
+        WHERE
+          ta.task_id IN (?)
+
+        ORDER BY
+          u.full_name ASC
+        `,
+        [mainTaskIds]
+      );
+
+      taskAssignmentRows = rows;
     }
 
-    const assignmentMap = new Map();
-    assignmentRows.forEach((row) => {
-      const projectId = row.project_id;
+    /*
+    ----------------------------------------------
+    BUILD MAPS
+    ----------------------------------------------
+    */
 
-      if (!assignmentMap.has(projectId)) {
-        assignmentMap.set(projectId, []);
+    const projectAssigneeMap =
+      new Map();
+
+    for (
+      const assignment
+      of projectAssignmentRows
+    ) {
+      const projectId =
+        Number(
+          assignment.project_id
+        );
+
+      if (
+        !projectAssigneeMap.has(
+          projectId
+        )
+      ) {
+        projectAssigneeMap.set(
+          projectId,
+          []
+        );
       }
 
-      assignmentMap.get(projectId).push({
-        user_id: row.user_id,
-        full_name: row.full_name,
-        email: row.email,
-        employee_code: row.employee_code,
-        designation: row.designation,
-        status: row.status,
-        department_name: row.department_name,
-        role_name: row.role_name,
-      });
-    });
+      projectAssigneeMap
+        .get(projectId)
+        .push({
+          user_id:
+            assignment.employee_id,
 
-    const taskMapByProject = new Map();
+          employee_id:
+            assignment.employee_id,
 
-    taskRows.forEach((task) => {
-      const projectId = task.project_id;
+          full_name:
+            assignment.full_name,
 
-      if (!taskMapByProject.has(projectId)) {
-        taskMapByProject.set(projectId, new Map());
-      }
+          email:
+            assignment.email,
 
-      const groupKey = [
-        task.project_id,
-        task.task_title,
-        task.task_description,
-        formatDateOnly(task.start_date),
-        formatDateOnly(task.due_date),
-        task.created_by_user_id || "",
-      ].join("::");
+          employee_code:
+            assignment.employee_code,
 
-      const projectTaskGroups = taskMapByProject.get(projectId);
+          designation:
+            assignment.designation,
 
-      if (!projectTaskGroups.has(groupKey)) {
-        projectTaskGroups.set(groupKey, {
-          task_id: task.task_id,
-          task_ids: [task.task_id],
-          project_id: task.project_id,
-          task_title: task.task_title,
-          task_description: task.task_description,
-          status: task.status,
-          progress: Number(task.progress || 0),
-          start_date: formatDateOnly(task.start_date),
-          due_date: formatDateOnly(task.due_date),
-          completed_subtasks: 0,
-          total_subtasks: 0,
-          assignees: [],
+          department_name:
+            assignment.department_name,
+
+          role_name:
+            assignment.role_name,
+
+          assignment_status:
+            assignment.assignment_status,
+
+          employee_progress:
+            Number(
+              assignment.employee_progress ||
+                0
+            ),
+
+          assigned_at:
+            assignment.assigned_at,
         });
-      } else {
-        projectTaskGroups.get(groupKey).task_ids.push(task.task_id);
+    }
+
+    const taskAssigneeMap =
+      new Map();
+
+    for (
+      const assignment
+      of taskAssignmentRows
+    ) {
+      const taskId =
+        Number(
+          assignment.task_id
+        );
+
+      if (
+        !taskAssigneeMap.has(
+          taskId
+        )
+      ) {
+        taskAssigneeMap.set(
+          taskId,
+          []
+        );
       }
 
-      if (task.assigned_to_user_id) {
-        projectTaskGroups.get(groupKey).assignees.push({
-          user_id: task.assigned_to_user_id,
-          full_name: task.assignee_name,
-          email: task.assignee_email,
-          employee_code: task.assignee_employee_code,
-          designation: task.assignee_designation,
-          department_name: task.assignee_department_name,
+      taskAssigneeMap
+        .get(taskId)
+        .push({
+          user_id:
+            assignment.employee_id,
+
+          employee_id:
+            assignment.employee_id,
+
+          full_name:
+            assignment.full_name,
+
+          email:
+            assignment.email,
+
+          employee_code:
+            assignment.employee_code,
+
+          designation:
+            assignment.designation,
+
+          department_name:
+            assignment.department_name,
+
+          assigned_at:
+            assignment.assigned_at,
         });
+    }
+
+    const taskMapByProject =
+      new Map();
+
+    for (
+      const task
+      of mainTaskRows
+    ) {
+      const projectId =
+        Number(task.project_id);
+
+      if (
+        !taskMapByProject.has(
+          projectId
+        )
+      ) {
+        taskMapByProject.set(
+          projectId,
+          []
+        );
       }
-    });
 
-    const projects = projectRows.map((project) => {
-      const taskGroups = taskMapByProject.get(project.project_id);
-      const mainTasks = taskGroups ? [...taskGroups.values()] : [];
+      const taskAssignees =
+        taskAssigneeMap.get(
+          Number(task.task_id)
+        ) || [];
 
-      return {
-        ...project,
-        start_date: formatDateOnly(project.start_date),
-        end_date: formatDateOnly(project.end_date),
-        overall_progress: Number(project.overall_progress || 0),
-        assignees: assignmentMap.get(project.project_id) || [],
-        main_tasks: mainTasks,
-      };
-    });
+      taskMapByProject
+        .get(projectId)
+        .push({
+          ...task,
+
+          start_date:
+            formatDateOnly(
+              task.start_date
+            ),
+
+          due_date:
+            formatDateOnly(
+              task.due_date
+            ),
+
+          status:
+            normalizeStatus(
+              task.status
+            ),
+
+          progress:
+            Number(
+              task.progress || 0
+            ),
+
+          total_subtasks:
+            Number(
+              task.total_subtasks ||
+                0
+            ),
+
+          completed_subtasks:
+            Number(
+              task.completed_subtasks ||
+                0
+            ),
+
+          assignees:
+            taskAssignees,
+
+          assignee_ids:
+            taskAssignees.map(
+              (employee) =>
+                Number(
+                  employee.employee_id
+                )
+            ),
+
+          assigned_names:
+            taskAssignees
+              .map(
+                (employee) =>
+                  employee.full_name
+              )
+              .filter(Boolean)
+              .join(", "),
+
+          assigned_emails:
+            taskAssignees
+              .map(
+                (employee) =>
+                  employee.email
+              )
+              .filter(Boolean)
+              .join(", "),
+        });
+    }
+
+    /*
+    ----------------------------------------------
+    FINAL PROJECT RESPONSE
+    ----------------------------------------------
+    */
+
+    const formattedProjects =
+      projects.map(
+        (project) => {
+          const projectId =
+            Number(
+              project.project_id
+            );
+
+          return {
+            ...project,
+
+            start_date:
+              formatDateOnly(
+                project.start_date
+              ),
+
+            due_date:
+              formatDateOnly(
+                project.due_date
+              ),
+
+            end_date:
+              formatDateOnly(
+                project.due_date
+              ),
+
+            status:
+              normalizeStatus(
+                project.status
+              ),
+
+            overall_progress:
+              Number(
+                project.overall_progress ||
+                  0
+              ),
+
+            assignees:
+              projectAssigneeMap.get(
+                projectId
+              ) || [],
+
+            main_tasks:
+              taskMapByProject.get(
+                projectId
+              ) || [],
+          };
+        }
+      );
 
     return res.status(200).json({
       success: true,
-      projects,
+      projects:
+        formattedProjects,
     });
   } catch (error) {
-    console.error("Get admin projects error:", error);
+    console.error(
+      "Get admin projects error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch projects.",
+      message:
+        "Failed to fetch projects.",
       error: error.message,
+      sqlMessage:
+        error.sqlMessage || null,
     });
   }
 };
-const createAdminProject = async (req, res) => {
-  const connection = await db.getConnection();
+
+/*
+========================================================
+CREATE PROJECT
+========================================================
+*/
+
+const createAdminProject = async (
+  req,
+  res
+) => {
+  const connection =
+    await db.getConnection();
 
   try {
-    const adminUserId = getLoggedInUserId(req);
-    const adminDepartmentId = getLoggedInDepartmentId(req);
+    const adminUserId =
+      getLoggedInUserId(req);
+
+    const adminDepartmentId =
+      getLoggedInDepartmentId(req);
 
     const adminUser = {
-      user_id: adminUserId,
-      full_name: req.user?.full_name || req.user?.name || "Admin",
-      email: req.user?.email || process.env.SMTP_USER,
+      user_id:
+        adminUserId,
+
+      full_name:
+        req.user?.full_name ||
+        req.user?.name ||
+        "Admin",
+
+      email:
+        req.user?.email ||
+        process.env.SMTP_USER,
     };
 
-const projectTitle =
-  req.body.project_title ||
-  req.body.title ||
-  req.body.project_name;
+    const projectTitle =
+      req.body.project_title ||
+      req.body.title ||
+      req.body.project_name;
 
-const projectDescription =
-  req.body.project_description ||
-  req.body.description ||
-  req.body.project_details ||
-  "";
+    const projectDescription =
+      req.body.project_description ||
+      req.body.description ||
+      req.body.project_details ||
+      "";
 
-const startDate =
-  req.body.start_date ||
-  req.body.startDate ||
-  req.body.project_start_date;
+    const priority =
+      req.body.priority ||
+      "medium";
 
-const endDate =
-  req.body.end_date ||
-  req.body.endDate ||
-  req.body.due_date ||
-  req.body.dueDate ||
-  req.body.project_end_date;;
+    const startDate =
+      formatDateOnly(
+        req.body.start_date ||
+          req.body.startDate ||
+          req.body.project_start_date
+      );
 
-    const assigneeIds = normalizeIdArray(
-      req.body.assignee_ids || req.body.assignees || req.body.project_assignees
-    );
+    const dueDate =
+      formatDateOnly(
+        req.body.due_date ||
+          req.body.end_date ||
+          req.body.endDate ||
+          req.body.dueDate ||
+          req.body.project_end_date
+      );
 
-    if (!projectTitle || !String(projectTitle).trim()) {
+    const assigneeIds =
+      normalizeIdArray(
+        req.body.assignee_ids ||
+          req.body.assignees ||
+          req.body.project_assignees
+      );
+
+    if (
+      !projectTitle ||
+      !String(
+        projectTitle
+      ).trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Project title is required.",
+        message:
+          "Project title is required.",
       });
     }
 
-    if (!startDate || !endDate) {
+    if (
+      !startDate ||
+      !dueDate
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Start date and end date are required.",
+        message:
+          "Project start date and deadline are required.",
       });
     }
 
-    if (!assigneeIds.length) {
+    if (
+      startDate > dueDate
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Select at least one project assignee.",
+        message:
+          "Project start date cannot be after project deadline.",
       });
+    }
+
+    if (
+      !assigneeIds.length
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Select at least one project employee.",
+      });
+    }
+
+    /*
+    Ensure selected employees belong to Admin's department.
+    */
+
+    if (
+      adminDepartmentId
+    ) {
+      const [validEmployees] =
+        await connection.query(
+          `
+          SELECT
+            u.user_id
+
+          FROM users u
+
+          LEFT JOIN roles r
+            ON r.role_id =
+               u.role_id
+
+          WHERE
+            u.user_id IN (?)
+
+            AND u.department_id = ?
+
+            AND LOWER(
+              COALESCE(
+                u.status,
+                'active'
+              )
+            ) = 'active'
+
+            AND LOWER(
+  COALESCE(
+    r.role_name,
+    ''
+  )
+) NOT IN ('superadmin')
+          `,
+          [
+            assigneeIds,
+            adminDepartmentId,
+          ]
+        );
+
+      const validIds =
+        new Set(
+          validEmployees.map(
+            (employee) =>
+              Number(
+                employee.user_id
+              )
+          )
+        );
+
+      const invalidIds =
+        assigneeIds.filter(
+          (id) =>
+            !validIds.has(
+              Number(id)
+            )
+        );
+
+      if (
+        invalidIds.length
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "One or more selected employees do not belong to your department.",
+        });
+      }
     }
 
     await connection.beginTransaction();
 
-    const projectMap = await getProjectColumnsMap(connection);
+    const [result] =
+      await connection.query(
+        `
+        INSERT INTO projects (
+          created_by_user_id,
+          department_id,
+          project_title,
+          project_description,
+          priority,
+          status,
+          start_date,
+          due_date,
+          overall_progress,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          'not_started',
+          ?,
+          ?,
+          0,
+          NOW(),
+          NOW()
+        )
+        `,
+        [
+          adminUserId || null,
+          adminDepartmentId || null,
+          String(
+            projectTitle
+          ).trim(),
 
-    const insertColumns = [];
-    const values = [];
+          String(
+            projectDescription
+          ).trim(),
 
-    if (projectMap.title) {
-      insertColumns.push(projectMap.title);
-      values.push(String(projectTitle).trim());
-    }
-
-    if (projectMap.description) {
-      insertColumns.push(projectMap.description);
-      values.push(String(projectDescription).trim());
-    }
-
-    if (projectMap.startDate) {
-      insertColumns.push(projectMap.startDate);
-      values.push(startDate);
-    }
-
-    if (projectMap.endDate) {
-      insertColumns.push(projectMap.endDate);
-      values.push(endDate);
-    }
-
-    if (projectMap.status) {
-      const defaultProjectStatus = await getBestEnumValue(
-        "projects",
-        projectMap.status,
-        ["not_started", "to_do", "pending", "ongoing"],
-        "not_started",
-        connection
+          priority,
+          startDate,
+          dueDate,
+        ]
       );
 
-      insertColumns.push(projectMap.status);
-      values.push(defaultProjectStatus);
-    }
-
-    if (projectMap.progress) {
-      insertColumns.push(projectMap.progress);
-      values.push(0);
-    }
-
-    if (projectMap.createdBy) {
-      insertColumns.push(projectMap.createdBy);
-      values.push(adminUserId || null);
-    }
-
-    if (projectMap.departmentId) {
-      insertColumns.push(projectMap.departmentId);
-      values.push(adminDepartmentId || null);
-    }
-
-    if (projectMap.createdAt) {
-      insertColumns.push(projectMap.createdAt);
-      values.push(new Date());
-    }
-
-    if (projectMap.updatedAt) {
-      insertColumns.push(projectMap.updatedAt);
-      values.push(new Date());
-    }
-
-    const placeholders = insertColumns.map(() => "?").join(", ");
-
-    const [projectResult] = await connection.query(
-      `
-        INSERT INTO projects (${insertColumns.join(", ")})
-        VALUES (${placeholders})
-      `,
-      values
-    );
-
-    const projectId = projectResult.insertId;
+    const projectId =
+      result.insertId;
 
     await syncProjectAssignments(
       connection,
@@ -711,144 +1256,233 @@ const endDate =
 
     await connection.commit();
 
-    const emailSummary = await sendProjectAssignmentEmails(projectId, adminUser);
+    let emailSummary = null;
+
+    try {
+      emailSummary =
+        await sendProjectAssignmentEmails(
+          projectId,
+          adminUser
+        );
+    } catch (emailError) {
+      console.error(
+        "Project assignment email error:",
+        emailError
+      );
+    }
 
     return res.status(201).json({
       success: true,
-      message: "Project created successfully.",
-      project_id: projectId,
-      assignee_ids: assigneeIds,
-      email_summary: emailSummary,
+      message:
+        "Project created successfully.",
+      project_id:
+        projectId,
+      assignee_ids:
+        assigneeIds,
+      email_summary:
+        emailSummary,
     });
   } catch (error) {
-    await connection.rollback();
+    try {
+      await connection.rollback();
+    } catch {}
 
-    console.error("Create admin project error:", error);
+    console.error(
+      "Create admin project error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to create project.",
+      message:
+        "Failed to create project.",
       error: error.message,
+      sqlMessage:
+        error.sqlMessage || null,
     });
   } finally {
     connection.release();
   }
 };
 
-const updateAdminProject = async (req, res) => {
-  const connection = await db.getConnection();
+/*
+========================================================
+UPDATE PROJECT
+========================================================
+*/
+
+const updateAdminProject = async (
+  req,
+  res
+) => {
+  const connection =
+    await db.getConnection();
 
   try {
-    const adminUserId = getLoggedInUserId(req);
-    const projectId = Number(req.params.projectId || req.params.id);
+    const adminUserId =
+      getLoggedInUserId(req);
 
-    const adminUser = {
-      user_id: adminUserId,
-      full_name: req.user?.full_name || req.user?.name || "Admin",
-      email: req.user?.email || process.env.SMTP_USER,
-    };
+    const projectId =
+      Number(
+        req.params.projectId ||
+          req.params.id
+      );
 
     if (!projectId) {
       return res.status(400).json({
         success: false,
-        message: "Project ID is required.",
+        message:
+          "Project ID is required.",
       });
     }
 
-    const projectTitle = req.body.project_title || req.body.title;
+    const adminUser = {
+      user_id:
+        adminUserId,
+
+      full_name:
+        req.user?.full_name ||
+        req.user?.name ||
+        "Admin",
+
+      email:
+        req.user?.email ||
+        process.env.SMTP_USER,
+    };
+
+    const projectTitle =
+      req.body.project_title ||
+      req.body.title;
+
     const projectDescription =
-      req.body.project_description || req.body.description || "";
-    const startDate = req.body.start_date;
-    const endDate = req.body.end_date;
+      req.body.project_description ||
+      req.body.description ||
+      "";
 
-    const assigneeIds = normalizeIdArray(
-      req.body.assignee_ids || req.body.assignees || req.body.project_assignees
-    );
+    const priority =
+      req.body.priority ||
+      "medium";
 
-    if (!projectTitle || !String(projectTitle).trim()) {
+    const startDate =
+      formatDateOnly(
+        req.body.start_date ||
+          req.body.startDate
+      );
+
+    const dueDate =
+      formatDateOnly(
+        req.body.due_date ||
+          req.body.end_date ||
+          req.body.endDate ||
+          req.body.dueDate
+      );
+
+    const assigneeIds =
+      normalizeIdArray(
+        req.body.assignee_ids ||
+          req.body.assignees ||
+          req.body.project_assignees
+      );
+
+    if (
+      !projectTitle ||
+      !String(
+        projectTitle
+      ).trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Project title is required.",
+        message:
+          "Project title is required.",
       });
     }
 
-    if (!startDate || !endDate) {
+    if (
+      !startDate ||
+      !dueDate
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Start date and end date are required.",
+        message:
+          "Project start date and deadline are required.",
       });
     }
 
-    if (!assigneeIds.length) {
+    if (
+      startDate > dueDate
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Select at least one project assignee.",
+        message:
+          "Project start date cannot be after project deadline.",
+      });
+    }
+
+    if (
+      !assigneeIds.length
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Select at least one project employee.",
       });
     }
 
     await connection.beginTransaction();
 
-    const projectMap = await getProjectColumnsMap(connection);
-
-    const [projectRows] = await connection.query(
-      `
-        SELECT project_id
+    const [existingRows] =
+      await connection.query(
+        `
+        SELECT
+          project_id
         FROM projects
         WHERE project_id = ?
         LIMIT 1
-      `,
-      [projectId]
-    );
+        `,
+        [projectId]
+      );
 
-    if (!projectRows.length) {
+    if (
+      !existingRows.length
+    ) {
       await connection.rollback();
 
       return res.status(404).json({
         success: false,
-        message: "Project not found.",
+        message:
+          "Project not found.",
       });
     }
 
-    const updateParts = [];
-    const values = [];
+    await connection.query(
+      `
+      UPDATE projects
 
-    if (projectMap.title) {
-      updateParts.push(`${projectMap.title} = ?`);
-      values.push(String(projectTitle).trim());
-    }
+      SET
+        project_title = ?,
+        project_description = ?,
+        priority = ?,
+        start_date = ?,
+        due_date = ?,
+        updated_at = NOW()
 
-    if (projectMap.description) {
-      updateParts.push(`${projectMap.description} = ?`);
-      values.push(String(projectDescription).trim());
-    }
+      WHERE project_id = ?
+      `,
+      [
+        String(
+          projectTitle
+        ).trim(),
 
-    if (projectMap.startDate) {
-      updateParts.push(`${projectMap.startDate} = ?`);
-      values.push(startDate);
-    }
+        String(
+          projectDescription
+        ).trim(),
 
-    if (projectMap.endDate) {
-      updateParts.push(`${projectMap.endDate} = ?`);
-      values.push(endDate);
-    }
-
-    if (projectMap.updatedAt) {
-      updateParts.push(`${projectMap.updatedAt} = ?`);
-      values.push(new Date());
-    }
-
-    if (updateParts.length) {
-      values.push(projectId);
-
-      await connection.query(
-        `
-          UPDATE projects
-          SET ${updateParts.join(", ")}
-          WHERE project_id = ?
-        `,
-        values
-      );
-    }
+        priority,
+        startDate,
+        dueDate,
+        projectId,
+      ]
+    );
 
     await syncProjectAssignments(
       connection,
@@ -859,525 +1493,1199 @@ const updateAdminProject = async (req, res) => {
 
     await connection.commit();
 
-   const emailSummary = await sendProjectUpdateEmails(projectId, adminUser, {
-  projectTitle,
-  projectDescription,
-  startDate,
-  endDate,
-  dueDate: endDate,
-});
+    let emailSummary = null;
+
+    try {
+      emailSummary =
+        await sendProjectUpdateEmails(
+          projectId,
+          adminUser,
+          {
+            projectTitle,
+            projectDescription,
+            startDate,
+            endDate:
+              dueDate,
+            dueDate,
+          }
+        );
+    } catch (emailError) {
+      console.error(
+        "Project update email error:",
+        emailError
+      );
+    }
+
     return res.status(200).json({
       success: true,
-      message: "Project updated successfully.",
-      project_id: projectId,
-      assignee_ids: assigneeIds,
-      email_summary: emailSummary,
+      message:
+        "Project updated successfully.",
+      project_id:
+        projectId,
+      assignee_ids:
+        assigneeIds,
+      email_summary:
+        emailSummary,
     });
   } catch (error) {
-    await connection.rollback();
+    try {
+      await connection.rollback();
+    } catch {}
 
-    console.error("Update admin project error:", error);
+    console.error(
+      "Update admin project error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to update project.",
+      message:
+        "Failed to update project.",
       error: error.message,
+      sqlMessage:
+        error.sqlMessage || null,
     });
   } finally {
     connection.release();
   }
 };
 
-const deleteAdminProject = async (req, res) => {
-  const connection = await db.getConnection();
+/*
+========================================================
+DELETE PROJECT
+
+Delete children first so DB deletion actually occurs.
+
+task_assignments is also ON DELETE CASCADE, but it is
+removed explicitly for compatibility / clarity.
+========================================================
+*/
+
+const deleteAdminProject = async (
+  req,
+  res
+) => {
+  const connection =
+    await db.getConnection();
 
   try {
-    const projectId = Number(req.params.projectId || req.params.id);
+    const projectId =
+      Number(
+        req.params.projectId ||
+          req.params.id
+      );
 
     if (!projectId) {
       return res.status(400).json({
         success: false,
-        message: "Project ID is required.",
+        message:
+          "Project ID is required.",
       });
     }
 
     await connection.beginTransaction();
 
-    await connection.query(
-      `
-        DELETE FROM project_assignments
+    const [projectRows] =
+      await connection.query(
+        `
+        SELECT
+          project_id
+        FROM projects
         WHERE project_id = ?
-      `,
-      [projectId]
-    );
+        LIMIT 1
+        `,
+        [projectId]
+      );
 
-    await connection.query(
-      `
-        DELETE FROM tasks
-        WHERE project_id = ?
-      `,
-      [projectId]
-    );
-
-    const [result] = await connection.query(
-      `
-        DELETE FROM projects
-        WHERE project_id = ?
-      `,
-      [projectId]
-    );
-
-    if (!result.affectedRows) {
+    if (
+      !projectRows.length
+    ) {
       await connection.rollback();
 
       return res.status(404).json({
         success: false,
-        message: "Project not found.",
+        message:
+          "Project not found.",
       });
+    }
+
+    /*
+    Delete task assignment rows for every
+    task belonging to this project.
+    */
+
+    await connection.query(
+      `
+      DELETE ta
+
+      FROM task_assignments ta
+
+      INNER JOIN tasks t
+        ON t.task_id =
+           ta.task_id
+
+      WHERE
+        t.project_id = ?
+      `,
+      [projectId]
+    );
+
+    /*
+    Delete subtasks first.
+    */
+
+    await connection.query(
+      `
+      DELETE FROM tasks
+      WHERE
+        project_id = ?
+        AND parent_task_id IS NOT NULL
+        AND parent_task_id <> 0
+      `,
+      [projectId]
+    );
+
+    /*
+    Delete Main Tasks.
+    */
+
+    await connection.query(
+      `
+      DELETE FROM tasks
+      WHERE project_id = ?
+      `,
+      [projectId]
+    );
+
+    /*
+    Delete Project assignments.
+    */
+
+    await connection.query(
+      `
+      DELETE FROM project_assignments
+      WHERE project_id = ?
+      `,
+      [projectId]
+    );
+
+    /*
+    Finally delete Project.
+    */
+
+    const [deleteResult] =
+      await connection.query(
+        `
+        DELETE FROM projects
+        WHERE project_id = ?
+        `,
+        [projectId]
+      );
+
+    if (
+      !deleteResult.affectedRows
+    ) {
+      throw new Error(
+        "Project deletion did not affect any project row."
+      );
     }
 
     await connection.commit();
 
     return res.status(200).json({
       success: true,
-      message: "Project deleted successfully.",
+      message:
+        "Project deleted successfully.",
+      project_id:
+        projectId,
     });
   } catch (error) {
-    await connection.rollback();
+    try {
+      await connection.rollback();
+    } catch {}
 
-    console.error("Delete admin project error:", error);
+    console.error(
+      "Delete admin project error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to delete project.",
+      message:
+        "Failed to delete project from database.",
       error: error.message,
+      sqlMessage:
+        error.sqlMessage || null,
     });
   } finally {
     connection.release();
   }
 };
 
-const insertMainTaskRows = async (
-  connection,
-  projectId,
-  taskTitle,
-  taskDescription,
-  assigneeIds,
-  createdByUserId
+/*
+========================================================
+CREATE MAIN TASK
+
+ONE tasks row
++
+multiple task_assignments rows
+========================================================
+*/
+
+const createMainTask = async (
+  req,
+  res
 ) => {
-  const taskMap = await getTaskColumnsMap(connection);
-
-  if (!taskMap.projectId || !taskMap.title) {
-    throw new Error("tasks table must have project_id and task_title/title.");
-  }
-
-  const taskStatus = taskMap.status
-    ? await getBestEnumValue(
-        "tasks",
-        taskMap.status,
-        ["to_do", "not_started", "pending", "ongoing", "in_progress"],
-        "to_do",
-        connection
-      )
-    : null;
-
-  const [projectRows] = await connection.query(
-    `
-      SELECT *
-      FROM projects
-      WHERE project_id = ?
-      LIMIT 1
-    `,
-    [projectId]
-  );
-
-  const project = projectRows[0] || {};
-  const projectMap = await getProjectColumnsMap(connection);
-
-  const projectStartDate = projectMap.startDate
-    ? formatDateOnly(project[projectMap.startDate])
-    : null;
-
-  const projectEndDate = projectMap.endDate
-    ? formatDateOnly(project[projectMap.endDate])
-    : null;
-
-  const createdTaskIds = [];
-
-  for (const userId of assigneeIds) {
-    const insertColumns = [];
-    const values = [];
-
-    insertColumns.push(taskMap.projectId);
-    values.push(projectId);
-
-    if (taskMap.parentTaskId) {
-      insertColumns.push(taskMap.parentTaskId);
-      values.push(null);
-    }
-
-    insertColumns.push(taskMap.title);
-    values.push(String(taskTitle).trim());
-
-    if (taskMap.description) {
-      insertColumns.push(taskMap.description);
-      values.push(String(taskDescription || "").trim());
-    }
-
-    if (taskMap.assignedTo) {
-      insertColumns.push(taskMap.assignedTo);
-      values.push(userId);
-    }
-
-    if (taskMap.createdBy) {
-      insertColumns.push(taskMap.createdBy);
-      values.push(createdByUserId || null);
-    }
-
-    if (taskMap.taskType) {
-      insertColumns.push(taskMap.taskType);
-      values.push("main");
-    }
-
-    if (taskMap.status) {
-      insertColumns.push(taskMap.status);
-      values.push(taskStatus);
-    }
-
-    if (taskMap.progress) {
-      insertColumns.push(taskMap.progress);
-      values.push(0);
-    }
-
-    if (taskMap.startDate) {
-      insertColumns.push(taskMap.startDate);
-      values.push(projectStartDate);
-    }
-
-    if (taskMap.dueDate) {
-      insertColumns.push(taskMap.dueDate);
-      values.push(projectEndDate);
-    }
-
-    if (taskMap.isChecked) {
-      insertColumns.push(taskMap.isChecked);
-      values.push(0);
-    }
-
-    if (taskMap.createdAt) {
-      insertColumns.push(taskMap.createdAt);
-      values.push(new Date());
-    }
-
-    if (taskMap.updatedAt) {
-      insertColumns.push(taskMap.updatedAt);
-      values.push(new Date());
-    }
-
-    const placeholders = insertColumns.map(() => "?").join(", ");
-
-    const [taskResult] = await connection.query(
-      `
-        INSERT INTO tasks (${insertColumns.join(", ")})
-        VALUES (${placeholders})
-      `,
-      values
-    );
-
-    createdTaskIds.push(taskResult.insertId);
-  }
-
-  return createdTaskIds;
-};
-
-const createMainTask = async (req, res) => {
-  const connection = await db.getConnection();
+  const connection =
+    await db.getConnection();
 
   try {
-    const adminUserId = getLoggedInUserId(req);
+    const adminUserId =
+      getLoggedInUserId(req);
 
     const adminUser = {
-      user_id: adminUserId,
-      full_name: req.user?.full_name || req.user?.name || "Admin",
-      email: req.user?.email || process.env.SMTP_USER,
+      user_id:
+        adminUserId,
+
+      full_name:
+        req.user?.full_name ||
+        req.user?.name ||
+        "Admin",
+
+      email:
+        req.user?.email ||
+        process.env.SMTP_USER,
     };
 
-    const projectId = Number(req.params.projectId || req.body.project_id);
-    const taskTitle = req.body.task_title || req.body.title;
-    const taskDescription =
-      req.body.task_description || req.body.description || "";
+    const projectId =
+      Number(
+        req.params.projectId ||
+          req.body.project_id
+      );
 
-    const assigneeIds = normalizeIdArray(
-      req.body.assignee_ids ||
-        req.body.assignees ||
-        req.body.assigned_to_user_ids
-    );
+    const taskTitle =
+      req.body.task_title ||
+      req.body.title;
+
+    const taskDescription =
+      req.body.task_description ||
+      req.body.description ||
+      "";
+
+    const priority =
+      req.body.priority ||
+      "medium";
+
+    const assigneeIds =
+      normalizeIdArray(
+        req.body.assignee_ids ||
+          req.body.assignees ||
+          req.body.assigned_to_user_ids
+      );
+
+    const requestedStartDate =
+      formatDateOnly(
+        req.body.start_date ||
+          req.body.startDate
+      );
+
+    const requestedDueDate =
+      formatDateOnly(
+        req.body.due_date ||
+          req.body.end_date ||
+          req.body.endDate ||
+          req.body.deadline
+      );
 
     if (!projectId) {
       return res.status(400).json({
         success: false,
-        message: "Project ID is required.",
+        message:
+          "Project ID is required.",
       });
     }
 
-    if (!taskTitle || !String(taskTitle).trim()) {
+    if (
+      !taskTitle ||
+      !String(
+        taskTitle
+      ).trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Main task title is required.",
+        message:
+          "Main Task title is required.",
       });
     }
 
-    if (!assigneeIds.length) {
+    if (
+      !assigneeIds.length
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Select at least one assignee for the main task.",
+        message:
+          "Select at least one employee for the Main Task.",
       });
     }
 
     await connection.beginTransaction();
 
-    const createdTaskIds = await insertMainTaskRows(
+    /*
+    Get Project dates.
+    */
+
+    const [projectRows] =
+      await connection.query(
+        `
+        SELECT
+          project_id,
+          project_title,
+
+          DATE_FORMAT(
+            start_date,
+            '%Y-%m-%d'
+          ) AS start_date,
+
+          DATE_FORMAT(
+            due_date,
+            '%Y-%m-%d'
+          ) AS due_date
+
+        FROM projects
+
+        WHERE
+          project_id = ?
+
+        LIMIT 1
+        `,
+        [projectId]
+      );
+
+    if (
+      !projectRows.length
+    ) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message:
+          "Project not found.",
+      });
+    }
+
+    const project =
+      projectRows[0];
+
+    /*
+    Main Task gets its OWN deadline.
+
+    If frontend hasn't yet sent it,
+    temporarily fall back to Project dates
+    so current UI does not break.
+
+    After Admin frontend is updated,
+    Main Task dates will come explicitly.
+    */
+
+    const taskStartDate =
+      requestedStartDate ||
+      project.start_date;
+
+    const taskDueDate =
+      requestedDueDate ||
+      project.due_date;
+
+    if (
+      !taskStartDate ||
+      !taskDueDate
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "Main Task start date and deadline are required.",
+      });
+    }
+
+    if (
+      taskStartDate >
+      taskDueDate
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "Main Task start date cannot be after its deadline.",
+      });
+    }
+
+    if (
+      project.start_date &&
+      taskStartDate <
+        project.start_date
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          `Main Task start date cannot be before Project start date (${project.start_date}).`,
+      });
+    }
+
+    if (
+      project.due_date &&
+      taskDueDate >
+        project.due_date
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          `Main Task deadline cannot exceed Project deadline (${project.due_date}).`,
+      });
+    }
+
+    /*
+    Every Main Task employee should also belong
+    to this Project.
+
+    If employee is not already there, add them
+    to project_assignments automatically.
+
+    This avoids a Main Task being assigned while
+    Employee Projects cannot see its Project.
+    */
+
+    for (
+      const employeeId
+      of assigneeIds
+    ) {
+      await connection.query(
+        `
+        INSERT INTO project_assignments (
+          project_id,
+          employee_id,
+          assigned_by_user_id,
+          assignment_status,
+          employee_progress,
+          assigned_at
+        )
+
+        SELECT
+          ?,
+          ?,
+          ?,
+          'assigned',
+          0,
+          NOW()
+
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM project_assignments
+          WHERE
+            project_id = ?
+            AND employee_id = ?
+            AND COALESCE(
+              assignment_status,
+              'assigned'
+            ) <> 'removed'
+        )
+        `,
+        [
+          projectId,
+          employeeId,
+          adminUserId || null,
+          projectId,
+          employeeId,
+        ]
+      );
+    }
+
+    /*
+    Create ONE Main Task row.
+    */
+
+    const primaryEmployeeId =
+      assigneeIds[0];
+
+    const [taskResult] =
+      await connection.query(
+        `
+        INSERT INTO tasks (
+          project_id,
+          parent_task_id,
+          created_by_user_id,
+          assigned_to_user_id,
+          task_title,
+          task_description,
+          task_type,
+          status,
+          priority,
+          progress,
+          is_checked,
+          start_date,
+          due_date,
+          review_status,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ?,
+          NULL,
+          ?,
+          ?,
+          ?,
+          ?,
+          'main',
+          'not_started',
+          ?,
+          0,
+          0,
+          ?,
+          ?,
+          'none',
+          NOW(),
+          NOW()
+        )
+        `,
+        [
+          projectId,
+          adminUserId || null,
+          primaryEmployeeId,
+          String(
+            taskTitle
+          ).trim(),
+
+          String(
+            taskDescription
+          ).trim(),
+
+          priority,
+          taskStartDate,
+          taskDueDate,
+        ]
+      );
+
+    const taskId =
+      taskResult.insertId;
+
+    /*
+    Link all employees to SAME Main Task.
+    */
+
+    await syncMainTaskAssignments(
       connection,
-      projectId,
-      taskTitle,
-      taskDescription,
+      taskId,
       assigneeIds,
       adminUserId
     );
 
     await connection.commit();
 
-    const emailSummary = await sendMainTaskAssignmentEmails(
-      projectId,
-      createdTaskIds,
-      adminUser
-    );
+    let emailSummary = null;
+
+    try {
+      emailSummary =
+        await sendMainTaskAssignmentEmails(
+          projectId,
+          [taskId],
+          adminUser
+        );
+    } catch (emailError) {
+      console.error(
+        "Main Task assignment email error:",
+        emailError
+      );
+    }
 
     return res.status(201).json({
       success: true,
-      message: "Main task added successfully.",
-      task_ids: createdTaskIds,
-      email_summary: emailSummary,
+
+      message:
+        "Main Task added successfully.",
+
+      task_id:
+        taskId,
+
+      /*
+      Keep array too because older Admin frontend
+      may expect task_ids.
+      */
+      task_ids: [
+        taskId,
+      ],
+
+      assignee_ids:
+        assigneeIds,
+
+      start_date:
+        taskStartDate,
+
+      due_date:
+        taskDueDate,
+
+      email_summary:
+        emailSummary,
     });
   } catch (error) {
-    await connection.rollback();
+    try {
+      await connection.rollback();
+    } catch {}
 
-    console.error("Create main task error:", error);
+    console.error(
+      "Create Main Task error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to add main task.",
+      message:
+        "Failed to add Main Task.",
       error: error.message,
+      sqlMessage:
+        error.sqlMessage || null,
     });
   } finally {
     connection.release();
   }
 };
-const updateMainTask = async (req, res) => {
-  const connection = await db.getConnection();
+
+/*
+========================================================
+UPDATE MAIN TASK
+
+VERY IMPORTANT:
+
+DO NOT delete and recreate Main Task.
+
+Existing Subtasks have:
+parent_task_id = this Main Task task_id
+
+Therefore Main Task ID must remain unchanged.
+========================================================
+*/
+
+const updateMainTask = async (
+  req,
+  res
+) => {
+  const connection =
+    await db.getConnection();
 
   try {
-    const adminUserId = getLoggedInUserId(req);
+    const adminUserId =
+      getLoggedInUserId(req);
 
     const adminUser = {
-      user_id: adminUserId,
-      full_name: req.user?.full_name || req.user?.name || "Admin",
-      email: req.user?.email || process.env.SMTP_USER,
+      user_id:
+        adminUserId,
+
+      full_name:
+        req.user?.full_name ||
+        req.user?.name ||
+        "Admin",
+
+      email:
+        req.user?.email ||
+        process.env.SMTP_USER,
     };
 
-    const taskId = Number(req.params.taskId || req.body.task_id);
-    const projectIdFromRequest = Number(
-      req.params.projectId || req.body.project_id
-    );
+    const taskId =
+      Number(
+        req.params.taskId ||
+          req.body.task_id
+      );
 
-    const taskTitle = req.body.task_title || req.body.title;
+    const taskTitle =
+      req.body.task_title ||
+      req.body.title;
+
     const taskDescription =
-      req.body.task_description || req.body.description || "";
+      req.body.task_description ||
+      req.body.description ||
+      "";
 
-    const assigneeIds = normalizeIdArray(
-      req.body.assignee_ids ||
-        req.body.assignees ||
-        req.body.assigned_to_user_ids
-    );
+    const priority =
+      req.body.priority ||
+      "medium";
+
+    const assigneeIds =
+      normalizeIdArray(
+        req.body.assignee_ids ||
+          req.body.assignees ||
+          req.body.assigned_to_user_ids
+      );
 
     if (!taskId) {
       return res.status(400).json({
         success: false,
-        message: "Task ID is required.",
+        message:
+          "Main Task ID is required.",
       });
     }
 
-    if (!taskTitle || !String(taskTitle).trim()) {
+    if (
+      !taskTitle ||
+      !String(
+        taskTitle
+      ).trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Main task title is required.",
+        message:
+          "Main Task title is required.",
       });
     }
 
-    if (!assigneeIds.length) {
+    if (
+      !assigneeIds.length
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Select at least one assignee for the main task.",
+        message:
+          "Select at least one employee for the Main Task.",
       });
     }
 
     await connection.beginTransaction();
 
-    const taskMap = await getTaskColumnsMap(connection);
+    const [taskRows] =
+      await connection.query(
+        `
+        SELECT
+          t.task_id,
+          t.project_id,
+          t.parent_task_id,
+          t.status,
 
-    const [existingRows] = await connection.query(
-      `
-        SELECT *
-        FROM tasks
-        WHERE task_id = ?
+          DATE_FORMAT(
+            t.start_date,
+            '%Y-%m-%d'
+          ) AS start_date,
+
+          DATE_FORMAT(
+            t.due_date,
+            '%Y-%m-%d'
+          ) AS due_date,
+
+          DATE_FORMAT(
+            p.start_date,
+            '%Y-%m-%d'
+          ) AS project_start_date,
+
+          DATE_FORMAT(
+            p.due_date,
+            '%Y-%m-%d'
+          ) AS project_due_date
+
+        FROM tasks t
+
+        INNER JOIN projects p
+          ON p.project_id =
+             t.project_id
+
+        WHERE
+          t.task_id = ?
+
+          AND (
+            t.parent_task_id IS NULL
+            OR t.parent_task_id = 0
+          )
+
         LIMIT 1
-      `,
-      [taskId]
-    );
+        `,
+        [taskId]
+      );
 
-    if (!existingRows.length) {
+    if (
+      !taskRows.length
+    ) {
       await connection.rollback();
 
       return res.status(404).json({
         success: false,
-        message: "Main task not found.",
+        message:
+          "Main Task not found.",
       });
     }
 
-    const existingTask = existingRows[0];
+    const existingTask =
+      taskRows[0];
 
     const projectId =
-      projectIdFromRequest ||
-      Number(taskMap.projectId ? existingTask[taskMap.projectId] : 0);
+      Number(
+        existingTask.project_id
+      );
 
-    if (!projectId) {
+    const taskStartDate =
+      formatDateOnly(
+        req.body.start_date ||
+          req.body.startDate
+      ) ||
+      existingTask.start_date;
+
+    const taskDueDate =
+      formatDateOnly(
+        req.body.due_date ||
+          req.body.end_date ||
+          req.body.endDate ||
+          req.body.deadline
+      ) ||
+      existingTask.due_date;
+
+    if (
+      !taskStartDate ||
+      !taskDueDate
+    ) {
       await connection.rollback();
 
       return res.status(400).json({
         success: false,
-        message: "Project ID not found for this task.",
+        message:
+          "Main Task start date and deadline are required.",
       });
     }
 
-    const existingTitle = taskMap.title ? existingTask[taskMap.title] : "";
-    const existingDescription = taskMap.description
-      ? existingTask[taskMap.description]
-      : "";
+    if (
+      taskStartDate >
+      taskDueDate
+    ) {
+      await connection.rollback();
 
-    const siblingWhere = [];
-    const siblingValues = [];
-
-    if (taskMap.projectId) {
-      siblingWhere.push(`${taskMap.projectId} = ?`);
-      siblingValues.push(projectId);
+      return res.status(400).json({
+        success: false,
+        message:
+          "Main Task start date cannot be after its deadline.",
+      });
     }
 
-    if (taskMap.title) {
-      siblingWhere.push(`${taskMap.title} = ?`);
-      siblingValues.push(existingTitle);
+    if (
+      existingTask.project_start_date &&
+      taskStartDate <
+        existingTask.project_start_date
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          `Main Task start date cannot be before Project start date (${existingTask.project_start_date}).`,
+      });
     }
 
-    if (taskMap.description) {
-      siblingWhere.push(`COALESCE(${taskMap.description}, '') = ?`);
-      siblingValues.push(existingDescription || "");
+    if (
+      existingTask.project_due_date &&
+      taskDueDate >
+        existingTask.project_due_date
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          `Main Task deadline cannot exceed Project deadline (${existingTask.project_due_date}).`,
+      });
     }
 
-    if (taskMap.parentTaskId) {
-      siblingWhere.push(
-        `(${taskMap.parentTaskId} IS NULL OR ${taskMap.parentTaskId} = 0)`
-      );
-    }
+    /*
+    Also prevent shortening a Main Task deadline
+    earlier than an existing Subtask deadline.
+    */
 
-    if (siblingWhere.length) {
+    const [invalidSubtasks] =
       await connection.query(
         `
-          DELETE FROM tasks
-          WHERE ${siblingWhere.join(" AND ")}
+        SELECT
+          task_id,
+          task_title,
+          DATE_FORMAT(
+            due_date,
+            '%Y-%m-%d'
+          ) AS due_date
+
+        FROM tasks
+
+        WHERE
+          parent_task_id = ?
+
+          AND due_date IS NOT NULL
+
+          AND due_date > ?
+
+        LIMIT 1
         `,
-        siblingValues
+        [
+          taskId,
+          taskDueDate,
+        ]
       );
-    } else {
+
+    if (
+      invalidSubtasks.length
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          `Main Task deadline cannot be earlier than existing Subtask "${invalidSubtasks[0].task_title}" deadline (${invalidSubtasks[0].due_date}).`,
+      });
+    }
+
+    /*
+    Update SAME task_id.
+    */
+
+    await connection.query(
+      `
+      UPDATE tasks
+
+      SET
+        task_title = ?,
+        task_description = ?,
+        priority = ?,
+        start_date = ?,
+        due_date = ?,
+        updated_at = NOW()
+
+      WHERE task_id = ?
+      `,
+      [
+        String(
+          taskTitle
+        ).trim(),
+
+        String(
+          taskDescription
+        ).trim(),
+
+        priority,
+        taskStartDate,
+        taskDueDate,
+        taskId,
+      ]
+    );
+
+    /*
+    Make sure Main Task employees also have
+    Project assignment.
+    */
+
+    for (
+      const employeeId
+      of assigneeIds
+    ) {
       await connection.query(
         `
-          DELETE FROM tasks
-          WHERE task_id = ?
+        INSERT INTO project_assignments (
+          project_id,
+          employee_id,
+          assigned_by_user_id,
+          assignment_status,
+          employee_progress,
+          assigned_at
+        )
+
+        SELECT
+          ?,
+          ?,
+          ?,
+          'assigned',
+          0,
+          NOW()
+
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM project_assignments
+          WHERE
+            project_id = ?
+            AND employee_id = ?
+            AND COALESCE(
+              assignment_status,
+              'assigned'
+            ) <> 'removed'
+        )
         `,
-        [taskId]
+        [
+          projectId,
+          employeeId,
+          adminUserId || null,
+          projectId,
+          employeeId,
+        ]
       );
     }
 
-    const createdTaskIds = await insertMainTaskRows(
+    await syncMainTaskAssignments(
       connection,
-      projectId,
-      taskTitle,
-      taskDescription,
+      taskId,
       assigneeIds,
       adminUserId
     );
 
     await connection.commit();
 
-    const emailSummary = await sendMainTaskAssignmentEmails(
-      projectId,
-      createdTaskIds,
-      adminUser
-    );
+    let emailSummary = null;
+
+    try {
+      emailSummary =
+        await sendMainTaskAssignmentEmails(
+          projectId,
+          [taskId],
+          adminUser
+        );
+    } catch (emailError) {
+      console.error(
+        "Main Task update email error:",
+        emailError
+      );
+    }
 
     return res.status(200).json({
       success: true,
-      message: "Main task updated successfully.",
-      task_ids: createdTaskIds,
-      email_summary: emailSummary,
+
+      message:
+        "Main Task updated successfully.",
+
+      task_id:
+        taskId,
+
+      task_ids: [
+        taskId,
+      ],
+
+      project_id:
+        projectId,
+
+      assignee_ids:
+        assigneeIds,
+
+      start_date:
+        taskStartDate,
+
+      due_date:
+        taskDueDate,
+
+      email_summary:
+        emailSummary,
     });
   } catch (error) {
-    await connection.rollback();
+    try {
+      await connection.rollback();
+    } catch {}
 
-    console.error("Update main task error:", error);
+    console.error(
+      "Update Main Task error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to update main task.",
+      message:
+        "Failed to update Main Task.",
       error: error.message,
+      sqlMessage:
+        error.sqlMessage || null,
     });
   } finally {
     connection.release();
   }
 };
+
+/*
+========================================================
+EXPORTS / OLD ALIASES
+
+Keep aliases so current frontend does not suddenly
+lose compatibility.
+========================================================
+*/
+
 module.exports = {
   getAdminProjects,
-  getDepartmentProjects: getAdminProjects,
-  getDepartmentProjectsForAdmin: getAdminProjects,
-  getProjects: getAdminProjects,
-  getAllProjects: getAdminProjects,
+
+  getDepartmentProjects:
+    getAdminProjects,
+
+  getDepartmentProjectsForAdmin:
+    getAdminProjects,
+
+  getProjects:
+    getAdminProjects,
+
+  getAllProjects:
+    getAdminProjects,
 
   createAdminProject,
-  createProject: createAdminProject,
-  assignProject: createAdminProject,
-  addProject: createAdminProject,
+
+  createProject:
+    createAdminProject,
+
+  assignProject:
+    createAdminProject,
+
+  addProject:
+    createAdminProject,
 
   updateAdminProject,
-  updateProject: updateAdminProject,
-  updateProjectDetails: updateAdminProject,
-  editProject: updateAdminProject,
+
+  updateProject:
+    updateAdminProject,
+
+  updateProjectDetails:
+    updateAdminProject,
+
+  editProject:
+    updateAdminProject,
 
   deleteAdminProject,
-  deleteProject: deleteAdminProject,
-  removeProject: deleteAdminProject,
+
+  deleteProject:
+    deleteAdminProject,
+
+  removeProject:
+    deleteAdminProject,
 
   getAssignableUsersForAdminProjects,
-  getAssignableUsers: getAssignableUsersForAdminProjects,
-  getAdminProjectUsers: getAssignableUsersForAdminProjects,
-  getProjectUsers: getAssignableUsersForAdminProjects,
-  getUsersForProjects: getAssignableUsersForAdminProjects,
+
+  getAssignableUsers:
+    getAssignableUsersForAdminProjects,
+
+  getAdminProjectUsers:
+    getAssignableUsersForAdminProjects,
+
+  getProjectUsers:
+    getAssignableUsersForAdminProjects,
+
+  getUsersForProjects:
+    getAssignableUsersForAdminProjects,
 
   createMainTask,
-  addMainTask: createMainTask,
-  createProjectTask: createMainTask,
-  addProjectTask: createMainTask,
-  createAdminProjectTask: createMainTask,
+
+  addMainTask:
+    createMainTask,
+
+  createProjectTask:
+    createMainTask,
+
+  addProjectTask:
+    createMainTask,
+
+  createAdminProjectTask:
+    createMainTask,
 
   updateMainTask,
-  updateProjectTask: updateMainTask,
-  updateAdminProjectTask: updateMainTask,
-  editMainTask: updateMainTask,
+
+  updateProjectTask:
+    updateMainTask,
+
+  updateAdminProjectTask:
+    updateMainTask,
+
+  editMainTask:
+    updateMainTask,
 };

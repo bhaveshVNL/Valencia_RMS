@@ -1,25 +1,296 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Plus,
-  RefreshCw,
-  X,
-} from "lucide-react";
+import { Plus, RefreshCw, Search, X } from "lucide-react";
 import api from "../../api/axios";
 
 const API_BASE = "/employee-projects";
 
-const getFirstWorkingEndpoint = async (endpoints) => {
-  let lastError = null;
+const normalizeStatus = (status) => {
+  const value = String(status || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
 
-  for (const endpoint of endpoints) {
-    try {
-      return await api.get(endpoint);
-    } catch (error) {
-      lastError = error;
-    }
+  if (["", "todo", "to_do", "pending", "not_started"].includes(value)) {
+    return "todo";
   }
 
-  throw lastError;
+  if (["in_progress", "ongoing", "progress"].includes(value)) {
+    return "in_progress";
+  }
+
+  if (["under_review", "review", "pending_review"].includes(value)) {
+    return "under_review";
+  }
+
+  if (["done", "completed", "complete"].includes(value)) {
+    return "done";
+  }
+
+  if (["rejected", "reject"].includes(value)) {
+    return "rejected";
+  }
+
+  if (["on_hold", "hold"].includes(value)) {
+    return "on_hold";
+  }
+
+  if (["blocked", "block"].includes(value)) {
+    return "blocked";
+  }
+
+  return "todo";
+};
+
+const getStatusLabel = (status) => {
+  const value = normalizeStatus(status);
+
+  if (value === "todo") return "To Do";
+  if (value === "in_progress") return "In Progress";
+  if (value === "under_review") return "Under Review";
+  if (value === "done") return "Completed";
+  if (value === "rejected") return "Rejected";
+  if (value === "on_hold") return "On Hold";
+  if (value === "blocked") return "Blocked";
+
+  return "To Do";
+};
+
+const statusColumns = [
+  {
+    key: "todo",
+    title: "To Do",
+    subtitle: "Project has not started yet",
+  },
+  {
+    key: "in_progress",
+    title: "In Progress",
+    subtitle: "Project work has started",
+  },
+  {
+    key: "blocked",
+    title: "Blocked",
+    subtitle: "Project is currently blocked",
+  },
+  {
+    key: "under_review",
+    title: "Under Review",
+    subtitle: "Waiting for admin review",
+  },
+  {
+    key: "done",
+    title: "Completed",
+    subtitle: "Completed projects",
+  },
+];
+
+const formatDate = (value) => {
+  if (!value) return "";
+
+  const text = String(value).trim();
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+
+  const parsed = new Date(text);
+
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const formatDisplayDate = (value) => {
+  const date = formatDate(value);
+
+  if (!date) return "-";
+
+  const [year, month, day] = date.split("-");
+
+  return `${day}-${month}-${year}`;
+};
+
+const compareDateOnly = (left, right) => {
+  const a = formatDate(left);
+  const b = formatDate(right);
+
+  if (!a || !b) return 0;
+  if (a < b) return -1;
+  if (a > b) return 1;
+
+  return 0;
+};
+
+const getProjectTitle = (project) => {
+  return project?.project_title || project?.title || "Untitled Project";
+};
+
+const getProjectDescription = (project) => {
+  return project?.project_description || project?.description || "";
+};
+
+const getProjectStartDate = (project) => {
+  return formatDate(project?.start_date || project?.project_start_date);
+};
+
+const getProjectEndDate = (project) => {
+  return formatDate(
+    project?.due_date ||
+    project?.end_date ||
+    project?.project_end_date ||
+    project?.deadline
+  );
+};
+
+const getAssignedNames = (project) => {
+  if (project?.assigned_names) return project.assigned_names;
+
+  if (Array.isArray(project?.assignees)) {
+    const names = project.assignees
+      .map((employee) => employee?.full_name)
+      .filter(Boolean)
+      .join(", ");
+
+    if (names) return names;
+  }
+
+  return "-";
+};
+
+const getAssignedEmails = (project) => {
+  if (project?.assigned_emails) return project.assigned_emails;
+
+  if (Array.isArray(project?.assignees)) {
+    const emails = project.assignees
+      .map((employee) => employee?.email)
+      .filter(Boolean)
+      .join(", ");
+
+    if (emails) return emails;
+  }
+
+  return "-";
+};
+
+const getMainTasks = (project) => {
+  const tasks =
+    project?.main_tasks ||
+    project?.mainTasks ||
+    project?.tasks ||
+    [];
+
+  return Array.isArray(tasks) ? tasks : [];
+};
+
+const getMainTaskId = (task) => {
+  return Number(task?.task_id || task?.main_task_id || task?.id || 0);
+};
+
+const getMainTaskTitle = (task) => {
+  return task?.task_title || task?.main_task || task?.title || "Main Task";
+};
+
+const getMainTaskDescription = (task) => {
+  return task?.task_description || task?.description || "";
+};
+
+const getMainTaskStartDate = (task) => {
+  return formatDate(task?.start_date || task?.task_start_date);
+};
+
+const getMainTaskEndDate = (task) => {
+  return formatDate(task?.due_date || task?.end_date || task?.task_end_date);
+};
+
+const getMainTaskAssignees = (task) => {
+  if (task?.assigned_names) return task.assigned_names;
+
+  if (Array.isArray(task?.assignees)) {
+    const names = task.assignees
+      .map((employee) => employee?.full_name)
+      .filter(Boolean)
+      .join(", ");
+
+    if (names) return names;
+  }
+
+  return "-";
+};
+
+const getMainTaskSubtasks = (task) => {
+  const subtasks =
+    task?.subtasks ||
+    task?.children ||
+    task?.sub_tasks ||
+    [];
+
+  return Array.isArray(subtasks) ? subtasks : [];
+};
+
+const getSubtaskId = (subtask) => {
+  return Number(subtask?.task_id || subtask?.subtask_id || subtask?.id || 0);
+};
+
+const getSubtaskTitle = (subtask) => {
+  return subtask?.task_title || subtask?.title || "Untitled Subtask";
+};
+
+const getSubtaskDescription = (subtask) => {
+  return subtask?.task_description || subtask?.description || "";
+};
+
+const getSubtaskStartDate = (subtask) => {
+  return formatDate(subtask?.start_date || subtask?.task_start_date);
+};
+
+const getSubtaskEndDate = (subtask) => {
+  return formatDate(
+    subtask?.due_date ||
+    subtask?.end_date ||
+    subtask?.task_end_date
+  );
+};
+
+const isSubtaskDone = (subtask) => {
+  return (
+    Number(subtask?.is_checked || 0) === 1 ||
+    normalizeStatus(subtask?.status) === "done"
+  );
+};
+const getSubtaskDisplayStatus = (subtask, mainTask) => {
+  if (isSubtaskDone(subtask)) {
+    return "Done";
+  }
+
+  const mainStatus = normalizeStatus(
+    mainTask?.status || mainTask?.task_status
+  );
+
+  if (mainStatus === "in_progress") {
+    return "In Progress";
+  }
+
+  return getStatusLabel(subtask?.status);
+};
+const isProjectLocked = (project) => {
+  return ["done", "rejected", "on_hold"].includes(
+    normalizeStatus(
+      project?.status_group ||
+      project?.status ||
+      project?.project_status
+    )
+  );
+};
+
+const isMainTaskLocked = (task) => {
+  return ["under_review", "done", "rejected", "on_hold"].includes(
+    normalizeStatus(task?.status || task?.task_status)
+  );
 };
 
 const normalizeProjectsResponse = (data) => {
@@ -55,224 +326,6 @@ const normalizeProjectsResponse = (data) => {
   };
 };
 
-const statusColumns = [
-  {
-    key: "todo",
-    title: "To Do",
-    subtitle: "Project/task has not started yet",
-  },
-  {
-    key: "in_progress",
-    title: "In Progress",
-    subtitle: "Work has started",
-  },
-  {
-    key: "blocked",
-    title: "Blocked",
-  },
-  {
-    key: "under_review",
-    title: "Under Review",
-    subtitle: "Waiting for admin review",
-  },
-  {
-    key: "done",
-    title: "Completed",
-    subtitle: "Completed work",
-  },
-
-];
-
-const formatDate = (dateValue) => {
-  if (!dateValue) return "";
-
-  const value = String(dateValue);
-
-  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
-    return value.slice(0, 10);
-  }
-
-  const parsedDate = new Date(value);
-
-  if (Number.isNaN(parsedDate.getTime())) return "";
-
-  const year = parsedDate.getFullYear();
-  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
-  const day = String(parsedDate.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
-
-const compareDateOnly = (leftDate, rightDate) => {
-  const left = formatDate(leftDate);
-  const right = formatDate(rightDate);
-
-  if (!left || !right) return 0;
-  if (left < right) return -1;
-  if (left > right) return 1;
-
-  return 0;
-};
-
-const normalizeStatus = (status) => {
-  const value = String(status || "").toLowerCase().trim().replace(/\s+/g, "_");
-
-  if (
-    value === "todo" ||
-    value === "to_do" ||
-    value === "pending" ||
-    value === "not_started" ||
-    value === "not-started"
-  ) {
-    return "todo";
-  }
-
-  if (value === "in_progress" || value === "ongoing" || value === "progress") {
-    return "in_progress";
-  }
-
-  if (value === "under_review" || value === "review") {
-    return "under_review";
-  }
-
-  if (value === "done" || value === "completed" || value === "complete") {
-    return "done";
-  }
-
-  if (value === "rejected" || value === "reject") {
-    return "rejected";
-  }
-
-  if (value === "on_hold" || value === "hold") {
-    return "on_hold";
-  }
-  if (value === "blocked" || value === "block") {
-    return "blocked";
-  }
-
-  return "todo";
-};
-
-const getStatusLabel = (status) => {
-  const value = normalizeStatus(status);
-
-  if (value === "todo") return "Needed";
-  if (value === "in_progress") return "In Progress";
-  if (value === "under_review") return "Under Review";
-  if (value === "done") return "Completed";
-  if (value === "rejected") return "Rejected";
-  if (value === "on_hold") return "On Hold";
-  if (value === "blocked") return "Blocked";
-
-  return "To Do";
-};
-
-const isSubtaskDone = (status, isChecked) => {
-  const value = normalizeStatus(status);
-  return value === "done" || Number(isChecked || 0) === 1;
-};
-
-const getProjectTitle = (project) => {
-  return project?.project_title || project?.title || "Untitled Project";
-};
-
-const getProjectMainTask = (project) => {
-  return (
-    project?.description ||
-    project?.project_description ||
-    project?.main_task ||
-    project?.task_description ||
-    "No main task added."
-  );
-};
-const formatDisplayDate = (dateValue) => {
-  if (!dateValue) return "-";
-
-  const parts = String(dateValue).split("-");
-
-  if (parts.length !== 3) {
-    return dateValue;
-  }
-
-  return `${parts[2]}-${parts[1]}-${parts[0]}`;
-};
-const getProjectStartDate = (project) => {
-  return (
-    formatDate(project?.start_date) ||
-    formatDate(project?.project_start_date) ||
-    ""
-  );
-};
-
-const getProjectEndDate = (project) => {
-  return (
-    formatDate(project?.end_date) ||
-    formatDate(project?.due_date) ||
-    formatDate(project?.project_end_date) ||
-    formatDate(project?.deadline) ||
-    ""
-  );
-};
-
-const getAssignedNames = (project) => {
-  return (
-    project?.assigned_names ||
-    project?.assigned_employees ||
-    project?.assigned_to_names ||
-    project?.assigned_to ||
-    "-"
-  );
-};
-
-const getAssignedEmails = (project) => {
-  return (
-    project?.assigned_emails ||
-    project?.assigned_employee_emails ||
-    project?.assigned_to_emails ||
-    "-"
-  );
-};
-
-const getSubtaskId = (subtask) => {
-  return subtask?.subtask_id || subtask?.task_id;
-};
-
-const getSubtaskTitle = (subtask) => {
-  return subtask?.title || subtask?.task_title || "Untitled Subtask";
-};
-
-const getSubtaskDescription = (subtask) => {
-  return (
-    subtask?.description ||
-    subtask?.task_description ||
-    subtask?.subtask_description ||
-    ""
-  );
-};
-
-const getSubtaskStartDate = (subtask) => {
-  return formatDate(subtask?.start_date || subtask?.task_start_date);
-};
-
-const getSubtaskEndDate = (subtask) => {
-  return formatDate(
-    subtask?.end_date || subtask?.due_date || subtask?.task_end_date
-  );
-};
-
-const isProjectLocked = (project) => {
-  const status = normalizeStatus(
-    project?.status_group || project?.status || project?.project_status
-  );
-
-  return (
-    status === "under_review" ||
-    status === "done" ||
-    status === "rejected" ||
-    status === "on_hold"
-  );
-};
-
 const EmployeeProjects = () => {
   const [activeTab, setActiveTab] = useState("my");
 
@@ -283,7 +336,7 @@ const EmployeeProjects = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [selectedProject, setSelectedProject] = useState(null);
-  const [subtasks, setSubtasks] = useState([]);
+  const [selectedMainTaskId, setSelectedMainTaskId] = useState(0);
 
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [subtaskDescription, setSubtaskDescription] = useState("");
@@ -293,7 +346,6 @@ const EmployeeProjects = () => {
   const [loading, setLoading] = useState(true);
   const [modalLoading, setModalLoading] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
-
   const [togglingSubtaskId, setTogglingSubtaskId] = useState(null);
   const [confirmSubtask, setConfirmSubtask] = useState(null);
 
@@ -301,47 +353,63 @@ const EmployeeProjects = () => {
   const [modalError, setModalError] = useState("");
   const [modalSuccess, setModalSuccess] = useState("");
 
+  const selectedMainTask = useMemo(() => {
+    const tasks = getMainTasks(selectedProject);
+
+    if (!tasks.length) return null;
+
+    return (
+      tasks.find(
+        (task) => getMainTaskId(task) === Number(selectedMainTaskId)
+      ) || tasks[0]
+    );
+  }, [selectedProject, selectedMainTaskId]);
+
+  const selectedSubtasks = useMemo(() => {
+    return getMainTaskSubtasks(selectedMainTask);
+  }, [selectedMainTask]);
+
   const fetchProjects = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await getFirstWorkingEndpoint([
-        `${API_BASE}/projects`,
-        `${API_BASE}/my-projects`,
-        `${API_BASE}/my`,
-        `${API_BASE}`,
-        `/employee/projects/my`,
-        `/employee/projects`,
-      ]);
+      const response = await api.get(`${API_BASE}/projects`);
 
-      const data = response.data || {};
-      const normalizedData = normalizeProjectsResponse(data);
-
-      const receivedProjects = normalizedData.myProjects || [];
+      const normalized = normalizeProjectsResponse(response.data || {});
+      const receivedProjects = normalized.myProjects || [];
 
       const receivedRejected =
-        normalizedData.rejectedProjects.length > 0
-          ? normalizedData.rejectedProjects
-          : receivedProjects.filter((project) => {
-            return (
-              normalizeStatus(project.status_group || project.status) ===
-              "rejected"
-            );
-          });
+        normalized.rejectedProjects.length > 0
+          ? normalized.rejectedProjects
+          : receivedProjects.filter(
+            (project) =>
+              normalizeStatus(
+                project.status_group ||
+                project.status ||
+                project.project_status
+              ) === "rejected"
+          );
 
       const receivedOnHold =
-        normalizedData.onHoldProjects.length > 0
-          ? normalizedData.onHoldProjects
-          : receivedProjects.filter((project) => {
-            return (
-              normalizeStatus(project.status_group || project.status) ===
-              "on_hold"
-            );
-          });
+        normalized.onHoldProjects.length > 0
+          ? normalized.onHoldProjects
+          : receivedProjects.filter(
+            (project) =>
+              normalizeStatus(
+                project.status_group ||
+                project.status ||
+                project.project_status
+              ) === "on_hold"
+          );
 
       const activeProjects = receivedProjects.filter((project) => {
-        const status = normalizeStatus(project.status_group || project.status);
+        const status = normalizeStatus(
+          project.status_group ||
+          project.status ||
+          project.project_status
+        );
+
         return status !== "rejected" && status !== "on_hold";
       });
 
@@ -379,21 +447,34 @@ const EmployeeProjects = () => {
     if (!term) return visibleProjects;
 
     return visibleProjects.filter((project) => {
-      return (
-        String(getProjectTitle(project)).toLowerCase().includes(term) ||
-        String(getProjectMainTask(project)).toLowerCase().includes(term) ||
-        String(getStatusLabel(project.status_group || project.status))
-          .toLowerCase()
-          .includes(term) ||
-        String(project.department_name || "").toLowerCase().includes(term) ||
-        String(project.created_by_name || "").toLowerCase().includes(term) ||
-        String(getAssignedNames(project)).toLowerCase().includes(term)
-      );
+      const mainTaskText = getMainTasks(project)
+        .map(
+          (task) =>
+            `${getMainTaskTitle(task)} ${getMainTaskDescription(task)}`
+        )
+        .join(" ");
+
+      return [
+        getProjectTitle(project),
+        getProjectDescription(project),
+        mainTaskText,
+        getStatusLabel(
+          project.status_group ||
+          project.status ||
+          project.project_status
+        ),
+        project.department_name,
+        project.created_by_name,
+        getAssignedNames(project),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
     });
   }, [visibleProjects, searchTerm]);
 
   const grouped = useMemo(() => {
-    const grouped = {
+    const result = {
       todo: [],
       in_progress: [],
       blocked: [],
@@ -402,47 +483,108 @@ const EmployeeProjects = () => {
     };
 
     filteredProjects.forEach((project) => {
-      const key = normalizeStatus(
-        project.status_group || project.status || project.project_status
+      const status = normalizeStatus(
+        project.status_group ||
+        project.status ||
+        project.project_status
       );
 
-      if (!grouped[key]) {
-        grouped.todo.push(project);
+      if (!result[status]) {
+        result.todo.push(project);
         return;
       }
 
-      grouped[key].push(project);
+      result[status].push(project);
     });
 
-    return grouped;
+    return result;
   }, [filteredProjects]);
+
+  const applyProjectDetailResponse = (
+    originalProject,
+    responseData,
+    preferredTaskId = 0
+  ) => {
+    const responseProject = responseData?.project || {};
+
+    const responseMainTasks =
+      responseData?.main_tasks ||
+      responseProject?.main_tasks ||
+      responseProject?.mainTasks ||
+      [];
+
+    const mergedProject = {
+      ...originalProject,
+      ...responseProject,
+      main_tasks: Array.isArray(responseMainTasks)
+        ? responseMainTasks
+        : [],
+    };
+
+    setSelectedProject(mergedProject);
+
+    const tasks = getMainTasks(mergedProject);
+
+    if (!tasks.length) {
+      setSelectedMainTaskId(0);
+      return;
+    }
+
+    const wantedId = Number(preferredTaskId || selectedMainTaskId || 0);
+
+    const matchingTask = tasks.find(
+      (task) => getMainTaskId(task) === wantedId
+    );
+
+    setSelectedMainTaskId(
+      matchingTask
+        ? getMainTaskId(matchingTask)
+        : getMainTaskId(tasks[0])
+    );
+  };
+
+  const refreshSelectedProject = async (
+    projectId,
+    preferredTaskId = 0,
+    originalProject = selectedProject
+  ) => {
+    const response = await api.get(
+      `${API_BASE}/projects/${projectId}/subtasks`
+    );
+
+    applyProjectDetailResponse(
+      originalProject || {},
+      response.data || {},
+      preferredTaskId
+    );
+
+    return response;
+  };
 
   const openProjectModal = async (project) => {
     try {
       setSelectedProject(project);
-      setSubtasks(project.subtasks || []);
+
+      setSelectedMainTaskId(
+        getMainTaskId(getMainTasks(project)[0]) || 0
+      );
+
       setSubtaskTitle("");
       setSubtaskDescription("");
       setSubtaskStartDate("");
       setSubtaskEndDate("");
+
       setModalError("");
       setModalSuccess("");
       setModalLoading(true);
 
-      const response = await api.get(
-        `${API_BASE}/projects/${project.project_id}/subtasks`
+      await refreshSelectedProject(
+        project.project_id,
+        getMainTaskId(getMainTasks(project)[0]) || 0,
+        project
       );
-
-      if (response.data?.project) {
-        setSelectedProject({
-          ...project,
-          ...response.data.project,
-        });
-      }
-
-      setSubtasks(response.data?.subtasks || project.subtasks || []);
     } catch (err) {
-      console.error("Fetch employee project subtasks error:", err);
+      console.error("Fetch employee project details error:", err);
 
       setModalError(
         err?.response?.data?.sqlMessage ||
@@ -456,176 +598,179 @@ const EmployeeProjects = () => {
   };
 
   const closeProjectModal = () => {
-  setSelectedProject(null);
-  setSubtasks([]);
-  setSubtaskTitle("");
-  setSubtaskDescription("");
-  setSubtaskStartDate("");
-  setSubtaskEndDate("");
-  setModalError("");
-  setModalSuccess("");
+    setSelectedProject(null);
+    setSelectedMainTaskId(0);
 
-  setConfirmSubtask(null);
-  setTogglingSubtaskId(null);
-};
-
-  const handleAddSubtask = async (event) => {
-  event?.preventDefault?.();
-
-  if (!selectedProject || addingSubtask) return;
-
-  setModalError("");
-  setModalSuccess("");
-
-  if (isProjectLocked(selectedProject)) {
-    setModalError("This project is locked. Subtasks cannot be added now.");
-    return;
-  }
-
-  const projectStartDate = getProjectStartDate(selectedProject);
-  const projectEndDate = getProjectEndDate(selectedProject);
-
-  if (!subtaskTitle.trim()) {
-    setModalError("Please enter subtask title.");
-    return;
-  }
-
-  if (!subtaskStartDate) {
-    setModalError("Please select subtask start date.");
-    return;
-  }
-
-  if (!subtaskEndDate) {
-    setModalError("Please select subtask end date.");
-    return;
-  }
-
-  if (compareDateOnly(subtaskEndDate, subtaskStartDate) < 0) {
-    setModalError(
-      "Subtask end date cannot be before subtask start date."
-    );
-    return;
-  }
-
-  if (
-    projectStartDate &&
-    compareDateOnly(subtaskStartDate, projectStartDate) < 0
-  ) {
-    setModalError(
-      `Subtask start date cannot be before project start date ${projectStartDate}.`
-    );
-    return;
-  }
-
-  if (
-    projectEndDate &&
-    compareDateOnly(subtaskEndDate, projectEndDate) > 0
-  ) {
-    setModalError(
-      `Subtask end date cannot exceed project end date ${projectEndDate}.`
-    );
-    return;
-  }
-
-  try {
-    setAddingSubtask(true);
-
-    const projectId = selectedProject.project_id;
-
-    // ADD SUBTASK
-    const response = await api.post(
-      `${API_BASE}/projects/${projectId}/subtasks`,
-      {
-        title: subtaskTitle.trim(),
-        description: subtaskDescription.trim(),
-        start_date: subtaskStartDate,
-        end_date: subtaskEndDate,
-      }
-    );
-
-    // CLEAR FORM
     setSubtaskTitle("");
     setSubtaskDescription("");
     setSubtaskStartDate("");
     setSubtaskEndDate("");
 
-    // USE SUBTASKS FROM POST RESPONSE IF AVAILABLE
-    if (Array.isArray(response.data?.subtasks)) {
-      setSubtasks(response.data.subtasks);
-    }
+    setModalError("");
+    setModalSuccess("");
 
-    // REFRESH ONLY THIS PROJECT POPUP
-    try {
-      const detailResponse = await api.get(
-        `${API_BASE}/projects/${projectId}/subtasks`
-      );
+    setConfirmSubtask(null);
+    setTogglingSubtaskId(null);
+  };
 
-      if (detailResponse.data?.project) {
-        setSelectedProject((previous) => ({
-          ...(previous || {}),
-          ...detailResponse.data.project,
-        }));
-      }
+  const selectMainTask = (task) => {
+    setSelectedMainTaskId(getMainTaskId(task));
 
-      if (Array.isArray(detailResponse.data?.subtasks)) {
-        setSubtasks(detailResponse.data.subtasks);
-      }
-    } catch (detailError) {
-      console.error(
-        "Refresh project details after add error:",
-        detailError
-      );
-    }
+    setSubtaskTitle("");
+    setSubtaskDescription("");
+    setSubtaskStartDate("");
+    setSubtaskEndDate("");
 
-    setModalSuccess(
-      response.data?.message || "Subtask added successfully."
-    );
+    setModalError("");
+    setModalSuccess("");
+  };
 
-    // IMPORTANT:
-    // DO NOT call fetchProjects() here.
-  } catch (err) {
-    console.error("Add employee subtask error:", err);
+  const handleAddSubtask = async (event) => {
+    event?.preventDefault?.();
 
-    setModalError(
-      err?.response?.data?.sqlMessage ||
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        "Failed to add subtask."
-    );
-  } finally {
-    setAddingSubtask(false);
-  }
-};
-
-  const handleToggleSubtask = (subtask) => {
-    if (!selectedProject) return;
-
-    const subtaskId = getSubtaskId(subtask);
-
-    if (!subtaskId) {
-      setModalError("Subtask ID not found.");
-      return;
-    }
-
-    if (isProjectLocked(selectedProject)) {
-      setModalError("This project is locked. Subtasks cannot be changed now.");
-      return;
-    }
-
-    if (isSubtaskDone(subtask.status, subtask.is_checked)) {
-      return;
-    }
+    if (!selectedProject || !selectedMainTask || addingSubtask) return;
 
     setModalError("");
     setModalSuccess("");
 
-    // Open our custom confirmation popup
+    if (isProjectLocked(selectedProject)) {
+      setModalError("This Project is locked.");
+      return;
+    }
+
+    if (isMainTaskLocked(selectedMainTask)) {
+      setModalError(
+        `Subtasks cannot be added while this Main Task is ${getStatusLabel(
+          selectedMainTask.status
+        )}.`
+      );
+      return;
+    }
+
+    if (!subtaskTitle.trim()) {
+      setModalError("Please enter Subtask title.");
+      return;
+    }
+
+    if (!subtaskStartDate || !subtaskEndDate) {
+      setModalError("Please select Subtask start date and deadline.");
+      return;
+    }
+
+    if (compareDateOnly(subtaskEndDate, subtaskStartDate) < 0) {
+      setModalError(
+        "Subtask deadline cannot be before Subtask start date."
+      );
+      return;
+    }
+
+    const mainStartDate = getMainTaskStartDate(selectedMainTask);
+    const mainEndDate = getMainTaskEndDate(selectedMainTask);
+
+    if (
+      mainStartDate &&
+      compareDateOnly(subtaskStartDate, mainStartDate) < 0
+    ) {
+      setModalError(
+        `Subtask start date cannot be before Main Task start date ${formatDisplayDate(
+          mainStartDate
+        )}.`
+      );
+      return;
+    }
+
+    if (
+      mainEndDate &&
+      compareDateOnly(subtaskEndDate, mainEndDate) > 0
+    ) {
+      setModalError(
+        `Subtask deadline cannot exceed Main Task deadline ${formatDisplayDate(
+          mainEndDate
+        )}.`
+      );
+      return;
+    }
+
+    try {
+      setAddingSubtask(true);
+
+      const taskId = getMainTaskId(selectedMainTask);
+
+      const response = await api.post(
+        `${API_BASE}/projects/${selectedProject.project_id}/subtasks`,
+        {
+          main_task_id: taskId,
+          task_title: subtaskTitle.trim(),
+          title: subtaskTitle.trim(),
+          task_description: subtaskDescription.trim(),
+          description: subtaskDescription.trim(),
+          start_date: subtaskStartDate,
+          due_date: subtaskEndDate,
+          end_date: subtaskEndDate,
+        }
+      );
+
+      setSubtaskTitle("");
+      setSubtaskDescription("");
+      setSubtaskStartDate("");
+      setSubtaskEndDate("");
+
+      await refreshSelectedProject(
+        selectedProject.project_id,
+        taskId,
+        selectedProject
+      );
+
+      await fetchProjects();
+
+      setModalSuccess(
+        response.data?.message || "Subtask added successfully."
+      );
+    } catch (err) {
+      console.error("Add employee Subtask error:", err);
+
+      setModalError(
+        err?.response?.data?.sqlMessage ||
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to add Subtask."
+      );
+    } finally {
+      setAddingSubtask(false);
+    }
+  };
+
+  const handleToggleSubtask = (subtask) => {
+    if (!selectedProject || !selectedMainTask) return;
+
+    if (
+      isProjectLocked(selectedProject) ||
+      isMainTaskLocked(selectedMainTask)
+    ) {
+      setModalError(
+        "This Main Task is locked. Subtasks cannot be changed now."
+      );
+      return;
+    }
+
+    if (isSubtaskDone(subtask) || togglingSubtaskId) return;
+
+    setModalError("");
+    setModalSuccess("");
     setConfirmSubtask(subtask);
   };
+
   const confirmMarkSubtaskDone = async () => {
-    if (!selectedProject || !confirmSubtask) return;
+    if (
+      !selectedProject ||
+      !selectedMainTask ||
+      !confirmSubtask
+    ) {
+      return;
+    }
 
     const subtaskId = getSubtaskId(confirmSubtask);
+    const taskId = getMainTaskId(selectedMainTask);
 
     if (!subtaskId) {
       setConfirmSubtask(null);
@@ -637,37 +782,45 @@ const EmployeeProjects = () => {
       setModalError("");
       setModalSuccess("");
 
-      // Close confirmation box
-      setConfirmSubtask(null);
 
       const response = await api.patch(
-        `${API_BASE}/projects/${selectedProject.project_id}/subtasks/${subtaskId}/status`,
+        `/employee-tasks/subtasks/${subtaskId}/check`,
         {
           checked: true,
+          is_checked: true,
+          status: "completed",
         }
       );
 
-      setSubtasks(response.data?.subtasks || []);
+      await refreshSelectedProject(
+        selectedProject.project_id,
+        taskId,
+        selectedProject
+      );
+
+      await fetchProjects();
 
       setModalSuccess(
         response.data?.message || "Subtask marked as Done."
       );
-
-      await fetchProjects();
     } catch (err) {
-      console.error("Complete employee subtask error:", err);
+      console.error("Complete employee Subtask error:", err);
 
       setModalError(
         err?.response?.data?.sqlMessage ||
         err?.response?.data?.error ||
         err?.response?.data?.message ||
-        "Failed to complete subtask."
+        "Failed to complete Subtask."
       );
     } finally {
       setTogglingSubtaskId(null);
+      setConfirmSubtask(null);
     }
   };
-  const renderCompactProjectTile = (project) => {
+
+  const renderProjectTile = (project) => {
+    const mainTasks = getMainTasks(project);
+
     return (
       <button
         type="button"
@@ -676,15 +829,33 @@ const EmployeeProjects = () => {
         onClick={() => openProjectModal(project)}
       >
         <div style={styles.projectTileTop}>
-          <h3 style={styles.projectTileTitle}>{getProjectTitle(project)}</h3>
+          <h3 style={styles.projectTileTitle}>
+            {getProjectTitle(project)}
+          </h3>
 
           <span style={styles.statusPill}>
-            {getStatusLabel(project.status_group || project.status)}
+            {getStatusLabel(
+              selectedMainTask?.status ||
+              selectedProject?.status_group ||
+              selectedProject?.status ||
+              selectedProject?.project_status
+            )}
           </span>
         </div>
 
-        <div style={styles.projectTileSpacer}></div>
-        <span style={styles.clickHint}>Click to view full details</span>
+        <p style={styles.projectTileMeta}>
+          {mainTasks.length} Main{" "}
+          {mainTasks.length === 1 ? "Task" : "Tasks"}
+        </p>
+
+        <p style={styles.projectDate}>
+          {formatDisplayDate(getProjectStartDate(project))} →{" "}
+          {formatDisplayDate(getProjectEndDate(project))}
+        </p>
+
+        <span style={styles.clickHint}>
+          Click to view Project and Main Tasks
+        </span>
       </button>
     );
   };
@@ -705,93 +876,137 @@ const EmployeeProjects = () => {
             type="button"
             key={project.project_id}
             style={
-              type === "rejected" ? styles.rejectedProjectTile : styles.holdTile
+              type === "rejected"
+                ? styles.rejectedProjectTile
+                : styles.holdTile
             }
             onClick={() => openProjectModal(project)}
           >
             <div style={styles.projectTileTop}>
-              <h3 style={styles.projectTileTitle}>{getProjectTitle(project)}</h3>
+              <h3 style={styles.projectTileTitle}>
+                {getProjectTitle(project)}
+              </h3>
 
               <span
-                style={type === "rejected" ? styles.rejectedPill : styles.holdPill}
+                style={
+                  type === "rejected"
+                    ? styles.rejectedPill
+                    : styles.holdPill
+                }
               >
                 {type === "rejected" ? "Rejected" : "On Hold"}
               </span>
             </div>
 
-            <div style={{ height: "18px" }} />
-
-            <span style={styles.clickHint}>Click to view details</span>
+            <span style={styles.clickHint}>
+              Click to view details
+            </span>
           </button>
         ))}
       </div>
     );
   };
 
+  const projectProgress = selectedProject
+    ? Number(
+      selectedProject.overall_progress ??
+      selectedProject.progress ??
+      0
+    )
+    : 0;
+
+  const canAddSubtask =
+    selectedProject &&
+    selectedMainTask &&
+    !isProjectLocked(selectedProject) &&
+    !isMainTaskLocked(selectedMainTask);
+
   return (
     <div style={styles.page}>
-      <div
-        style={{
-          width: "100%",
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          marginBottom: "18px",
-        }}
-      >
-        <button type="button" style={styles.refreshBtn} onClick={fetchProjects}>
+      <div style={styles.toolbar}>
+        <div style={styles.searchContainer}>
+          <Search size={19} style={styles.searchIcon} />
+
+          <input
+            style={styles.search}
+            type="text"
+            placeholder="Search project, task, admin..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+        </div>
+
+        <button
+          type="button"
+          style={
+            activeTab === "my"
+              ? styles.activeTab
+              : styles.tab
+          }
+          onClick={() => setActiveTab("my")}
+        >
+          My Projects {myProjects.length}
+        </button>
+
+        <button
+          type="button"
+          style={
+            activeTab === "rejected"
+              ? styles.activeRejectedTab
+              : styles.tab
+          }
+          onClick={() => setActiveTab("rejected")}
+        >
+          Rejected {rejectedProjects.length}
+        </button>
+
+        <button
+          type="button"
+          style={
+            activeTab === "on_hold"
+              ? styles.activeHoldTab
+              : styles.tab
+          }
+          onClick={() => setActiveTab("on_hold")}
+        >
+          On Hold {onHoldProjects.length}
+        </button>
+
+        <button
+          type="button"
+          style={styles.refreshBtn}
+          onClick={fetchProjects}
+          disabled={loading}
+        >
           <RefreshCw size={18} />
-          Refresh
+          {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
-      <section style={styles.tabs}>
-        <button
-          type="button"
-          style={activeTab === "my" ? styles.activeTab : styles.tab}
-          onClick={() => setActiveTab("my")}
-        >
-          My Projects <span>{myProjects.length}</span>
-        </button>
+      {error && (
+        <div style={styles.error}>
+          {error}
+        </div>
+      )}
 
-        <button
-          type="button"
-          style={activeTab === "rejected" ? styles.activeRejectedTab : styles.tab}
-          onClick={() => setActiveTab("rejected")}
-        >
-          Rejected Projects <span>{rejectedProjects.length}</span>
-        </button>
-
-        <button
-          type="button"
-          style={activeTab === "on_hold" ? styles.activeHoldTab : styles.tab}
-          onClick={() => setActiveTab("on_hold")}
-        >
-          Projects On Hold <span>{onHoldProjects.length}</span>
-        </button>
-      </section>
-
-      <input
-        style={styles.search}
-        type="text"
-        placeholder="Search projects, admin, status..."
-        value={searchTerm}
-        onChange={(event) => setSearchTerm(event.target.value)}
-      />
-
-      {error && <div style={styles.error}>{error}</div>}
-
-      {loading ? (
-        <div style={styles.empty}>Loading projects...</div>
-      ) : activeTab === "my" ? (
+      {activeTab === "my" ? (
         <section style={styles.stageRow}>
           {statusColumns.map((column) => (
-            <div style={styles.stageColumn} key={column.key}>
+            <div
+              style={styles.stageColumn}
+              key={column.key}
+            >
               <div style={styles.stageHeader}>
                 <div>
-                  <h2 style={styles.stageTitle}>{column.title}</h2>
-                  <p style={styles.stageSubtitle}>{column.subtitle}</p>
+                  <h2 style={styles.stageTitle}>
+                    {column.title}
+                  </h2>
+
+                  <p style={styles.stageSubtitle}>
+                    {column.subtitle}
+                  </p>
                 </div>
+
                 <span style={styles.stageCount}>
                   {grouped[column.key]?.length || 0}
                 </span>
@@ -799,274 +1014,570 @@ const EmployeeProjects = () => {
 
               <div style={styles.stageBody}>
                 {grouped[column.key]?.length === 0 ? (
-                  <div style={styles.emptyColumn}>No projects here.</div>
+                  <div style={styles.emptyColumn}>
+                    No projects here.
+                  </div>
                 ) : (
-                  grouped[column.key].map(renderCompactProjectTile)
+                  grouped[column.key].map(renderProjectTile)
                 )}
               </div>
             </div>
           ))}
         </section>
       ) : activeTab === "rejected" ? (
-        renderSpecialProjectList(filteredProjects, "rejected")
+        renderSpecialProjectList(
+          filteredProjects,
+          "rejected"
+        )
       ) : (
-        renderSpecialProjectList(filteredProjects, "on_hold")
+        renderSpecialProjectList(
+          filteredProjects,
+          "on_hold"
+        )
       )}
 
       {selectedProject && (
-        <div style={styles.modalBackdrop} onClick={closeProjectModal}>
-          <div style={styles.modal} onClick={(event) => event.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div>
-                <h2 style={styles.modalTitle}>
-                  {getProjectTitle(selectedProject)}
-                </h2>
-                <p style={styles.modalDescription}>
-                  {getProjectMainTask(selectedProject)}
-                </p>
-              </div>
+        <div
+          style={styles.modalBackdrop}
+          onClick={closeProjectModal}
+        >
+          <div
+            style={styles.modal}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={styles.modalBody}>
+              <div style={styles.modalHeader}>
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={styles.modalTitle}>
+                    {getProjectTitle(selectedProject)}
+                  </h2>
 
-              <button type="button" style={styles.closeBtn} onClick={closeProjectModal}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={styles.detailGrid}>
-              <div style={styles.detailBox}>
-                <span style={styles.detailBoxLabel}>Department</span>
-                <p style={styles.detailBoxValue}>
-                  {selectedProject.department_name || "-"}
-                </p>
-              </div>
-
-              <div style={styles.detailBox}>
-                <span style={styles.detailBoxLabel}>Created By</span>
-                <p style={styles.detailBoxValue}>
-                  {selectedProject.created_by_name || "-"}
-                  <br />
-                  {selectedProject.created_by_email || "-"}
-                </p>
-              </div>
-
-              <div style={styles.detailBox}>
-                <span style={styles.detailBoxLabel}>Assigned To</span>
-                <p style={styles.detailBoxValue}>
-                  {getAssignedNames(selectedProject)}
-                  <br />
-                  {getAssignedEmails(selectedProject)}
-                </p>
-              </div>
-
-              <div style={styles.detailBox}>
-                <span style={styles.detailBoxLabel}>Status</span>
-                <p style={styles.detailBoxValue}>
-                  {getStatusLabel(
-                    selectedProject.status_group || selectedProject.status
-                  )}
-                </p>
-              </div>
-
-              <div style={styles.detailBox}>
-                <span style={styles.detailBoxLabel}>Start Date</span>
-                <p style={styles.detailBoxValue}>
-                  {formatDisplayDate(getProjectStartDate(selectedProject))}
-                </p>
-              </div>
-
-              <div style={styles.detailBox}>
-                <span style={styles.detailBoxLabel}>End Date</span>
-                <p style={styles.detailBoxValue}>
-                  {formatDisplayDate(getProjectEndDate(selectedProject))}
-                </p>
-              </div>
-            </div>
-
-            <div style={styles.progressBlock}>
-              <div style={styles.progressTop}>
-                <strong>Project Progress</strong>
-
-                <span>
-                  {normalizeStatus(
-                    selectedProject.status_group || selectedProject.status
-                  ) === "rejected"
-                    ? 0
-                    : selectedProject.progress ||
-                    selectedProject.overall_progress ||
-                    0}
-                  %
-                </span>
-              </div>
-
-              <div style={styles.progressTrack}>
-                <div
-                  style={{
-                    ...styles.progressFill,
-                    width: `${normalizeStatus(
-                      selectedProject.status_group || selectedProject.status
-                    ) === "rejected"
-                        ? 0
-                        : selectedProject.progress ||
-                        selectedProject.overall_progress ||
-                        0
-                      }%`,
-                  }}
-                />
-              </div>
-
-              <p style={styles.progressNote}>
-                {selectedProject.completed_subtasks || 0}/
-                {selectedProject.total_subtasks || 0} subtasks completed
-              </p>
-            </div>
-
-            {isProjectLocked(selectedProject) && (
-              <div style={styles.modalWarning}>
-                ⚠ Subtasks cannot be added.
-              </div>
-            )}
-
-            <div style={styles.subtaskForm}>
-              <div style={styles.formTitleRow}>
-                <Plus size={18} />
-                <h3>Add Subtask</h3>
-              </div>
-
-              <div style={styles.formGrid}>
-                <div style={styles.field}>
-                  <label>Subtask Title</label>
-                  <input
-                    type="text"
-                    value={subtaskTitle}
-                    onChange={(event) => setSubtaskTitle(event.target.value)}
-                    placeholder="Example: Backend API"
-                    disabled={isProjectLocked(selectedProject)}
-                  />
-                </div>
-
-                <div style={styles.field}>
-                  <label>Start Date</label>
-                  <input
-                    type="date"
-                    value={subtaskStartDate}
-                    min={getProjectStartDate(selectedProject) || undefined}
-                    max={getProjectEndDate(selectedProject) || undefined}
-                    onChange={(event) => setSubtaskStartDate(event.target.value)}
-                    disabled={isProjectLocked(selectedProject)}
-                  />
-                </div>
-
-                <div style={styles.field}>
-                  <label>End Date</label>
-                  <input
-                    type="date"
-                    value={subtaskEndDate}
-                    min={
-                      subtaskStartDate ||
-                      getProjectStartDate(selectedProject) ||
-                      undefined
-                    }
-                    max={getProjectEndDate(selectedProject) || undefined}
-                    onChange={(event) => setSubtaskEndDate(event.target.value)}
-                    disabled={isProjectLocked(selectedProject)}
-                  />
+                  <p style={styles.modalDescription}>
+                    {getProjectDescription(selectedProject) ||
+                      "No Project description provided."}
+                  </p>
                 </div>
 
                 <button
                   type="button"
-                  style={styles.addBtn}
-                  disabled={addingSubtask}
-                  onClick={handleAddSubtask}
+                  style={styles.closeBtn}
+                  onClick={closeProjectModal}
                 >
-                  {addingSubtask ? "Adding..." : "Add"}
+                  <X size={18} />
                 </button>
+              </div>
 
-                <div style={styles.fieldFull}>
-                  <label>Subtask Description</label>
-                  <textarea
-                    value={subtaskDescription}
-                    onChange={(event) =>
-                      setSubtaskDescription(event.target.value)
-                    }
-                    placeholder="Write what this subtask includes..."
-                    style={styles.textarea}
-                    disabled={isProjectLocked(selectedProject)}
-                  />
+
+              <div style={styles.detailGrid}>
+                <div style={styles.detailBox}>
+                  <span style={styles.detailBoxLabel}>
+                    Department
+                  </span>
+                  <p style={styles.detailBoxValue}>
+                    {selectedProject.department_name || "-"}
+                  </p>
+                </div>
+
+                <div style={styles.detailBox}>
+                  <span style={styles.detailBoxLabel}>
+                    Created By
+                  </span>
+                  <p style={styles.detailBoxValue}>
+                    {selectedProject.created_by_name || "-"}
+                    <br />
+                    {selectedProject.created_by_email || "-"}
+                  </p>
+                </div>
+
+                <div style={styles.detailBox}>
+                  <span style={styles.detailBoxLabel}>
+                    Project Assigned To
+                  </span>
+                  <p style={styles.detailBoxValue}>
+                    {getAssignedNames(selectedProject)}
+                    <br />
+                    {getAssignedEmails(selectedProject)}
+                  </p>
+                </div>
+
+                <div style={styles.detailBox}>
+                  <span style={styles.detailBoxLabel}>
+                    Project Status
+                  </span>
+                  <p style={styles.detailBoxValue}>
+                    {getStatusLabel(
+                      selectedProject.status_group ||
+                      selectedProject.status ||
+                      selectedProject.project_status
+                    )}
+                  </p>
+                </div>
+                {normalizeStatus(
+  selectedProject.status_group ||
+  selectedProject.status ||
+  selectedProject.project_status
+) === "rejected" && (
+  <div style={styles.detailBox}>
+    <span style={styles.detailBoxLabel}>
+      Admin Remark
+    </span>
+
+    <p style={styles.detailBoxValue}>
+      {
+        selectedProject.rejection_remark ||
+        selectedProject.reject_remark ||
+        selectedProject.admin_remark ||
+        selectedProject.rejection_reason ||
+        "-"
+      }
+    </p>
+  </div>
+)}
+
+                <div style={styles.detailBox}>
+                  <span style={styles.detailBoxLabel}>
+                    Project Start
+                  </span>
+                  <p style={styles.detailBoxValue}>
+                    {formatDisplayDate(
+                      getProjectStartDate(selectedProject)
+                    )}
+                  </p>
+                </div>
+
+                <div style={styles.detailBox}>
+                  <span style={styles.detailBoxLabel}>
+                    Project Deadline
+                  </span>
+                  <p style={styles.detailBoxValue}>
+                    {formatDisplayDate(
+                      getProjectEndDate(selectedProject)
+                    )}
+                  </p>
                 </div>
               </div>
-            </div>
-            {modalError && <div style={styles.modalError}>{modalError}</div>}
 
-            <section style={styles.subtaskSection}>
-              <h3 style={styles.sectionTitle}>Subtasks</h3>
+              <div style={styles.progressBlock}>
+                <div style={styles.progressTop}>
+                  <strong>Project Progress</strong>
+                  <span>{projectProgress}%</span>
+                </div>
 
-              {modalLoading ? (
-                <div style={styles.empty}>Loading subtasks...</div>
-              ) : subtasks.length === 0 ? (
-                <div style={styles.empty}>No subtasks added yet.</div>
-              ) : (
-                <div style={styles.subtaskList}>
-                  {subtasks.map((subtask) => {
-                    const subtaskId = getSubtaskId(subtask);
-                    const done = isSubtaskDone(
-                      subtask.status,
-                      subtask.is_checked
-                    );
+                <div style={styles.progressTrack}>
+                  <div
+                    style={{
+                      ...styles.progressFill,
+                      width: `${Math.min(
+                        100,
+                        Math.max(0, projectProgress)
+                      )}%`,
+                    }}
+                  />
+                </div>
 
-                    return (
-                      <label style={styles.subtaskRow} key={subtaskId}>
-                        {normalizeStatus(
-                          selectedProject.status_group || selectedProject.status
-                        ) !== "rejected" && (
-                            <input
-                              type="checkbox"
-                              checked={done}
-                              disabled={
-                                done ||
-                                isProjectLocked(selectedProject) ||
-                                togglingSubtaskId === subtaskId
-                              }
-                              onChange={() => handleToggleSubtask(subtask)}
-                            />
+                <p style={styles.progressNote}>
+                  {selectedProject.completed_subtasks || 0}/
+                  {selectedProject.total_subtasks || 0} Subtasks completed
+                </p>
+              </div>
+
+              <section style={styles.mainTaskSection}>
+                <div style={styles.sectionHeadingRow}>
+                  <div>
+                    <h3 style={styles.sectionTitle}>
+                      Assigned Main Tasks
+                    </h3>
+
+                    <p style={styles.sectionSubtitle}>
+                      Select a Main Task to view its shared Subtasks.
+                    </p>
+                  </div>
+
+                  <span style={styles.mainTaskCount}>
+                    {getMainTasks(selectedProject).length}
+                  </span>
+                </div>
+
+                {modalLoading ? (
+                  <div style={styles.empty}>
+                    Loading Main Tasks...
+                  </div>
+                ) : getMainTasks(selectedProject).length === 0 ? (
+                  <div style={styles.empty}>
+                    No Main Task has been assigned to you for this Project.
+                  </div>
+                ) : (
+                  <div style={styles.mainTaskTabs}>
+                    {getMainTasks(selectedProject).map((task) => {
+                      const taskId = getMainTaskId(task);
+                      const active =
+                        taskId === getMainTaskId(selectedMainTask);
+
+                      return (
+                        <button
+                          key={taskId}
+                          type="button"
+                          style={
+                            active
+                              ? styles.activeMainTaskTab
+                              : styles.mainTaskTab
+                          }
+                          onClick={() => selectMainTask(task)}
+                        >
+                          <span style={styles.mainTaskTabTitle}>
+                            {getMainTaskTitle(task)}
+                          </span>
+
+                          <span style={styles.mainTaskTabStatus}>
+                            {getStatusLabel(task.status)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {selectedMainTask && (
+                <>
+                  <section style={styles.mainTaskDetailCard}>
+                    <div style={styles.mainTaskHeader}>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={styles.eyebrow}>
+                          MAIN TASK
+                        </span>
+
+                        <h3 style={styles.mainTaskTitle}>
+                          {getMainTaskTitle(selectedMainTask)}
+                        </h3>
+                      </div>
+
+                      <span style={styles.statusPill}>
+                        {getStatusLabel(selectedMainTask.status)}
+                      </span>
+                    </div>
+
+                    <div style={styles.mainTaskInfoGrid}>
+                      <div style={styles.detailBox}>
+                        <span style={styles.detailBoxLabel}>
+                          Main Task Description
+                        </span>
+                        <p style={styles.detailBoxValue}>
+                          {getMainTaskDescription(selectedMainTask) || "-"}
+                        </p>
+                      </div>
+
+                      <div style={styles.detailBox}>
+                        <span style={styles.detailBoxLabel}>
+                          Main Task Assigned To
+                        </span>
+                        <p style={styles.detailBoxValue}>
+                          {getMainTaskAssignees(selectedMainTask)}
+                        </p>
+                      </div>
+
+                      <div style={styles.detailBox}>
+                        <span style={styles.detailBoxLabel}>
+                          Start Date
+                        </span>
+                        <p style={styles.detailBoxValue}>
+                          {formatDisplayDate(
+                            getMainTaskStartDate(selectedMainTask)
                           )}
-                        <div>
-                          <strong>{getSubtaskTitle(subtask)}</strong>
+                        </p>
+                      </div>
 
-                          <p style={styles.detailBoxValue}>
-                            {getSubtaskStartDate(subtask) || "-"} to{" "}
-                            {getSubtaskEndDate(subtask) || "-"}
-                          </p>
-
-                          {getSubtaskDescription(subtask) && (
-                            <p style={styles.subtaskDescription}>
-                              {getSubtaskDescription(subtask)}
-                            </p>
+                      <div style={styles.detailBox}>
+                        <span style={styles.detailBoxLabel}>
+                          Deadline
+                        </span>
+                        <p style={styles.detailBoxValue}>
+                          {formatDisplayDate(
+                            getMainTaskEndDate(selectedMainTask)
                           )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={styles.taskProgressRow}>
+                      <strong>
+                        {selectedMainTask.completed_subtasks || 0}/
+                        {selectedMainTask.total_subtasks || 0} Subtasks
+                      </strong>
+
+                      <strong>
+                        {Number(selectedMainTask.progress || 0)}%
+                      </strong>
+                    </div>
+
+                    <div style={styles.progressTrack}>
+                      <div
+                        style={{
+                          ...styles.progressFill,
+                          width: `${Math.min(
+                            100,
+                            Math.max(
+                              0,
+                              Number(selectedMainTask.progress || 0)
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </section>
+
+                  {!canAddSubtask && (
+                    <div style={styles.modalWarning}>
+                      Subtasks cannot be added while this Main Task is{" "}
+                      <strong>
+                        {getStatusLabel(selectedMainTask.status)}
+                      </strong>
+                      .
+                    </div>
+                  )}
+
+                  {canAddSubtask && (
+                    <form
+                      style={styles.subtaskForm}
+                      onSubmit={handleAddSubtask}
+                    >
+                      <div style={styles.formTitleRow}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <Plus size={18} />
+                          <h3 style={{ margin: 0 }}>
+                            Add Subtask
+                          </h3>
                         </div>
 
-                        <span
-                          style={
-                            done
-                              ? styles.doneBadge
-                              : styles.todoBadge
-                          }
+                        <button
+                          type="submit"
+                          style={styles.addBtn}
+                          disabled={addingSubtask}
                         >
-                          {done ? "Done" : getStatusLabel(subtask.status)}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-                        </section>
+                          {addingSubtask ? "Adding..." : "Add"}
+                        </button>
+                      </div>
+
+                      <p style={styles.formHint}>
+                        Subtask dates must stay within this Main Task:{" "}
+                        <strong>
+                          {formatDisplayDate(
+                            getMainTaskStartDate(selectedMainTask)
+                          )}
+                        </strong>{" "}
+                        to{" "}
+                        <strong>
+                          {formatDisplayDate(
+                            getMainTaskEndDate(selectedMainTask)
+                          )}
+                        </strong>
+                        .
+                      </p>
+
+                      <div style={styles.formGrid}>
+                        <label style={styles.field}>
+                          <span>Subtask Title</span>
+                          <input
+                            style={styles.input}
+                            type="text"
+                            value={subtaskTitle}
+                            onChange={(event) =>
+                              setSubtaskTitle(event.target.value)
+                            }
+                            placeholder="Example: Backend API"
+                          />
+                        </label>
+
+                        <label style={styles.field}>
+                          <span>Start Date</span>
+                          <input
+                            style={styles.input}
+                            type="date"
+                            value={subtaskStartDate}
+                            min={
+                              getMainTaskStartDate(selectedMainTask) ||
+                              undefined
+                            }
+                            max={
+                              getMainTaskEndDate(selectedMainTask) ||
+                              undefined
+                            }
+                            onChange={(event) => {
+                              const value = event.target.value;
+
+                              setSubtaskStartDate(value);
+
+                              if (
+                                subtaskEndDate &&
+                                value &&
+                                subtaskEndDate < value
+                              ) {
+                                setSubtaskEndDate("");
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <label style={styles.field}>
+                          <span>End Date / Deadline</span>
+                          <input
+                            style={styles.input}
+                            type="date"
+                            value={subtaskEndDate}
+                            min={
+                              subtaskStartDate ||
+                              getMainTaskStartDate(selectedMainTask) ||
+                              undefined
+                            }
+                            max={
+                              getMainTaskEndDate(selectedMainTask) ||
+                              undefined
+                            }
+                            onChange={(event) =>
+                              setSubtaskEndDate(event.target.value)
+                            }
+                          />
+                        </label>
+
+
+
+
+                        <label style={styles.fieldFull}>
+                          <span>Subtask Description</span>
+                          <textarea
+                            value={subtaskDescription}
+                            onChange={(event) =>
+                              setSubtaskDescription(event.target.value)
+                            }
+                            placeholder="Write what this Subtask includes..."
+                            style={styles.textarea}
+                          />
+                        </label>
+                      </div>
+                    </form>
+                  )}
+
+                  {modalError && (
+                    <div style={styles.modalError}>
+                      {modalError}
+                    </div>
+                  )}
+
+                  {modalSuccess && (
+                    <div style={styles.modalSuccess}>
+                      {modalSuccess}
+                    </div>
+                  )}
+
+                  <section style={styles.subtaskSection}>
+                    <h3 style={styles.sectionTitle}>
+                      Shared Subtasks
+                    </h3>
+
+                    {selectedSubtasks.length === 0 ? (
+                      <div style={styles.empty}>
+                        No Subtasks added under this Main Task yet.
+                      </div>
+                    ) : (
+                      <div style={styles.subtaskList}>
+                        {selectedSubtasks.map((subtask) => {
+                          const subtaskId = getSubtaskId(subtask);
+                          const done = isSubtaskDone(subtask);
+
+                          return (
+                            <div
+                              style={styles.subtaskRow}
+                              key={subtaskId}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={done}
+                                disabled={
+                                  done ||
+                                  isProjectLocked(selectedProject) ||
+                                  isMainTaskLocked(selectedMainTask) ||
+                                  togglingSubtaskId === subtaskId
+                                }
+                                onChange={() =>
+                                  handleToggleSubtask(subtask)
+                                }
+                              />
+
+                              <div style={{ minWidth: 0 }}>
+                                <strong>
+                                  {getSubtaskTitle(subtask)}
+                                </strong>
+
+                                <p style={styles.subtaskDates}>
+                                  {formatDisplayDate(
+                                    getSubtaskStartDate(subtask)
+                                  )}{" "}
+                                  to{" "}
+                                  {formatDisplayDate(
+                                    getSubtaskEndDate(subtask)
+                                  )}
+                                </p>
+
+                                {getSubtaskDescription(subtask) && (
+                                  <p style={styles.subtaskDescription}>
+                                    {getSubtaskDescription(subtask)}
+                                  </p>
+                                )}
+
+                                {subtask.created_by_name && (
+                                  <p style={styles.subtaskCreator}>
+                                    Added by {subtask.created_by_name}
+                                  </p>
+                                )}
+                              </div>
+
+                              <span
+                                style={{
+                                  fontWeight: 900,
+                                  fontSize: "14px",
+                                  textAlign: "center",
+                                  minWidth: "90px",
+                                }}
+                              >
+                                {getSubtaskDisplayStatus(
+                                  subtask,
+                                  selectedMainTask
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                </>
+                           )}
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button
+                type="button"
+                style={styles.cancelModalButton}
+                onClick={closeProjectModal}
+              >
+                Cancel
+              </button>
+            </div>
+
           </div>
         </div>
       )}
 
-      {/* CONFIRM SUBTASK DONE POPUP - PASTE HERE */}
       {confirmSubtask && (
         <div style={styles.confirmOverlay}>
           <div style={styles.confirmBox}>
-            <h3 style={styles.confirmTitle}>Are you sure?</h3>
+            <h3 style={styles.confirmTitle}>
+              Mark this Subtask as Done?
+            </h3>
+
+            <p style={styles.confirmText}>
+              Completed Subtasks cannot be unchecked from this page.
+            </p>
 
             <div style={styles.confirmActions}>
               <button
@@ -1082,13 +1593,12 @@ const EmployeeProjects = () => {
                 style={styles.confirmYesBtn}
                 onClick={confirmMarkSubtaskDone}
               >
-                Yes
+                Yes, Done
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };
@@ -1096,190 +1606,212 @@ const EmployeeProjects = () => {
 const styles = {
   page: {
     width: "100%",
+    minWidth: 0,
     paddingBottom: "40px",
   },
-  header: {
-    background: "#ffffff",
-    border: "1px solid #e5e7eb",
-    borderRadius: "22px",
-    padding: "30px 34px",
-    marginBottom: "22px",
+
+  toolbar: {
+    width: "100%",
     display: "flex",
-    justifyContent: "space-between",
-    gap: "18px",
     alignItems: "center",
-    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
-  },
-  h1: {
-    margin: "0 0 8px",
-    color: "#111827",
-    fontSize: "36px",
-    fontWeight: 900,
-  },
-  subtitle: {
-    margin: 0,
-    color: "#667085",
-    fontSize: "16px",
-    lineHeight: 1.5,
-  },
-  refreshBtn: {
-    border: "0",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "14px",
-    padding: "13px 18px",
-    fontWeight: 900,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    cursor: "pointer",
-  },
-  tabs: {
-    display: "flex",
     gap: "12px",
-    flexWrap: "wrap",
     marginBottom: "18px",
+    flexWrap: "nowrap",
   },
+
+  searchContainer: {
+    position: "relative",
+    height: "56px",
+    minWidth: 0,
+  },
+
+  searchIcon: {
+    position: "absolute",
+    left: "18px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    color: "#64748b",
+    pointerEvents: "none",
+  },
+
+  search: {
+    width: "100%",
+    height: "56px",
+    boxSizing: "border-box",
+    border: "1px solid #d7dde7",
+    borderRadius: "16px",
+    padding: "0 18px 0 50px",
+    outline: 0,
+    fontSize: "15px",
+    fontWeight: 600,
+    color: "#111827",
+    background: "#ffffff",
+  },
+
   tab: {
-    border: "0",
+    border: "1px solid #d7dde7",
     background: "#ffffff",
     color: "#111827",
     borderRadius: "16px",
-    padding: "16px 22px",
+    height: "56px",
+    padding: "0 18px",
+    fontSize: "14px",
     fontWeight: 900,
     cursor: "pointer",
-    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.08)",
+    whiteSpace: "nowrap",
   },
+
   activeTab: {
-    border: "0",
+    border: "none",
     background: "#ff5733",
     color: "#ffffff",
     borderRadius: "16px",
-    padding: "16px 22px",
+    height: "56px",
+    padding: "0 18px",
+    fontSize: "14px",
     fontWeight: 900,
     cursor: "pointer",
-    boxShadow: "0 8px 20px rgba(255, 87, 51, 0.18)",
+    whiteSpace: "nowrap",
+    boxShadow: "0 8px 18px rgba(255, 87, 51, 0.16)",
   },
+
   activeRejectedTab: {
-    border: "0",
+    border: "none",
     background: "#ef4444",
     color: "#ffffff",
     borderRadius: "16px",
-    padding: "16px 22px",
+    height: "56px",
+    padding: "0 18px",
+    fontSize: "14px",
     fontWeight: 900,
     cursor: "pointer",
-    boxShadow: "0 8px 20px rgba(239, 68, 68, 0.18)",
+    whiteSpace: "nowrap",
   },
+
   activeHoldTab: {
-    border: "0",
+    border: "none",
     background: "#111827",
     color: "#ffffff",
     borderRadius: "16px",
-    padding: "16px 22px",
+    height: "56px",
+    padding: "0 18px",
+    fontSize: "14px",
     fontWeight: 900,
     cursor: "pointer",
-    boxShadow: "0 8px 20px rgba(17, 24, 39, 0.18)",
+    whiteSpace: "nowrap",
   },
-  search: {
-    width: "min(720px, 100%)",
-    height: "54px",
-    border: "1px solid #d1d5db",
+
+  refreshBtn: {
+    border: "none",
+    background: "#ff5733",
+    color: "#ffffff",
     borderRadius: "16px",
-    padding: "0 18px",
-    outline: "0",
+    height: "56px",
+    padding: "0 22px",
     fontSize: "15px",
-    marginBottom: "24px",
-    background: "#ffffff",
+    fontWeight: 900,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    boxShadow: "0 8px 18px rgba(255, 87, 51, 0.16)",
   },
 
   stageRow: {
-  display: "flex",
-  flexWrap: "nowrap",
-  alignItems: "flex-start",
-  gap: "20px",
-  overflowX: "auto",
-  overflowY: "hidden",
-  paddingBottom: "14px",
-},
+    width: "100%",
+    display: "flex",
+    flexWrap: "nowrap",
+    gap: "20px",
+    overflowX: "auto",
+    overflowY: "hidden",
+    paddingBottom: "16px",
+    scrollBehavior: "smooth",
+  },
 
   stageColumn: {
-  flex: "0 0 300px",
-
-  height: "560px",
-  minHeight: "560px",
-  maxHeight: "560px",
-
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: "22px",
-  padding: "18px",
-  boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
-
-  display: "flex",
-  flexDirection: "column",
-
-  overflow: "hidden",
-},
+    flex: "0 0 calc((100% - 40px) / 3)",
+  width: "calc((100% - 40px) / 3)",
+    height: "620px",
+    minHeight: "620px",
+    maxHeight: "620px",
+    boxSizing: "border-box",
+    background: "#ffffff",
+    borderRadius: "20px",
+    padding: "18px",
+    boxShadow: "0 6px 20px rgba(15, 23, 42, 0.06)",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  },
 
   stageHeader: {
-  background: "#f8fafc",
-  borderRadius: "18px",
-  padding: "16px",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "12px",
-  alignItems: "center",
-  marginBottom: "16px",
-
-  flexShrink: 0,
-},
+    width: "100%",
+    minHeight: "105px",
+    boxSizing: "border-box",
+    background: "#f7f9fc",
+    borderRadius: "18px",
+    padding: "17px",
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "12px",
+    alignItems: "center",
+    marginBottom: "16px",
+    flexShrink: 0,
+  },
 
   stageTitle: {
     margin: 0,
-    color: "#111827",
+    color: "#0f172a",
     fontSize: "22px",
+    lineHeight: 1.15,
     fontWeight: 900,
   },
+
   stageSubtitle: {
-    margin: "5px 0 0",
-    color: "#667085",
+    margin: "6px 0 0",
+    color: "#64748b",
     fontSize: "13px",
+    lineHeight: 1.35,
   },
+
   stageCount: {
-    width: "38px",
-    height: "38px",
+    width: "40px",
+    height: "40px",
     borderRadius: "50%",
-    background: "#e5e7eb",
+    background: "#e9edf3",
     display: "grid",
     placeItems: "center",
+    fontSize: "13px",
     fontWeight: 900,
     color: "#111827",
     flexShrink: 0,
   },
+
   stageBody: {
-  display: "flex",
-  flexDirection: "column",
-  gap: "12px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    overflowX: "hidden",
+    paddingRight: "5px",
+  },
 
-  flex: 1,
-  minHeight: 0,
-
-  overflowY: "auto",
-  overflowX: "hidden",
-
-  paddingRight: "6px",
-},
   projectTile: {
-  width: "100%",
-  textAlign: "left",
-  border: "1px solid #e5e7eb",
-  background: "#ffffff",
-  borderRadius: "18px",
-  padding: "18px",
-  cursor: "pointer",
-  transition: "0.2s ease",
-  flexShrink: 0,
-},
+    width: "100%",
+    boxSizing: "border-box",
+    textAlign: "left",
+    border: "1px solid #e3e8ef",
+    background: "#ffffff",
+    borderRadius: "16px",
+    padding: "16px",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+
   projectTileTop: {
     display: "flex",
     justifyContent: "space-between",
@@ -1287,46 +1819,63 @@ const styles = {
     alignItems: "flex-start",
     marginBottom: "10px",
   },
+
   projectTileTitle: {
     margin: 0,
     color: "#111827",
-    fontSize: "19px",
+    fontSize: "18px",
+    lineHeight: 1.2,
     fontWeight: 900,
   },
-  projectTileDescription: {
-    margin: "0 0 14px",
-    color: "#667085",
-    fontSize: "14px",
-    lineHeight: 1.5,
+
+  projectTileMeta: {
+    margin: "0 0 8px",
+    color: "#64748b",
+    fontSize: "13px",
+    fontWeight: 800,
   },
-  projectTileSpacer: {
-    height: "18px",
+
+  projectDate: {
+    margin: "0 0 12px",
+    color: "#475569",
+    fontSize: "12px",
+    fontWeight: 800,
   },
+
   statusPill: {
     background: "#eef2ff",
     color: "#374151",
     borderRadius: "999px",
-    padding: "7px 11px",
+    padding: "7px 14px",
     fontSize: "12px",
     fontWeight: 900,
     whiteSpace: "nowrap",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "fit-content",
+    height: "36px",
   },
+
   clickHint: {
-    color: "#ff5a3c",
-    fontWeight: "700",
-    whiteSpace: "normal",
-    wordBreak: "break-word",
-    overflowWrap: "break-word",
-    marginTop: "8px",
-  },
-  emptyColumn: {
-    border: "1px dashed #d1d5db",
-    borderRadius: "16px",
-    padding: "22px",
-    textAlign: "center",
-    color: "#94a3b8",
+    color: "#ff5733",
+    fontSize: "12px",
     fontWeight: 800,
   },
+
+  emptyColumn: {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px dashed #d5dbe5",
+    borderRadius: "14px",
+    padding: "16px 12px",
+    textAlign: "center",
+    color: "#94a3b8",
+    fontSize: "12px",
+    fontWeight: 800,
+    background: "#ffffff",
+  },
+
   empty: {
     border: "1px dashed #d1d5db",
     borderRadius: "16px",
@@ -1336,6 +1885,7 @@ const styles = {
     fontWeight: 800,
     background: "#ffffff",
   },
+
   error: {
     background: "#fff1f2",
     color: "#dc2626",
@@ -1345,11 +1895,13 @@ const styles = {
     marginBottom: "18px",
     fontWeight: 800,
   },
+
   specialGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: "18px",
   },
+
   rejectedProjectTile: {
     textAlign: "left",
     border: "1px solid #fecaca",
@@ -1358,6 +1910,7 @@ const styles = {
     padding: "20px",
     cursor: "pointer",
   },
+
   holdTile: {
     textAlign: "left",
     border: "1px solid #fde68a",
@@ -1366,6 +1919,7 @@ const styles = {
     padding: "20px",
     cursor: "pointer",
   },
+
   rejectedPill: {
     background: "#fee2e2",
     color: "#991b1b",
@@ -1374,6 +1928,7 @@ const styles = {
     fontSize: "12px",
     fontWeight: 900,
   },
+
   holdPill: {
     background: "#fef3c7",
     color: "#92400e",
@@ -1382,6 +1937,7 @@ const styles = {
     fontSize: "12px",
     fontWeight: 900,
   },
+
   emptySpecial: {
     border: "1px dashed #d1d5db",
     borderRadius: "18px",
@@ -1391,6 +1947,7 @@ const styles = {
     color: "#94a3b8",
     fontWeight: 900,
   },
+
   modalBackdrop: {
     position: "fixed",
     inset: 0,
@@ -1400,15 +1957,21 @@ const styles = {
     placeItems: "center",
     padding: "24px",
   },
+
   modal: {
-    width: "min(900px, 96vw)",
+    position: "relative",
+    width: "min(1250px, 96vw)",
+    height: "90vh",
     maxHeight: "90vh",
-    overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
     background: "#ffffff",
     borderRadius: "26px",
-    padding: "28px",
-    boxShadow: "0 24px 70px rgba(0,0,0,0.25)",
+    padding: "0",
+    boxShadow: "0 24px 60px rgba(15, 23, 42, 0.28)",
+    overflow: "hidden",
   },
+
   modalHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -1416,20 +1979,23 @@ const styles = {
     alignItems: "flex-start",
     marginBottom: "22px",
   },
+
   modalTitle: {
     margin: 0,
     color: "#111827",
     fontSize: "30px",
     fontWeight: 900,
   },
+
   modalDescription: {
     margin: "8px 0 0",
     color: "#667085",
     fontSize: "15px",
     lineHeight: 1.5,
   },
+
   closeBtn: {
-    border: "0",
+    border: 0,
     background: "#111827",
     color: "#ffffff",
     borderRadius: "12px",
@@ -1438,14 +2004,15 @@ const styles = {
     display: "grid",
     placeItems: "center",
     cursor: "pointer",
-    flexShrink: 0,
   },
+
   detailGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
     gap: "12px",
     marginBottom: "20px",
   },
+
   detailBox: {
     background: "#f8fafc",
     border: "1px solid #e5e7eb",
@@ -1456,34 +2023,37 @@ const styles = {
   },
 
   detailBoxLabel: {
-    fontWeight: "700",
+    fontWeight: 800,
     display: "block",
     marginBottom: "6px",
+    color: "#475569",
+    fontSize: "12px",
   },
 
   detailBoxValue: {
     color: "#111827",
     fontSize: "14px",
-    fontWeight: "400",
+    fontWeight: 500,
     margin: 0,
-    lineHeight: "1.5",
-    wordBreak: "break-word",
+    lineHeight: 1.5,
     overflowWrap: "anywhere",
+    wordBreak: "break-word",
   },
+
   progressBlock: {
     background: "#fff7f4",
     border: "1px solid #ffd4c8",
     borderRadius: "18px",
     padding: "16px",
-    marginBottom: "18px",
+    marginBottom: "22px",
   },
+
   progressTop: {
     display: "flex",
     justifyContent: "space-between",
     marginBottom: "10px",
-    color: "#111827",
-    fontWeight: 900,
   },
+
   progressTrack: {
     width: "100%",
     height: "10px",
@@ -1491,209 +2061,339 @@ const styles = {
     background: "#ffd6cc",
     overflow: "hidden",
   },
+
   progressFill: {
     height: "100%",
     borderRadius: "999px",
     background: "#ff5733",
   },
+
   progressNote: {
     margin: "8px 0 0",
     color: "#667085",
     fontSize: "13px",
     fontWeight: 800,
   },
-  lockNotice: {
-    background: "#f8fafc",
-    border: "1px solid #e5e7eb",
-    color: "#374151",
-    borderRadius: "16px",
-    padding: "14px",
-    fontWeight: 900,
-    marginBottom: "18px",
+
+  mainTaskSection: {
+    marginBottom: "20px",
   },
-  subtaskForm: {
-    border: "1px solid #e5e7eb",
-    background: "#f8fafc",
-    borderRadius: "18px",
-    padding: "16px",
-    marginBottom: "18px",
-  },
-  formTitleRow: {
+
+  sectionHeadingRow: {
     display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginBottom: "14px",
-    color: "#ff5733",
+    justifyContent: "space-between",
+    gap: "14px",
+    marginBottom: "12px",
   },
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "1.2fr 1fr 1fr auto",
-    gap: "12px",
-    alignItems: "end",
-  },
-  field: {
-    display: "grid",
-    gap: "7px",
-  },
-  fieldFull: {
-    gridColumn: "1 / -1",
-    display: "grid",
-    gap: "7px",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: "85px",
-    border: "1px solid #d1d5db",
-    borderRadius: "12px",
-    padding: "12px",
-    fontSize: "14px",
-    outline: "0",
-    resize: "vertical",
-    fontFamily: "inherit",
-  },
-  addBtn: {
-    border: "0",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "13px",
-    height: "46px",
-    padding: "0 18px",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  modalSuccess: {
-    background: "#f0fdf4",
-    color: "#15803d",
-    border: "1px solid #bbf7d0",
-    borderRadius: "14px",
-    padding: "12px 14px",
-    marginBottom: "14px",
-    fontWeight: 800,
-  },
-  modalError: {
-    background: "#fff1f2",
-    color: "#dc2626",
-    border: "1px solid #fecdd3",
-    borderRadius: "14px",
-    padding: "12px 14px",
-    marginBottom: "14px",
-    fontWeight: 800,
-  },
-  subtaskSection: {
-    marginTop: "8px",
-  },
+
   sectionTitle: {
-    margin: "0 0 14px",
-    color: "#111827",
+    margin: 0,
     fontSize: "22px",
     fontWeight: 900,
   },
-  subtaskList: {
-    display: "grid",
-    gap: "10px",
-    maxHeight: "320px",
-    overflowY: "auto",
-    paddingRight: "8px",
-  },
-  subtaskRow: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "16px",
-    padding: "14px",
-    display: "grid",
-    gridTemplateColumns: "24px 1fr auto",
-    gap: "12px",
-    alignItems: "center",
-  },
-  subtaskDescription: {
+
+  sectionSubtitle: {
     margin: "5px 0 0",
-    color: "#667085",
+    color: "#64748b",
     fontSize: "13px",
-    lineHeight: 1.45,
   },
-  doneBadge: {
-    background: "#dcfce7",
-    color: "#166534",
+
+  mainTaskCount: {
+    minWidth: "38px",
+    height: "38px",
+    padding: "0 10px",
     borderRadius: "999px",
-    padding: "7px 11px",
-    fontSize: "12px",
+    background: "#f1f5f9",
+    display: "grid",
+    placeItems: "center",
     fontWeight: 900,
   },
-  todoBadge: {
-    background: "#eef2ff",
-    color: "#374151",
-    borderRadius: "999px",
-    padding: "7px 11px",
-    fontSize: "12px",
+
+  mainTaskTabs: {
+    display: "flex",
+    gap: "10px",
+    overflowX: "auto",
+  },
+
+  mainTaskTab: {
+    flex: "0 0 220px",
+    border: "1px solid #e5e7eb",
+    background: "#ffffff",
+    borderRadius: "14px",
+    padding: "13px",
+    textAlign: "left",
+  },
+
+  activeMainTaskTab: {
+    flex: "0 0 220px",
+    border: "1px solid #ffb8a7",
+    background: "#fff7f4",
+    borderRadius: "14px",
+    padding: "13px",
+    textAlign: "left",
+  },
+
+  mainTaskTabTitle: {
+    display: "block",
+    fontWeight: 900,
+    fontSize: "13px",
+  },
+
+  mainTaskTabStatus: {
+    color: "#64748b",
+    fontSize: "11px",
+  },
+
+  mainTaskDetailCard: {
+    border: "1px solid #e5e7eb",
+    borderRadius: "20px",
+    padding: "18px",
+    marginBottom: "18px",
+  },
+
+  mainTaskHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: "16px",
+  },
+
+  eyebrow: {
+    color: "#ff5733",
+    fontSize: "11px",
     fontWeight: 900,
   },
+
+  mainTaskTitle: {
+    margin: 0,
+    fontSize: "24px",
+    fontWeight: 900,
+  },
+
+  mainTaskInfoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+    gap: "10px",
+  },
+
+  taskProgressRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: "12px",
+    marginBottom: "12px",
+  },
+
   modalWarning: {
     background: "#fff7ed",
     color: "#c2410c",
     border: "1px solid #fed7aa",
     borderRadius: "14px",
     padding: "12px 14px",
-    marginBottom: "14px",
-    fontWeight: 800,
+    marginBottom: "18px",
   },
+
+  subtaskForm: {
+    background: "#f8fafc",
+    borderRadius: "18px",
+    padding: "16px",
+    marginBottom: "18px",
+  },
+
+  formTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    color: "#ff5733",
+    marginBottom: "12px",
+  },
+
+  formHint: {
+    color: "#64748b",
+    fontSize: "12px",
+  },
+
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "1.2fr 1fr 1fr",
+    gap: "12px",
+    alignItems: "end",
+  },
+
+  field: {
+    display: "grid",
+    gap: "7px",
+  },
+
+  fieldFull: {
+    gridColumn: "1 / -1",
+    display: "grid",
+    gap: "7px",
+  },
+
+  input: {
+    height: "46px",
+    border: "1px solid #d1d5db",
+    borderRadius: "12px",
+    padding: "0 12px",
+  },
+
+  textarea: {
+    minHeight: "85px",
+    border: "1px solid #d1d5db",
+    borderRadius: "12px",
+    padding: "12px",
+  },
+
+  addBtn: {
+    border: 0,
+    background: "#ff5733",
+    color: "#ffffff",
+    borderRadius: "13px",
+    height: "46px",
+    padding: "0 18px",
+  },
+
+  modalSuccess: {
+    background: "#f0fdf4",
+    color: "#15803d",
+    padding: "12px",
+  },
+
+  modalError: {
+    background: "#fff1f2",
+    color: "#dc2626",
+    padding: "12px",
+  },
+  modalBody: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "34px",
+  },
+
+  modalFooter: {
+    height: "80px",
+    flexShrink: 0,
+    borderTop: "1px solid #e5e7eb",
+    background: "#ffffff",
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    padding: "0 34px",
+  },
+
+  cancelModalButton: {
+    height: "42px",
+    padding: "0 24px",
+    borderRadius: "12px",
+    border: "1px solid #d1d5db",
+    background: "#ffffff",
+    color: "#111827",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  subtaskSection: {
+    marginTop: "8px",
+  },
+
+  subtaskList: {
+    display: "grid",
+    gap: "10px",
+    maxHeight: "340px",
+    overflowY: "auto",
+  },
+
+  subtaskRow: {
+    border: "1px solid #e5e7eb",
+    borderRadius: "16px",
+    padding: "14px",
+    display: "grid",
+    gridTemplateColumns: "24px 1fr 100px",
+    gap: "12px",
+    alignItems: "center",
+  },
+
+  subtaskDates: {
+    color: "#475569",
+    fontSize: "12px",
+  },
+
+  subtaskDescription: {
+    color: "#667085",
+    fontSize: "13px",
+  },
+
+  subtaskCreator: {
+    color: "#94a3b8",
+    fontSize: "11px",
+  },
+
+  doneBadge: {
+    background: "#dcfce7",
+    color: "#166534",
+    borderRadius: "10px",
+    padding: "4px 8px",
+    fontSize: "12px",
+    fontWeight: 900,
+  },
+
+  todoBadge: {
+    background: "#eef2ff",
+    color: "#374151",
+    borderRadius: "10px",
+    padding: "4px 8px",
+    fontSize: "12px",
+    fontWeight: 900,
+  },
+
   confirmOverlay: {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(15, 23, 42, 0.45)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "20px",
-  zIndex: 20000,
-},
+    position: "fixed",
+    inset: 0,
+    background: "rgba(15, 23, 42, 0.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20000,
+  },
 
-confirmBox: {
-  width: "min(380px, 92vw)",
-  background: "#ffffff",
-  borderRadius: "22px",
-  padding: "30px",
-  boxShadow: "0 24px 70px rgba(15, 23, 42, 0.28)",
-  border: "1px solid #eef2f7",
-  textAlign: "center",
-},
+  confirmBox: {
+    width: "400px",
+    background: "#ffffff",
+    borderRadius: "22px",
+    padding: "30px",
+    textAlign: "center",
+  },
 
-confirmTitle: {
-  margin: "0 0 26px",
-  color: "#111827",
-  fontSize: "24px",
-  fontWeight: 900,
-},
+  confirmTitle: {
+    margin: "0 0 10px",
+  },
 
-confirmActions: {
-  display: "flex",
-  justifyContent: "center",
-  gap: "12px",
-},
+  confirmText: {
+    color: "#64748b",
+  },
 
-confirmCancelBtn: {
-  minWidth: "110px",
-  height: "46px",
-  border: "1px solid #d1d5db",
-  borderRadius: "13px",
-  background: "#ffffff",
-  color: "#111827",
-  fontSize: "15px",
-  fontWeight: 900,
-  cursor: "pointer",
-},
+  confirmActions: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "12px",
+  },
 
-confirmYesBtn: {
-  minWidth: "110px",
-  height: "46px",
-  border: "none",
-  borderRadius: "13px",
-  background: "#ff5733",
-  color: "#ffffff",
-  fontSize: "15px",
-  fontWeight: 900,
-  cursor: "pointer",
-  boxShadow: "0 8px 18px rgba(255, 87, 51, 0.22)",
-},
+  confirmCancelBtn: {
+    height: "46px",
+    padding: "0 20px",
+    borderRadius: "13px",
+    border: "1px solid #d1d5db",
+    background: "#ffffff",
+  },
+
+  confirmYesBtn: {
+    height: "46px",
+    padding: "0 20px",
+    borderRadius: "13px",
+    border: 0,
+    background: "#ff5733",
+    color: "#ffffff",
+  },
 };
-
 
 export default EmployeeProjects;

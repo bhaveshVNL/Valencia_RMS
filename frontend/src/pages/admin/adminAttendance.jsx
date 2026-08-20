@@ -236,26 +236,46 @@ const AdminAttendance = () => {
 
       {activeTab === "employeeSummary" && (
         <section style={styles.contentBlock}>
-          <div style={styles.sectionTitleRow}>
-            <div>
-              <h2 style={styles.sectionTitle}>Employee Summary</h2>
-              <p style={styles.sectionSubtitle}>
-                Department employee attendance summary
-                {dateRange?.start_date && dateRange?.end_date
-                  ? ` from ${dateRange.start_date} to ${dateRange.end_date}.`
-                  : "."}{" "}
-                Absent is counted from missing working dates only, Sundays excluded.
-              </p>
-            </div>
-          </div>
 
-          <input
-            style={styles.searchInput}
-            type="text"
-            placeholder="Search employee, email, department..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
+  <div style={styles.employeeSummaryHeader}>
+
+    <div>
+      <h2 style={styles.sectionTitle}>
+        {employeeSummary[0]?.department_name || "Department"} Users
+      </h2>
+
+      <p style={styles.sectionSubtitle}>
+        Employee attendance management
+      </p>
+    </div>
+
+    <button
+      type="button"
+      style={styles.refreshButton}
+      onClick={fetchAttendance}
+    >
+      Refresh
+    </button>
+
+  </div>
+
+
+  <div style={styles.searchRow}>
+
+    <input
+      style={styles.searchInput}
+      type="text"
+      placeholder="Search employee, email, department..."
+      value={searchTerm}
+      onChange={(event) => setSearchTerm(event.target.value)}
+    />
+
+
+    <div style={styles.totalBadge}>
+      Total: {filteredEmployees.length}
+    </div>
+
+  </div>
 
           {loading ? (
             <div style={styles.emptyBox}>Loading employee summary...</div>
@@ -276,10 +296,15 @@ const AdminAttendance = () => {
 
 const styles = {
   page: {
-    width: "100%",
-    minHeight: "100%",
-    marginTop: "-46px",
-  },
+  width: "100%",
+  flex: 1,
+  minHeight: "100%",
+
+  boxSizing: "border-box",
+
+  margin: 0,
+  padding: "18px 20px 32px",
+},
 
   errorBox: {
     background: "#fff1f2",
@@ -327,11 +352,16 @@ const styles = {
   },
 
   contentBlock: {
-    background: "#ffffff",
-    borderRadius: "28px",
-    padding: "32px 38px",
-    boxShadow: "0 18px 46px rgba(15, 23, 42, 0.07)",
-  },
+  width: "100%",
+  boxSizing: "border-box",
+
+  background: "#ffffff",
+  borderRadius: "28px",
+
+  padding: "32px 38px",
+
+  boxShadow: "0 18px 46px rgba(15, 23, 42, 0.07)",
+},
 
   myAttendanceHeader: {
     display: "grid",
@@ -390,7 +420,8 @@ const styles = {
     color: "#ff5733",
     borderRadius: "999px",
     padding: "8px 16px",
-    maxWidth: "100%",
+    maxwidth: "auto",
+flex: 1,
   },
 
   myDepartmentText: {
@@ -466,6 +497,43 @@ const styles = {
   sectionTitleRow: {
     marginBottom: "20px",
   },
+  employeeSummaryHeader: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
+},
+
+searchRow: {
+  display: "flex",
+  alignItems: "center",
+  gap: "18px",
+  marginBottom: "24px",
+},
+
+refreshButton: {
+  border: "none",
+  background: "#ff5733",
+  color: "#ffffff",
+  borderRadius: "14px",
+  padding: "12px 24px",
+  fontSize: "14px",
+  fontWeight: 900,
+  cursor: "pointer",
+  boxShadow: "0 10px 22px rgba(255,87,51,0.22)",
+},
+
+totalBadge: {
+  background: "#111827",
+  color: "#ffffff",
+  borderRadius: "999px",
+  padding: "12px 20px",
+  fontSize: "15px",
+  fontWeight: 900,
+  whiteSpace: "nowrap",
+},
+
+
 
   sectionTitle: {
     margin: "0 0 8px",
@@ -483,7 +551,8 @@ const styles = {
   },
 
   searchInput: {
-    width: "100%",
+    width: "auto",
+flex: 1,
     height: "58px",
     border: "1.5px solid #cbd5e1",
     borderRadius: "16px",
@@ -498,14 +567,14 @@ const styles = {
   },
 
   tableBlock: {
-    width: "100%",
-    overflowX: "auto",
-  },
+  width: "100%",
+  overflowX: "auto",
+},
 
   table: {
-    width: "100%",
-    borderCollapse: "collapse",
-  },
+  width: "100%",
+  borderCollapse: "collapse",
+},
 
   th: {
     textAlign: "left",
@@ -626,7 +695,8 @@ const styles = {
     padding: "7px 13px",
     fontSize: "14px",
     fontWeight: 900,
-    maxWidth: "100%",
+    maxwidth: "auto",
+flex: 1,
     textTransform: "uppercase",
     letterSpacing: "0.03em",
   },

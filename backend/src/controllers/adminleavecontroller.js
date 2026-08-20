@@ -1,11 +1,8 @@
 const db = require("../config/db");
 const { sendMail } = require("../utils/emailservice");
-const LEAVE_LIMITS = {
-  sick: 7,
-  casual: 7,
-  mandatory: 18,
-  festival: 4,
-};
+const {
+  buildLeaveBalances,
+} = require("../utils/leavepolicy");
 
 const getLeaveLabel = (type) => {
   if (type === "sick") {
@@ -576,154 +573,80 @@ const reviewLeaveApplication = async (
   status ===
   "approved"
 ) {
-  let limit =
-    LEAVE_LIMITS[
+  const leaveYear =
+    Number(
+      String(
+        leave.start_date
+      ).slice(
+        0,
+        4
+      )
+    );
+
+  /*
+  Exclude the current pending application
+  when calculating balance.
+
+  Other pending applications remain reserved.
+  */
+  const balances =
+    await buildLeaveBalances(
+      connection,
+      leave.employee_id,
+      leaveYear,
+      {
+        excludeLeaveId:
+          leaveId,
+      }
+    );
+
+  const selectedBalance =
+    balances[
       leave.leave_type
     ];
 
-  /*
-  ================================================
-  PRIVILEGED LEAVE
-  1.5 days earned each month,
-  maximum 18 days.
-  ================================================
-  */
-  if (
-    leave.leave_type ===
-    "mandatory"
-  ) {
-    const leaveYear =
-      Number(
-        String(
-          leave.start_date ||
-            ""
-        ).slice(0, 4)
-      );
+  if (!selectedBalance) {
+    await connection.rollback();
 
-    const now =
-      new Date();
-
-    const currentYear =
-      now.getFullYear();
-
-    const currentMonth =
-      now.getMonth() + 1;
-
-    if (
-      leaveYear <
-      currentYear
-    ) {
-      limit = 18;
-    } else if (
-      leaveYear ===
-      currentYear
-    ) {
-      limit =
-        Math.min(
-          18,
-          currentMonth *
-            1.5
-        );
-    } else {
-      limit = 0;
-    }
+    return res.status(400).json({
+      success: false,
+      message:
+        "Unable to calculate employee Leave balance.",
+    });
   }
 
-  /*
-  ================================================
-  HOLIDAY / FESTIVAL LEAVE
+  const available =
+    Number(
+      selectedBalance.available ||
+        0
+    );
 
-  LEAVE_LIMITS.festival = 4
-
-  No special calculation is required here.
-  The normal balance check below will ensure
-  the employee cannot get more than 4 approved
-  Holiday Leaves in the year.
-  ================================================
-  */
+  const requestedDays =
+    Number(
+      leave.total_days ||
+        0
+    );
 
   if (
-    limit !==
-    undefined
+    requestedDays >
+    available
   ) {
-        const [usedRows] =
-          await connection.query(
-            `
-            SELECT
-              COALESCE(
-                SUM(total_days),
-                0
-              ) AS used_days
+    await connection.rollback();
 
-            FROM leave_applications
+    return res.status(400).json({
+      success: false,
 
-            WHERE
-              employee_id = ?
+      message:
+        `Cannot approve. Employee only has ${available} ${getLeaveLabel(
+          leave.leave_type
+        )} day(s) available.`,
+    });
+  }
 
-              AND
-              leave_type = ?
-
-              AND
-              status = 'approved'
-
-              AND
-              YEAR(start_date) =
-              YEAR(?)
-
-              AND
-              leave_id <> ?
-            `,
-            [
-              leave.employee_id,
-              leave.leave_type,
-              leave.start_date,
-              leaveId,
-            ]
-          );
-
-        const alreadyUsed =
-          Number(
-            usedRows[0]
-              ?.used_days ||
-              0
-          );
-
-        const requestedDays =
-          Number(
-            leave.total_days ||
-              0
-          );
-
-        if (
-          alreadyUsed +
-            requestedDays >
-          limit
-        ) {
-          await connection
-            .rollback();
-
-          return res
-            .status(400)
-            .json({
-              success: false,
-
-              message:
-                `Cannot approve. Employee only has ${Math.max(
-                  0,
-                  limit -
-                    alreadyUsed
-                )} ${getLeaveLabel(
-                  leave.leave_type
-                )} day(s) remaining.`,
-            });
-        }
-
-        remainingBalance =
-          limit -
-          alreadyUsed -
-          requestedDays;
-      }
-    }
+  remainingBalance =
+    available -
+    requestedDays;
+}
 
     /*
     ====================================================

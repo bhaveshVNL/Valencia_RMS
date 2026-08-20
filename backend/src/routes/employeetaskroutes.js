@@ -16,96 +16,137 @@ const {
 
 const router = express.Router();
 
+const employeeAccess = [
+  authMiddleware,
+  requireRole(
+    "employee",
+    "administrator",
+    "admin",
+    "superadmin"
+  ),
+];
+
+/*
+========================================================
+EMPLOYEE MAIN TASKS
+========================================================
+*/
+
+// Get all Main Tasks assigned to logged-in employee
 router.get(
   "/",
-  authMiddleware,
-  requireRole("employee"),
+  ...employeeAccess,
   getEmployeeTasks
 );
 
+// Existing frontend alias
 router.get(
   "/my",
-  authMiddleware,
-  requireRole("employee"),
+  ...employeeAccess,
   getEmployeeTasks
 );
 
-/* TASK TIMER ACTIONS */
+/*
+========================================================
+SUBTASK STATUS
 
-router.post(
-  "/:taskId/start",
-  authMiddleware,
-  requireRole("employee"),
-  startEmployeeTask
-);
+Keep these BEFORE the dynamic /:taskId routes.
+========================================================
+*/
 
-router.post(
-  "/:taskId/pause",
-  authMiddleware,
-  requireRole("employee"),
-  pauseEmployeeTask
-);
-
-router.post(
-  "/:taskId/resume",
-  authMiddleware,
-  requireRole("employee"),
-  resumeEmployeeTask
-);
-
-router.post(
-  "/:taskId/submit-review",
-  authMiddleware,
-  requireRole("employee"),
-  submitEmployeeTaskForReview
-);
-
-/* SUBTASKS */
-
-router.post(
-  "/:taskId/subtasks",
-  authMiddleware,
-  requireRole("employee"),
-  addEmployeeSubtask
-);
-
-router.post(
-  "/tasks/:taskId/subtasks",
-  authMiddleware,
-  requireRole("employee"),
-  addEmployeeSubtask
-);
-
+// Mark shared Subtask as completed
 router.patch(
   "/subtasks/:subtaskId/check",
-  authMiddleware,
-  requireRole("employee"),
+  ...employeeAccess,
   markEmployeeSubtaskDone
 );
 
+// PUT alias because older frontend may try PUT
 router.put(
   "/subtasks/:subtaskId/check",
-  authMiddleware,
-  requireRole("employee"),
+  ...employeeAccess,
   markEmployeeSubtaskDone
 );
 
 /*
-Keep generic /:taskId routes AFTER the specific routes.
+========================================================
+MAIN TASK DETAILS
+========================================================
 */
 
+// Get one Main Task + shared Subtasks
 router.get(
   "/:taskId",
-  authMiddleware,
-  requireRole("employee"),
+  ...employeeAccess,
   getEmployeeTaskDetails
 );
 
+// Existing frontend alias
 router.get(
   "/:taskId/details",
-  authMiddleware,
-  requireRole("employee"),
+  ...employeeAccess,
   getEmployeeTaskDetails
+);
+
+/*
+========================================================
+ADD SUBTASK
+
+Subtask belongs to MAIN TASK, not directly to Project.
+========================================================
+*/
+
+router.post(
+  "/:taskId/subtasks",
+  ...employeeAccess,
+  addEmployeeSubtask
+);
+
+// Older frontend compatibility
+router.post(
+  "/tasks/:taskId/subtasks",
+  ...employeeAccess,
+  addEmployeeSubtask
+);
+
+/*
+========================================================
+TASK TIMER / STATUS ACTIONS
+========================================================
+*/
+
+// To Do -> In Progress
+router.post(
+  "/:taskId/start",
+  ...employeeAccess,
+  startEmployeeTask
+);
+
+// Pause employee's timer
+router.post(
+  "/:taskId/pause",
+  ...employeeAccess,
+  pauseEmployeeTask
+);
+
+// Resume employee's timer
+router.post(
+  "/:taskId/resume",
+  ...employeeAccess,
+  resumeEmployeeTask
+);
+
+/*
+Main Tasks with all Subtasks completed will already
+move automatically to Under Review.
+
+This endpoint remains useful for Main Tasks that have
+no Subtasks.
+*/
+router.post(
+  "/:taskId/submit-review",
+  ...employeeAccess,
+  submitEmployeeTaskForReview
 );
 
 module.exports = router;

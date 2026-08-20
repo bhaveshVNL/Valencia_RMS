@@ -13,26 +13,53 @@ const EMPTY_FORM = {
 };
 
 const DEFAULT_BALANCES = {
-  sick: { label: "Sick Leave", total: 7, earned: 7, used: 0, pending: 0, available: 7, remaining: 7 },
-  casual: { label: "Casual Leave", total: 7, earned: 7, used: 0, pending: 0, available: 7, remaining: 7 },
+  sick: {
+    label: "Sick Leave",
+    total: 2,
+    earned: 2,
+    used: 0,
+    pending: 0,
+    available: 2,
+    remaining: 2,
+  },
+
+  casual: {
+    label: "Casual Leave",
+    total: 2,
+    earned: 2,
+    used: 0,
+    pending: 0,
+    available: 2,
+    remaining: 2,
+  },
+
   mandatory: {
     label: "Privileged Leave",
     monthly_credit: 1.5,
-    annual_entitlement: 18,
+    carry_forward: true,
     earned: 0,
     used: 0,
     pending: 0,
     available: 0,
     remaining: 0,
   },
-  festival: { label: "Holiday Leave", total: 4, earned: 4, used: 0, pending: 0, available: 4, remaining: 4 },
+
+  festival: {
+    label: "Holiday Leave",
+    total: 4,
+    earned: 4,
+    used: 0,
+    pending: 0,
+    available: 4,
+    remaining: 4,
+  },
 };
 
 const LEAVE_CARDS = [
   { key: "sick", title: "Sick Leave", description: "Annual sick leave entitlement" },
   { key: "casual", title: "Casual Leave", description: "Annual casual leave entitlement" },
   { key: "mandatory", title: "Privileged Leave", description: "1.5 days credited monthly" },
-  { key: "festival", title: "Holiday Leave", description: "Choose up to 4 festival holidays" },
+  { key: "festival", title: "Holiday Leave", description: "1 Holiday Leave in 2026 - Christmas" },
 ];
 
 const HISTORY_FILTERS = ["all", "pending", "approved", "rejected"];
@@ -135,11 +162,16 @@ const BalanceCard = ({ leave, balance, onApply }) => {
       </p>
 
       {isPrivileged && (
-        <div style={styles.cardInfo}>
-          <span>Annual entitlement: <strong>18 days</strong></span>
-          <span>No advance leave</span>
-        </div>
-      )}
+  <div style={styles.cardInfo}>
+    <span>
+      <strong>1.5 days credited every month</strong>
+    </span>
+
+    <span>
+      Unused balance carries forward
+    </span>
+  </div>
+)}
 
       {isFestival && (
         <div style={styles.cardInfo}>
@@ -265,23 +297,45 @@ const EmployeeLeaveApplications = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showInstructions, setShowInstructions] = useState(false);
-  const [showHolidayCalendar, setShowHolidayCalendar] = useState(false);
+  const [showHolidayCalendar, setShowHolidayCalendar] = useState(false);  
+  const POLICY_START_DATE = "2026-09-01";
 
-  const minimumLeaveDate = getTomorrowDate();
+  const minimumLeaveDate =
+    getTomorrowDate() > POLICY_START_DATE
+      ? getTomorrowDate()
+      : POLICY_START_DATE;
 
   const calculateDays = useMemo(() => {
-    if (selectedLeaveType === "festival") {
-      return form.start_date ? 1 : 0;
+    if (
+      selectedLeaveType === "festival"
+    ) {
+      return form.start_date
+        ? 1
+        : 0;
     }
 
-    if (form.duration_type === "half_day") {
-      return form.start_date ? 0.5 : 0;
+    if (
+      form.duration_type === "half_day"
+    ) {
+      return form.start_date
+        ? 0.5
+        : 0;
     }
 
-    if (!form.start_date || !form.end_date) return 0;
+    if (
+      !form.start_date ||
+      !form.end_date
+    ) {
+      return 0;
+    }
 
-    const start = new Date(`${form.start_date}T00:00:00`);
-    const end = new Date(`${form.end_date}T00:00:00`);
+    const start = new Date(
+      `${form.start_date}T00:00:00`
+    );
+
+    const end = new Date(
+      `${form.end_date}T00:00:00`
+    );
 
     if (
       Number.isNaN(start.getTime()) ||
@@ -291,24 +345,34 @@ const EmployeeLeaveApplications = () => {
       return 0;
     }
 
-    return Math.floor(
-      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1;
+    return (
+      Math.floor(
+        (end.getTime() - start.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1
+    );
   }, [
+    selectedLeaveType,
     form.start_date,
     form.end_date,
     form.duration_type,
-    selectedLeaveType,
   ]);
 
   const filteredApplications = useMemo(() => {
-    if (historyFilter === "all") return applications;
+    if (historyFilter === "all") {
+      return applications;
+    }
 
     return applications.filter(
       (application) =>
-        String(application.status || "").toLowerCase() === historyFilter
+        String(
+          application.status || ""
+        ).toLowerCase() === historyFilter
     );
-  }, [applications, historyFilter]);
+  }, [
+    applications,
+    historyFilter,
+  ]);
 
   const blockedFestivalDates = useMemo(
     () =>
@@ -670,12 +734,11 @@ const EmployeeLeaveApplications = () => {
       </div>
 
       <div style={styles.balanceInfo}>
-        Pending leave is reserved from your available balance.
-        Approved leave is counted as used. Privileged Leave is
-        earned at 1.5 days per month and cannot be taken in
-        advance. Holiday Leave allows up to 4 festival holidays
-        and requires Admin approval.
-      </div>
+  Sick and Casual Leave reset every January.
+  Privileged Leave earns 1.5 days every month and
+  unused balance carries forward. Pending Leave is
+  reserved from the available balance.
+</div>
 
       <section style={styles.historyCard}>
         <div style={styles.historyHeader}>

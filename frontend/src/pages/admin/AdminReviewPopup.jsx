@@ -16,6 +16,7 @@ const AdminReviewPopup = () => {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [expandedProjectId, setExpandedProjectId] = useState(null);
   const [error, setError] = useState("");
+  const [selectedProject, setSelectedProject] = useState(null);
 
   const fetchReviewProjects = async () => {
     try {
@@ -106,14 +107,14 @@ const AdminReviewPopup = () => {
             key={subtask.task_id}
             style={styles.subtaskItem}
           >
-            <div>
+            <div style={styles.subtaskContent}>
               <strong>{subtask.task_title}</strong>
 
-              <p>
+              <p style={styles.wrapText}>
                 {subtask.task_description || "-"}
               </p>
 
-              <span>
+              <span style={styles.subtaskDate}>
                 {subtask.start_date || "-"} to{" "}
                 {subtask.due_date || "-"}
               </span>
@@ -137,21 +138,13 @@ const AdminReviewPopup = () => {
   };
 
   const renderProjectCard = (project) => {
-    const isExpanded =
-      expandedProjectId === project.project_id;
-
     return (
       <div
         key={project.project_id}
         style={styles.reviewCard}
       >
-        <div
-          style={styles.dropdownHeader}
-          onClick={() =>
-            toggleProject(project.project_id)
-          }
-        >
-          <div>
+        <div style={styles.reviewTop}>
+          <div style={styles.reviewProjectInfo}>
             <h3 style={styles.cardTitle}>
               {project.project_title}
             </h3>
@@ -163,171 +156,19 @@ const AdminReviewPopup = () => {
             </p>
           </div>
 
-          <span style={styles.reviewBadge}>
-            {isExpanded ? (
-              <>
-                <ChevronUp size={15} />
-                Close
-              </>
-            ) : (
-              <>
-                <ChevronDown size={15} />
-                View Details
-              </>
-            )}
-          </span>
+          <button
+            type="button"
+            style={styles.viewDetailsBtn}
+            onClick={() => setSelectedProject(project)}
+          >
+            View Details
+          </button>
         </div>
-
-        {isExpanded && (
-          <>
-            <div style={styles.infoGrid}>
-              <div style={styles.infoBox}>
-                <span>Department</span>
-                <strong>
-                  {project.department_name || "-"}
-                </strong>
-              </div>
-
-              <div style={styles.infoBox}>
-                <span>Assigned To</span>
-                <strong>
-                  {project.assigned_names || "-"}
-                </strong>
-                <p>
-                  {project.assigned_emails || "-"}
-                </p>
-              </div>
-
-              <div style={styles.infoBox}>
-                <span>Created By</span>
-                <strong>
-                  {project.created_by_name || "-"}
-                </strong>
-              </div>
-
-              <div style={styles.infoBox}>
-                <span>Dates</span>
-                <strong>
-                  {project.start_date || "-"} to{" "}
-                  {project.due_date || "-"}
-                </strong>
-              </div>
-            </div>
-
-            <div style={styles.progressBlock}>
-              <div style={styles.progressTop}>
-                <span>
-                  Project Progress
-                </span>
-
-                <strong>
-                  {project.overall_progress || 0}%
-                </strong>
-              </div>
-
-              <div style={styles.progressTrack}>
-                <div
-                  style={{
-                    ...styles.progressFill,
-                    width: `${
-                      project.overall_progress || 0
-                    }%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={styles.assigneeSection}>
-              <h4 style={styles.assigneeTitle}>
-                Assignee Work Details
-              </h4>
-
-              {(project.main_tasks || []).map(
-                (task) => (
-                  <div
-                    key={task.task_id}
-                    style={styles.assigneeCard}
-                  >
-                    <div>
-                      <strong>
-                        {task.assignee_name || "-"}
-                      </strong>
-
-                      <p>
-                        {task.assignee_email || "-"}
-                      </p>
-                    </div>
-
-                    <div style={styles.mainTaskBox}>
-                      <span>Main Task</span>
-
-                      <strong>
-                        {task.task_title || "-"}
-                      </strong>
-
-                      <p>
-                        {task.task_description || "-"}
-                      </p>
-                    </div>
-
-                    {renderSubtasks(task)}
-                  </div>
-                )
-              )}
-            </div>
-
-            <div style={styles.actionRow}>
-              <button
-                type="button"
-                style={styles.doneBtn}
-                disabled={Boolean(actionLoadingId)}
-                onClick={() =>
-                  handleAction(
-                    project.project_id,
-                    "done"
-                  )
-                }
-              >
-                <CheckCircle2 size={17} />
-                Done
-              </button>
-
-              <button
-                type="button"
-                style={styles.rejectBtn}
-                disabled={Boolean(actionLoadingId)}
-                onClick={() =>
-                  handleAction(
-                    project.project_id,
-                    "reject"
-                  )
-                }
-              >
-                <XCircle size={17} />
-                Reject
-              </button>
-
-              <button
-                type="button"
-                style={styles.holdBtn}
-                disabled={Boolean(actionLoadingId)}
-                onClick={() =>
-                  handleAction(
-                    project.project_id,
-                    "on_hold"
-                  )
-                }
-              >
-                <PauseCircle size={17} />
-                On Hold
-              </button>
-            </div>
-          </>
-        )}
       </div>
     );
   };
-    return (
+
+  return (
     <div style={styles.section}>
       <div style={styles.sectionHeader}>
         <div>
@@ -365,13 +206,218 @@ const AdminReviewPopup = () => {
           No projects waiting for review.
         </div>
       ) : (
-        <div style={styles.reviewList}>
-          {reviewProjects.map(renderProjectCard)}
-        </div>
+        <>
+          <div style={styles.reviewList}>
+            {reviewProjects.map(renderProjectCard)}
+          </div>
+
+          {selectedProject && (
+            <div
+              style={styles.modalOverlay}
+              onClick={() => setSelectedProject(null)}
+            >
+              <div
+                style={styles.modal}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div style={styles.modalHeader}>
+                  <div style={styles.modalHeadingContent}>
+                    <h2 style={styles.modalTitle}>
+                      {selectedProject.project_title}
+                    </h2>
+
+                    <p style={styles.cardDesc}>
+                      {selectedProject.project_description ||
+                        "No project description."}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    style={styles.closeBtn}
+                    onClick={() => setSelectedProject(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div style={styles.infoGrid}>
+                  <div style={styles.infoBox}>
+                    <span style={styles.infoLabel}>
+                      Department
+                    </span>
+
+                    <strong style={styles.infoValue}>
+                      {selectedProject.department_name || "-"}
+                    </strong>
+                  </div>
+
+                  <div style={styles.infoBox}>
+                    <span style={styles.infoLabel}>
+                      Assigned To
+                    </span>
+
+                    <strong style={styles.infoValue}>
+                      {selectedProject.assigned_names || "-"}
+                    </strong>
+
+                    <p style={styles.infoSecondary}>
+                      {selectedProject.assigned_emails || "-"}
+                    </p>
+                  </div>
+
+                  <div style={styles.infoBox}>
+                    <span style={styles.infoLabel}>
+                      Created By
+                    </span>
+
+                    <strong style={styles.infoValue}>
+                      {selectedProject.created_by_name || "-"}
+                    </strong>
+
+                    <p style={styles.infoSecondary}>
+                      {selectedProject.created_by_email || "-"}
+                    </p>
+                  </div>
+
+                  <div style={styles.infoBox}>
+                    <span style={styles.infoLabel}>
+                      Dates
+                    </span>
+
+                    <strong style={styles.infoValue}>
+                      {selectedProject.start_date || "-"} to{" "}
+                      {selectedProject.due_date || "-"}
+                    </strong>
+                  </div>
+                </div>
+
+                <div style={styles.progressBlock}>
+                  <div style={styles.progressTop}>
+                    <span>Project Progress</span>
+
+                    <strong>
+                      {selectedProject.overall_progress || 0}%
+                    </strong>
+                  </div>
+
+                  <div style={styles.progressTrack}>
+                    <div
+                      style={{
+                        ...styles.progressFill,
+                        width: `${selectedProject.overall_progress || 0}%`,
+                      }}
+                    />
+                  </div>
+
+                  <p style={styles.taskLine}>
+                    {selectedProject.completed_active_assignees || 0}/
+                    {selectedProject.active_assignees || 0} active
+                    assignees completed.
+                  </p>
+                </div>
+
+                <div style={styles.assigneeSection}>
+                  <h4 style={styles.assigneeTitle}>
+                    Assignee Work Details
+                  </h4>
+
+                  {(selectedProject.main_tasks || []).map((task) => (
+                    <div
+                      key={task.task_id}
+                      style={styles.assigneeCard}
+                    >
+                      <div style={styles.assigneeTop}>
+                        <div style={styles.assigneeInfo}>
+                          <strong style={styles.assigneeName}>
+                            {task.assignee_name || "-"}
+                          </strong>
+
+                          <p style={styles.assigneeEmail}>
+                            {task.assignee_email || "-"}
+                          </p>
+                        </div>
+
+                        <span style={styles.assigneeProgress}>
+                          {task.completed_subtasks || 0}/
+                          {task.total_subtasks || 0} done
+                        </span>
+                      </div>
+
+                      <div style={styles.mainTaskBox}>
+                        <span style={styles.mainTaskLabel}>
+                          Main Task
+                        </span>
+
+                        <strong style={styles.mainTaskTitle}>
+                          {task.task_title || "-"}
+                        </strong>
+
+                        <p style={styles.wrapText}>
+                          {task.task_description || "-"}
+                        </p>
+                      </div>
+
+                      {renderSubtasks(task)}
+                    </div>
+                  ))}
+                </div>
+
+                <div style={styles.actionRow}>
+                  <button
+                    type="button"
+                    style={styles.doneBtn}
+                    disabled={Boolean(actionLoadingId)}
+                    onClick={() =>
+                      handleAction(
+                        selectedProject.project_id,
+                        "done"
+                      )
+                    }
+                  >
+                    <CheckCircle2 size={17} />
+                    Done
+                  </button>
+
+                  <button
+                    type="button"
+                    style={styles.rejectBtn}
+                    disabled={Boolean(actionLoadingId)}
+                    onClick={() =>
+                      handleAction(
+                        selectedProject.project_id,
+                        "reject"
+                      )
+                    }
+                  >
+                    <XCircle size={17} />
+                    Reject
+                  </button>
+
+                  <button
+                    type="button"
+                    style={styles.holdBtn}
+                    disabled={Boolean(actionLoadingId)}
+                    onClick={() =>
+                      handleAction(
+                        selectedProject.project_id,
+                        "on_hold"
+                      )
+                    }
+                  >
+                    <PauseCircle size={17} />
+                    On Hold
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 };
+
 const styles = {
   section: {
     background: "#ffffff",
@@ -460,8 +506,21 @@ const styles = {
   reviewCard: {
     border: "1px solid #ffd0c4",
     borderRadius: "20px",
-    padding: "20px",
+    padding: "20px 24px",
     background: "#fff7f4",
+  },
+
+  reviewTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "24px",
+    width: "100%",
+  },
+
+  reviewProjectInfo: {
+    minWidth: 0,
+    flex: 1,
   },
 
   dropdownHeader: {
@@ -477,6 +536,7 @@ const styles = {
     fontSize: "22px",
     fontWeight: 900,
     color: "#111827",
+    overflowWrap: "anywhere",
   },
 
   cardDesc: {
@@ -484,6 +544,7 @@ const styles = {
     color: "#667085",
     fontSize: "14px",
     lineHeight: 1.5,
+    overflowWrap: "anywhere",
   },
 
   reviewBadge: {
@@ -501,34 +562,64 @@ const styles = {
 
   infoGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "12px",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "14px",
     marginTop: "18px",
-    marginBottom: "16px",
+    marginBottom: "18px",
   },
 
   infoBox: {
+    minWidth: 0,
     background: "#ffffff",
     border: "1px solid #e5e7eb",
     borderRadius: "15px",
-    padding: "13px",
+    padding: "15px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    overflow: "hidden",
+  },
+
+  infoLabel: {
+    color: "#64748b",
+    fontSize: "12px",
+    fontWeight: 800,
+  },
+
+  infoValue: {
+    color: "#111827",
+    fontSize: "14px",
+    fontWeight: 900,
+    lineHeight: 1.35,
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
+  },
+
+  infoSecondary: {
+    margin: 0,
+    color: "#64748b",
+    fontSize: "12px",
+    lineHeight: 1.35,
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
   },
 
   progressBlock: {
     background: "#ffffff",
     border: "1px solid #e5e7eb",
     borderRadius: "15px",
-    padding: "13px",
+    padding: "15px",
     marginBottom: "16px",
   },
 
   progressTop: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
+    gap: "16px",
     fontWeight: 900,
     color: "#111827",
-    marginBottom: "8px",
+    marginBottom: "10px",
   },
 
   progressTrack: {
@@ -545,16 +636,23 @@ const styles = {
     borderRadius: "999px",
   },
 
+  taskLine: {
+    margin: "8px 0 0",
+    color: "#64748b",
+    fontSize: "13px",
+    fontWeight: 700,
+  },
+
   assigneeSection: {
     background: "#ffffff",
     border: "1px solid #e5e7eb",
     borderRadius: "16px",
-    padding: "14px",
+    padding: "16px",
     marginBottom: "16px",
   },
 
   assigneeTitle: {
-    margin: "0 0 12px",
+    margin: "0 0 14px",
     color: "#111827",
     fontSize: "17px",
     fontWeight: 900,
@@ -566,15 +664,83 @@ const styles = {
     padding: "14px",
     marginBottom: "12px",
     background: "#f8fafc",
+    minWidth: 0,
+    overflow: "hidden",
+  },
+
+  assigneeTop: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "18px",
+    marginBottom: "12px",
+  },
+
+  assigneeInfo: {
+    minWidth: 0,
+    flex: 1,
+  },
+
+  assigneeName: {
+    display: "block",
+    color: "#111827",
+    fontSize: "15px",
+    fontWeight: 900,
+    overflowWrap: "anywhere",
+  },
+
+  assigneeEmail: {
+    margin: "4px 0 0",
+    color: "#64748b",
+    fontSize: "13px",
+    lineHeight: 1.4,
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
+  },
+
+  assigneeProgress: {
+    flexShrink: 0,
+    background: "#eef2ff",
+    color: "#334155",
+    borderRadius: "999px",
+    padding: "7px 11px",
+    fontSize: "12px",
+    fontWeight: 900,
+    whiteSpace: "nowrap",
   },
 
   mainTaskBox: {
     background: "#ffffff",
     border: "1px solid #e5e7eb",
     borderRadius: "13px",
-    padding: "12px",
+    padding: "13px",
     marginTop: "12px",
     marginBottom: "12px",
+    display: "grid",
+    gap: "6px",
+    minWidth: 0,
+  },
+
+  mainTaskLabel: {
+    color: "#64748b",
+    fontSize: "12px",
+    fontWeight: 800,
+  },
+
+  mainTaskTitle: {
+    color: "#111827",
+    fontSize: "14px",
+    fontWeight: 900,
+    overflowWrap: "anywhere",
+  },
+
+  wrapText: {
+    margin: 0,
+    color: "#64748b",
+    fontSize: "13px",
+    lineHeight: 1.5,
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
   },
 
   subtaskList: {
@@ -588,8 +754,24 @@ const styles = {
     padding: "12px",
     background: "#ffffff",
     display: "flex",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: "12px",
+    gap: "14px",
+    minWidth: 0,
+  },
+
+  subtaskContent: {
+    minWidth: 0,
+    flex: 1,
+    display: "grid",
+    gap: "5px",
+    overflowWrap: "anywhere",
+  },
+
+  subtaskDate: {
+    color: "#64748b",
+    fontSize: "12px",
+    lineHeight: 1.4,
   },
 
   doneMiniBadge: {
@@ -600,6 +782,7 @@ const styles = {
     height: "fit-content",
     fontSize: "12px",
     fontWeight: 900,
+    flexShrink: 0,
   },
 
   pendingMiniBadge: {
@@ -610,12 +793,14 @@ const styles = {
     height: "fit-content",
     fontSize: "12px",
     fontWeight: 900,
+    flexShrink: 0,
   },
 
   actionRow: {
     display: "flex",
     gap: "10px",
     flexWrap: "wrap",
+    paddingTop: "2px",
   },
 
   doneBtn: {
@@ -655,6 +840,76 @@ const styles = {
     alignItems: "center",
     gap: "7px",
     cursor: "pointer",
+  },
+
+  viewDetailsBtn: {
+    border: 0,
+    background: "#ff5733",
+    color: "#ffffff",
+    borderRadius: "999px",
+    padding: "11px 18px",
+    fontSize: "13px",
+    fontWeight: 900,
+    cursor: "pointer",
+    flexShrink: 0,
+    marginLeft: "auto",
+  },
+
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(15, 23, 42, 0.68)",
+    zIndex: 10000,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "28px",
+    overflow: "hidden",
+  },
+
+  modal: {
+    width: "min(1100px, 94vw)",
+    maxWidth: "1100px",
+    maxHeight: "90vh",
+    overflowY: "auto",
+    overflowX: "hidden",
+    background: "#ffffff",
+    borderRadius: "24px",
+    padding: "28px",
+    boxShadow: "0 30px 80px rgba(15, 23, 42, 0.32)",
+    boxSizing: "border-box",
+  },
+
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "24px",
+    marginBottom: "22px",
+  },
+
+  modalHeadingContent: {
+    minWidth: 0,
+    flex: 1,
+  },
+
+  modalTitle: {
+    margin: 0,
+    color: "#111827",
+    fontSize: "28px",
+    fontWeight: 900,
+    overflowWrap: "anywhere",
+  },
+
+  closeBtn: {
+    border: 0,
+    background: "#ff5733",
+    color: "#ffffff",
+    borderRadius: "14px",
+    padding: "11px 18px",
+    fontWeight: 900,
+    cursor: "pointer",
+    flexShrink: 0,
   },
 };
 

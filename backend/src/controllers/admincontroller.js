@@ -212,48 +212,32 @@ const getAdminDepartmentUsers = async (req, res) => {
 
 const getAdminAssignableUsers = async (req, res) => {
   try {
-    const { error } = await getLoggedInAdmin(req);
-
-    if (error) {
-      return res.status(error.status).json({
-        message: error.message,
-      });
-    }
-
-    const [users] = await db.query(
-      `
-      SELECT 
-        u.user_id AS id,
+    const [users] = await db.query(`
+      SELECT
         u.user_id,
-        u.employee_code,
         u.full_name,
         u.email,
-        u.phone,
-        u.designation,
         u.department_id,
-        u.role_id,
-        r.role_name,
         d.department_name
       FROM users u
-      LEFT JOIN roles r 
-        ON u.role_id = r.role_id
-      LEFT JOIN departments d 
-        ON u.department_id = d.department_id
+      LEFT JOIN departments d
+        ON d.department_id = u.department_id
+      LEFT JOIN roles r
+        ON r.role_id = u.role_id
+      WHERE LOWER(r.role_name) = 'employee'
       ORDER BY u.full_name ASC
-      `
-    );
+    `);
 
     return res.status(200).json({
-      total: users.length,
+      success: true,
       users,
     });
   } catch (error) {
-    console.error("Get admin assignable users error:", error);
+    console.error("getAdminAssignableUsers error:", error);
 
     return res.status(500).json({
-      message: "Failed to fetch assignable users.",
-      error: error.message,
-      sqlMessage: error.sqlMessage || null,
+      success: false,
+      message: "Failed to fetch assignable employees",
     });
   }
 };

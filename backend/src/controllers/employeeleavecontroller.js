@@ -1,14 +1,18 @@
 const db = require("../config/db");
 const { sendMail } = require("../utils/emailservice");
 
-const LEAVE_LIMITS = {
-  sick: 7,
-  casual: 7,
-  mandatory: 18,
-  festival: 4,
-};
+const {
+  POLICY_START_DATE,
+  MONTHLY_PRIVILEGED_CREDIT,
+  getAnnualEntitlements,
+  buildLeaveBalances,
+} = require("../utils/leavepolicy");
 
-const MONTHLY_PRIVILEGED_CREDIT = 1.5;
+
+const LEAVE_APPLICATION_RECIPIENTS = [
+  "premal.mehta@valencianutrition.com",
+  "rathika.haleangadi@valencianutrition.com",
+];
 
 /*
 ========================================================
@@ -295,365 +299,6 @@ const getLeaveColumns = async () => {
   );
 };
 
-/*
-========================================================
-PRIVILEGED LEAVE EARNED
-========================================================
-*/
-
-const getPrivilegedEarned = (
-  year
-) => {
-  const now = new Date();
-
-  const currentYear =
-    now.getFullYear();
-
-  const currentMonth =
-    now.getMonth() + 1;
-
-  if (year < currentYear) {
-    return 18;
-  }
-
-  if (year > currentYear) {
-    return 0;
-  }
-
-  return Math.min(
-    18,
-    currentMonth *
-      MONTHLY_PRIVILEGED_CREDIT
-  );
-};
-
-/*
-========================================================
-GET USED + PENDING LEAVE
-========================================================
-*/
-
-const getLeaveUsage = async (
-  employeeId,
-  year
-) => {
-  const [rows] =
-    await db.query(
-      `
-      SELECT
-        leave_type,
-
-        COALESCE(
-          SUM(
-            CASE
-              WHEN status = 'approved'
-              THEN total_days
-              ELSE 0
-            END
-          ),
-          0
-        ) AS used_days,
-
-        COALESCE(
-          SUM(
-            CASE
-              WHEN status = 'pending'
-              THEN total_days
-              ELSE 0
-            END
-          ),
-          0
-        ) AS pending_days
-
-      FROM leave_applications
-
-      WHERE employee_id = ?
-        AND YEAR(start_date) = ?
-
-      GROUP BY leave_type
-      `,
-      [
-        employeeId,
-        year,
-      ]
-    );
-
-  const usage = {
-    sick: {
-      used: 0,
-      pending: 0,
-    },
-
-    casual: {
-      used: 0,
-      pending: 0,
-    },
-
-    mandatory: {
-      used: 0,
-      pending: 0,
-    },
-
-    festival: {
-      used: 0,
-      pending: 0,
-    },
-  };
-
-  rows.forEach((row) => {
-    const type =
-      normalizeLeaveType(
-        row.leave_type
-      );
-
-    if (!type) {
-      return;
-    }
-
-    usage[type] = {
-      used: Number(
-        row.used_days || 0
-      ),
-
-      pending: Number(
-        row.pending_days || 0
-      ),
-    };
-  });
-
-  return usage;
-};
-
-/*
-========================================================
-BUILD LEAVE BALANCES
-========================================================
-*/
-
-const buildLeaveBalances = async (
-  employeeId,
-  year
-) => {
-  const usage =
-    await getLeaveUsage(
-      employeeId,
-      year
-    );
-
-  /*
-  Sick Leave
-  */
-
-  const sickUsed =
-    Number(
-      usage.sick.used || 0
-    );
-
-  const sickPending =
-    Number(
-      usage.sick.pending || 0
-    );
-
-  const sickAvailable =
-    Math.max(
-      0,
-      LEAVE_LIMITS.sick -
-        sickUsed -
-        sickPending
-    );
-
-  /*
-  Casual Leave
-  */
-
-  const casualUsed =
-    Number(
-      usage.casual.used || 0
-    );
-
-  const casualPending =
-    Number(
-      usage.casual.pending || 0
-    );
-
-  const casualAvailable =
-    Math.max(
-      0,
-      LEAVE_LIMITS.casual -
-        casualUsed -
-        casualPending
-    );
-
-  /*
-  Privileged Leave
-  */
-
-  const privilegedEarned =
-    getPrivilegedEarned(
-      year
-    );
-
-  const privilegedUsed =
-    Number(
-      usage.mandatory.used ||
-        0
-    );
-
-  const privilegedPending =
-    Number(
-      usage.mandatory
-        .pending || 0
-    );
-
-  const privilegedAvailable =
-    Math.max(
-      0,
-      privilegedEarned -
-        privilegedUsed -
-        privilegedPending
-    );
-
-  /*
-  Holiday Leave
-  */
-
-  const festivalUsed =
-    Number(
-      usage.festival.used ||
-        0
-    );
-
-  const festivalPending =
-    Number(
-      usage.festival
-        .pending || 0
-    );
-
-  const festivalAvailable =
-    Math.max(
-      0,
-      LEAVE_LIMITS.festival -
-        festivalUsed -
-        festivalPending
-    );
-
-  return {
-    sick: {
-      label: "Sick Leave",
-      total: 7,
-      earned: 7,
-
-      used:
-        formatNumber(
-          sickUsed
-        ),
-
-      pending:
-        formatNumber(
-          sickPending
-        ),
-
-      available:
-        formatNumber(
-          sickAvailable
-        ),
-
-      remaining:
-        formatNumber(
-          sickAvailable
-        ),
-    },
-
-    casual: {
-      label: "Casual Leave",
-      total: 7,
-      earned: 7,
-
-      used:
-        formatNumber(
-          casualUsed
-        ),
-
-      pending:
-        formatNumber(
-          casualPending
-        ),
-
-      available:
-        formatNumber(
-          casualAvailable
-        ),
-
-      remaining:
-        formatNumber(
-          casualAvailable
-        ),
-    },
-
-    mandatory: {
-      label:
-        "Privileged Leave",
-
-      monthly_credit: 1.5,
-
-      annual_entitlement:
-        18,
-
-      earned:
-        formatNumber(
-          privilegedEarned
-        ),
-
-      used:
-        formatNumber(
-          privilegedUsed
-        ),
-
-      pending:
-        formatNumber(
-          privilegedPending
-        ),
-
-      available:
-        formatNumber(
-          privilegedAvailable
-        ),
-
-      remaining:
-        formatNumber(
-          privilegedAvailable
-        ),
-    },
-
-    festival: {
-      label:
-        "Holiday Leave",
-
-      total: 4,
-      earned: 4,
-
-      used:
-        formatNumber(
-          festivalUsed
-        ),
-
-      pending:
-        formatNumber(
-          festivalPending
-        ),
-
-      available:
-        formatNumber(
-          festivalAvailable
-        ),
-
-      remaining:
-        formatNumber(
-          festivalAvailable
-        ),
-    },
-  };
-};
 
 /*
 ========================================================
@@ -685,10 +330,11 @@ const getEmployeeLeaveSummary =
           : currentYear;
 
       const balances =
-        await buildLeaveBalances(
-          employeeId,
-          year
-        );
+  await buildLeaveBalances(
+    db,
+    employeeId,
+    year
+  );
 
       const columns =
         await getLeaveColumns();
@@ -796,22 +442,30 @@ const getEmployeeLeaveSummary =
         year,
 
         configuration: {
-          sick_annual_entitlement:
-            7,
+  policy_start_date:
+    POLICY_START_DATE,
 
-          casual_annual_entitlement:
-            7,
+  sick_entitlement:
+    getAnnualEntitlements(
+      year
+    ).sick,
 
-          privileged_monthly_credit:
-            1.5,
+  casual_entitlement:
+    getAnnualEntitlements(
+      year
+    ).casual,
 
-          privileged_annual_entitlement:
-            18,
+  privileged_monthly_credit:
+    MONTHLY_PRIVILEGED_CREDIT,
 
-          holiday_annual_entitlement:
-            4,
-        },
+  privileged_carry_forward:
+    true,
 
+  holiday_entitlement:
+    getAnnualEntitlements(
+      year
+    ).festival,
+},
         balances,
 
         applications:
@@ -966,6 +620,19 @@ const applyEmployeeLeave =
               "Invalid leave date.",
           });
       }
+      if (
+  startDate <
+  POLICY_START_DATE
+) {
+  return res
+    .status(400)
+    .json({
+      success: false,
+
+      message:
+        "The new Leave policy starts from 01-09-2026.",
+    });
+}
 
       /*
       ------------------------------
@@ -1109,6 +776,26 @@ const applyEmployeeLeave =
             });
         }
       }
+            if (
+        endDate &&
+        startDate.slice(
+          0,
+          4
+        ) !==
+          endDate.slice(
+            0,
+            4
+          )
+      ) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+
+            message:
+              "Please submit separate Leave applications for each calendar year.",
+          });
+      }
 
       /*
       Reason remains required for
@@ -1193,10 +880,11 @@ const applyEmployeeLeave =
       */
 
       const balances =
-        await buildLeaveBalances(
-          employeeId,
-          leaveYear
-        );
+  await buildLeaveBalances(
+    db,
+    employeeId,
+    leaveYear
+  );
 
       const selectedBalance =
         balances[
@@ -1728,23 +1416,20 @@ Valencia RMS
           `;
 
           const mailResponse =
-            await sendMail({
-              to:
-                admin.email,
+  await sendMail({
+    to:
+      LEAVE_APPLICATION_RECIPIENTS,
 
-              cc: [
-                "manish.turakhia@valencianutrition.com",
-                "rathika.haleangadi@valencianutrition.com",
-              ],
+    subject,
 
-              subject,
-              text,
-              html,
+    text,
 
-              replyTo:
-                employee.email ||
-                undefined,
-            });
+    html,
+
+    replyTo:
+      employee.email ||
+      undefined,
+  });
 
           emailResult = {
             sent:

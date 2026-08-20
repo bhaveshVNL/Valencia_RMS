@@ -4,7 +4,6 @@ const db = require("../config/db");
 
 const FIXED_LEAVE_RECIPIENTS = [
   "premal.mehta@valencianutrition.com",
-  "manish@valencianutrition.com",
   "rathika.haleangadi@valencianutrition.com",
 ];
 
@@ -152,40 +151,9 @@ const getLeaveMailInfo = async (req, res) => {
     }
 
     const user = userRows[0];
-
-    const recipients = [...FIXED_LEAVE_RECIPIENTS];
-
-    const [departmentAdmins] = await db.query(
-      `
-      SELECT DISTINCT u.email
-      FROM users u
-      JOIN roles r ON r.role_id = u.role_id
-      WHERE r.role_name = 'admin'
-      AND u.status = 'active'
-      AND u.department_id = ?
-      AND u.email IS NOT NULL
-      AND u.email != ''
-      `,
-      [user.department_id]
-    );
-
-    departmentAdmins.forEach((admin) => {
-      recipients.push(admin.email);
-    });
-
-    if (
-      String(user.department_name || "").trim().toLowerCase() === "it"
-    ) {
-      recipients.push("jay.more@valencianutrition.com");
-    }
-
     const finalRecipients = [
-      ...new Set(
-        recipients
-          .map((email) => String(email || "").trim().toLowerCase())
-          .filter(Boolean)
-      ),
-    ];
+  ...FIXED_LEAVE_RECIPIENTS,
+];
 
     const subject = "LEAVE APPLICATION";
 

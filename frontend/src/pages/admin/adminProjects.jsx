@@ -182,6 +182,15 @@ const normalizeProject = (project) => {
         "-",
       status: normalizeStatus(task.status || task.task_status),
       progress: Number(task.progress || task.task_progress || 0),
+      start_date: normalizeDateForInput(
+        task.start_date || task.task_start_date
+      ),
+      due_date: normalizeDateForInput(
+        task.due_date || task.end_date || task.task_end_date
+      ),
+      end_date: normalizeDateForInput(
+        task.due_date || task.end_date || task.task_end_date
+      ),
       assignees: dedupeUsers(taskAssignees),
       completed_subtasks:
         task.completed_subtasks ||
@@ -341,12 +350,16 @@ const AdminProjects = () => {
   const [newMainTask, setNewMainTask] = useState({
     task_title: "",
     task_description: "",
+    start_date: "",
+    due_date: "",
     assignee_ids: [],
   });
 
   const [editMainTask, setEditMainTask] = useState({
     task_title: "",
     task_description: "",
+    start_date: "",
+    due_date: "",
     assignee_ids: [],
   });
 
@@ -390,46 +403,26 @@ const AdminProjects = () => {
   };
 
 const fetchUsers = async () => {
-  const urls = [
-    "/admin-projects/assignable-users",
-    "/admin-projects/users",
-    "/admin-projects/all-users",
-    "/admin-projects/project-users",
-    "/admin-users",
-    "/admin-users/users",
-    "/admin-users/department-users",
-    "/admin-users/employees",
-    "/admin/users",
-    "/admin/users/department",
-    "/admin/department-users",
-  ];
+  try {
+    const response = await api.get("/admin-projects/assignable-users");
+    const data = getApiData(response);
 
-  const collectedUsers = [];
+    const userRows =
+      data.users ||
+      data.employees ||
+      data.rows ||
+      data;
 
-  for (const url of urls) {
-    try {
-      const response = await api.get(url);
-      const data = getApiData(response);
-
-      const userRows =
-        data.users ||
-        data.all_users ||
-        data.active_users ||
-        data.activeUsers ||
-        data.department_users ||
-        data.departmentUsers ||
-        data.employees ||
-        data.assignees ||
-        data.rows ||
-        data;
-
-      collectedUsers.push(...asArray(userRows));
-    } catch {
-      // continue checking next endpoint
-    }
+    setUsers(dedupeUsers(asArray(userRows)));
+  } catch (err) {
+    console.error("Fetch assignable department employees error:", err);
+    setUsers([]);
+    setError(
+      err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to fetch department employees."
+    );
   }
-
-  setUsers(dedupeUsers(collectedUsers));
 };
 
   useEffect(() => {
@@ -534,7 +527,11 @@ const fetchUsers = async () => {
     });
   }, [editProjectUserPool, editAssigneeSearch]);
 
-  const selectedProjectAssignees = useMemo(() => {
+  const currentProjectAssignees = useMemo(() => {
+    return dedupeUsers(selectedProject?.assignees || []);
+  }, [selectedProject]);
+
+  const selectedEditProjectAssignees = useMemo(() => {
     const selectedIds = new Set(editProject.assignee_ids.map(String));
 
     return editProjectUserPool.filter((user) =>
@@ -547,6 +544,8 @@ const fetchUsers = async () => {
     setEditMainTask({
       task_title: "",
       task_description: "",
+      start_date: "",
+      due_date: "",
       assignee_ids: [],
     });
   };
@@ -575,6 +574,8 @@ const fetchUsers = async () => {
     setNewMainTask({
       task_title: "",
       task_description: "",
+      start_date: "",
+      due_date: "",
       assignee_ids: [],
     });
 
@@ -592,6 +593,8 @@ const fetchUsers = async () => {
     setNewMainTask({
       task_title: "",
       task_description: "",
+      start_date: "",
+      due_date: "",
       assignee_ids: [],
     });
 
@@ -692,6 +695,8 @@ const fetchUsers = async () => {
     setEditMainTask({
       task_title: task.task_title || "",
       task_description: task.task_description || "",
+      start_date: normalizeDateForInput(task.start_date),
+      due_date: normalizeDateForInput(task.due_date || task.end_date),
       assignee_ids: [...new Set(assigneeIds)],
     });
   };
@@ -725,7 +730,12 @@ const fetchUsers = async () => {
     }
 
     if (!newProject.start_date || !newProject.end_date) {
-      setError("Start date and end date are required.");
+      setError("Project start date and deadline are required.");
+      return;
+    }
+
+    if (newProject.start_date > newProject.end_date) {
+      setError("Project start date cannot be after project deadline.");
       return;
     }
 
@@ -743,6 +753,7 @@ const fetchUsers = async () => {
         project_description: newProject.project_description.trim(),
         description: newProject.project_description.trim(),
         start_date: newProject.start_date,
+        due_date: newProject.end_date,
         end_date: newProject.end_date,
         assignee_ids: newProject.assignee_ids,
         assignees: newProject.assignee_ids,
@@ -781,7 +792,12 @@ const fetchUsers = async () => {
     }
 
     if (!editProject.start_date || !editProject.end_date) {
-      setError("Start date and end date are required.");
+      setError("Project start date and deadline are required.");
+      return;
+    }
+
+    if (editProject.start_date > editProject.end_date) {
+      setError("Project start date cannot be after project deadline.");
       return;
     }
 
@@ -800,7 +816,9 @@ const fetchUsers = async () => {
         title: editProject.project_title.trim(),
         project_description: editProject.project_description.trim(),
         description: editProject.project_description.trim(),
+        priority: selectedProject.priority || "medium",
         start_date: editProject.start_date,
+        due_date: editProject.end_date,
         end_date: editProject.end_date,
         assignee_ids: editProject.assignee_ids,
         assignees: editProject.assignee_ids,
@@ -879,6 +897,36 @@ const fetchUsers = async () => {
       return;
     }
 
+    if (!newMainTask.start_date || !newMainTask.due_date) {
+      setError("Main task start date and deadline are required.");
+      return;
+    }
+
+    if (newMainTask.start_date > newMainTask.due_date) {
+      setError("Main task start date cannot be after its deadline.");
+      return;
+    }
+
+    if (
+      selectedProject.start_date &&
+      newMainTask.start_date < selectedProject.start_date
+    ) {
+      setError(
+        `Main task start date cannot be before project start date (${selectedProject.start_date}).`
+      );
+      return;
+    }
+
+    if (
+      selectedProject.end_date &&
+      newMainTask.due_date > selectedProject.end_date
+    ) {
+      setError(
+        `Main task deadline cannot exceed project deadline (${selectedProject.end_date}).`
+      );
+      return;
+    }
+
     if (!newMainTask.assignee_ids.length) {
       setError("Select at least one assignee for the main task.");
       return;
@@ -895,6 +943,9 @@ const fetchUsers = async () => {
         title: newMainTask.task_title.trim(),
         task_description: newMainTask.task_description.trim(),
         description: newMainTask.task_description.trim(),
+        start_date: newMainTask.start_date,
+        due_date: newMainTask.due_date,
+        end_date: newMainTask.due_date,
         assignee_ids: newMainTask.assignee_ids,
         assigned_to_user_ids: newMainTask.assignee_ids,
         assignees: newMainTask.assignee_ids,
@@ -910,11 +961,15 @@ const fetchUsers = async () => {
         payload
       );
 
-      setSuccessMessage(response?.data?.message || "Main task added successfully.");
+      setSuccessMessage(
+        response?.data?.message || "Main task added successfully."
+      );
 
       setNewMainTask({
         task_title: "",
         task_description: "",
+        start_date: "",
+        due_date: "",
         assignee_ids: [],
       });
 
@@ -941,6 +996,36 @@ const fetchUsers = async () => {
       return;
     }
 
+    if (!editMainTask.start_date || !editMainTask.due_date) {
+      setError("Main task start date and deadline are required.");
+      return;
+    }
+
+    if (editMainTask.start_date > editMainTask.due_date) {
+      setError("Main task start date cannot be after its deadline.");
+      return;
+    }
+
+    if (
+      selectedProject.start_date &&
+      editMainTask.start_date < selectedProject.start_date
+    ) {
+      setError(
+        `Main task start date cannot be before project start date (${selectedProject.start_date}).`
+      );
+      return;
+    }
+
+    if (
+      selectedProject.end_date &&
+      editMainTask.due_date > selectedProject.end_date
+    ) {
+      setError(
+        `Main task deadline cannot exceed project deadline (${selectedProject.end_date}).`
+      );
+      return;
+    }
+
     if (!editMainTask.assignee_ids.length) {
       setError("Select at least one assignee for the main task.");
       return;
@@ -959,6 +1044,10 @@ const fetchUsers = async () => {
         title: editMainTask.task_title.trim(),
         task_description: editMainTask.task_description.trim(),
         description: editMainTask.task_description.trim(),
+        priority: task.priority || "medium",
+        start_date: editMainTask.start_date,
+        due_date: editMainTask.due_date,
+        end_date: editMainTask.due_date,
         assignee_ids: editMainTask.assignee_ids,
         assigned_to_user_ids: editMainTask.assignee_ids,
         assignees: editMainTask.assignee_ids,
@@ -974,9 +1063,11 @@ const fetchUsers = async () => {
         payload
       );
 
-      setSuccessMessage(response?.data?.message || "Main task updated successfully.");
-      cancelEditMainTask();
+      setSuccessMessage(
+        response?.data?.message || "Main task updated successfully."
+      );
 
+      cancelEditMainTask();
       await refreshSelectedProject(projectId);
     } catch (err) {
       setError(
@@ -1565,7 +1656,7 @@ const exportProjectData = async () => {
               </label>
 
               <label style={styles.field}>
-                <span>Start Date</span>
+                <span>Project Start Date</span>
                 <input
                   type="date"
                   value={newProject.start_date}
@@ -1579,7 +1670,7 @@ const exportProjectData = async () => {
               </label>
 
               <label style={styles.field}>
-                <span>End Date</span>
+                <span>Project Deadline</span>
                 <input
                   type="date"
                   value={newProject.end_date}
@@ -1612,7 +1703,7 @@ const exportProjectData = async () => {
                 <div>
                   <h3 style={styles.panelTitle}>Project Assignees</h3>
                   <p style={styles.panelSubtitle}>
-                    Admin can select anyone from all active users. Selected:{" "}
+                    Employees from your department. Selected:{" "}
                     {newProject.assignee_ids.length}
                   </p>
                 </div>
@@ -1623,7 +1714,7 @@ const exportProjectData = async () => {
                     style={styles.searchInput}
                     value={assignSearch}
                     onChange={(event) => setAssignSearch(event.target.value)}
-                    placeholder="Search all users..."
+                    placeholder="Search department employees..."
                   />
                 </div>
               </div>
@@ -1631,7 +1722,7 @@ const exportProjectData = async () => {
               <div style={styles.assigneeList}>
                 {filteredAssignUsers.length === 0 ? (
                   <div style={styles.emptyColumn}>
-                    No users found. Add the user from Users page first, then refresh this page.
+                    No active employees were returned for your department.
                   </div>
                 ) : (
                   filteredAssignUsers.map((user) => {
@@ -1762,7 +1853,9 @@ const exportProjectData = async () => {
               </div>
             </div>
 
-            {normalizeStatus(selectedProject.status) === "under_review" && (
+            {["under_review", "on_hold"].includes(
+  normalizeStatus(selectedProject.status)
+) && (
               <section style={styles.reviewActionSection}>
                 <div style={styles.reviewActionHeader}>
                   <div>
@@ -1830,6 +1923,20 @@ const exportProjectData = async () => {
                     <XCircle size={18} />
                     Reject
                   </button>
+                  {normalizeStatus(selectedProject.status) === "on_hold" && (
+  <button
+    type="button"
+    style={{
+      ...styles.approveButton,
+      ...(reviewActionLoading ? styles.disabledReviewButton : {}),
+    }}
+    disabled={reviewActionLoading}
+    onClick={() => handleProjectReviewAction("on_hold")}
+  >
+    <RefreshCw size={18} />
+    {reviewActionLoading ? "Processing..." : "Resume"}
+  </button>
+)}
                 </div>
               </section>
             )}
@@ -1873,13 +1980,53 @@ const exportProjectData = async () => {
       />
     </label>
 
+    <div style={styles.formGrid}>
+      <label style={styles.field}>
+        <span>Main Task Start Date</span>
+        <input
+          type="date"
+          value={newMainTask.start_date}
+          min={selectedProject.start_date || undefined}
+          max={selectedProject.end_date || undefined}
+          onChange={(event) => {
+            const value = event.target.value;
+
+            setNewMainTask((previous) => ({
+              ...previous,
+              start_date: value,
+              due_date:
+                previous.due_date && previous.due_date < value
+                  ? ""
+                  : previous.due_date,
+            }));
+          }}
+        />
+      </label>
+
+      <label style={styles.field}>
+        <span>Main Task Deadline</span>
+        <input
+          type="date"
+          value={newMainTask.due_date}
+          min={newMainTask.start_date || selectedProject.start_date || undefined}
+          max={selectedProject.end_date || undefined}
+          onChange={(event) =>
+            setNewMainTask((previous) => ({
+              ...previous,
+              due_date: event.target.value,
+            }))
+          }
+        />
+      </label>
+    </div>
+
     <div style={styles.taskAssigneeList}>
-      {selectedProjectAssignees.length === 0 ? (
+      {currentProjectAssignees.length === 0 ? (
         <div style={styles.emptyColumn}>
           Select project assignees first.
         </div>
       ) : (
-        selectedProjectAssignees.map((user) => {
+        currentProjectAssignees.map((user) => {
           const userId = String(getUserId(user));
 
           const checked = newMainTask.assignee_ids
@@ -1936,6 +2083,15 @@ const exportProjectData = async () => {
                               <div style={styles.mainTaskTextBlock}>
                                 <h4>{task.task_title}</h4>
                                 <p>{task.task_description}</p>
+
+                                <div style={styles.mainTaskDateLine}>
+                                  <span>
+                                    Start: {task.start_date || "-"}
+                                  </span>
+                                  <span>
+                                    Deadline: {task.due_date || task.end_date || "-"}
+                                  </span>
+                                </div>
                               </div>
 
                               <div style={styles.mainTaskActions}>
@@ -2016,18 +2172,63 @@ const exportProjectData = async () => {
                               />
                             </label>
 
+                            <div style={styles.formGrid}>
+                              <label style={styles.field}>
+                                <span>Main Task Start Date</span>
+                                <input
+                                  type="date"
+                                  value={editMainTask.start_date}
+                                  min={selectedProject.start_date || undefined}
+                                  max={selectedProject.end_date || undefined}
+                                  onChange={(event) => {
+                                    const value = event.target.value;
+
+                                    setEditMainTask((previous) => ({
+                                      ...previous,
+                                      start_date: value,
+                                      due_date:
+                                        previous.due_date &&
+                                        previous.due_date < value
+                                          ? ""
+                                          : previous.due_date,
+                                    }));
+                                  }}
+                                />
+                              </label>
+
+                              <label style={styles.field}>
+                                <span>Main Task Deadline</span>
+                                <input
+                                  type="date"
+                                  value={editMainTask.due_date}
+                                  min={
+                                    editMainTask.start_date ||
+                                    selectedProject.start_date ||
+                                    undefined
+                                  }
+                                  max={selectedProject.end_date || undefined}
+                                  onChange={(event) =>
+                                    setEditMainTask((previous) => ({
+                                      ...previous,
+                                      due_date: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </label>
+                            </div>
+
                             <div style={styles.editTaskAssigneeBox}>
                               <strong style={styles.editTaskAssigneeTitle}>
                                 Select Assignee(s)
                               </strong>
 
                               <div style={styles.taskAssigneeList}>
-                                {selectedProjectAssignees.length === 0 ? (
+                                {currentProjectAssignees.length === 0 ? (
                                   <div style={styles.emptyColumn}>
                                     No project assignees available.
                                   </div>
                                 ) : (
-                                  selectedProjectAssignees.map((user) => {
+                                  currentProjectAssignees.map((user) => {
                                     const userId = String(getUserId(user));
                                     const checked = editMainTask.assignee_ids
                                       .map(String)
@@ -2081,6 +2282,15 @@ const exportProjectData = async () => {
                 </div>
               )}
             </section>
+            <div style={styles.modalFooter}>
+  <button
+    type="button"
+    style={styles.cancelModalButton}
+    onClick={closeProjectDetails}
+  >
+    Cancel
+  </button>
+</div>
           </div>
         </div>
       )}
@@ -2140,7 +2350,7 @@ const exportProjectData = async () => {
               </label>
 
               <label style={styles.field}>
-                <span>Start Date</span>
+                <span>Project Start Date</span>
                 <input
                   type="date"
                   value={editProject.start_date}
@@ -2154,7 +2364,7 @@ const exportProjectData = async () => {
               </label>
 
               <label style={styles.field}>
-                <span>End Date</span>
+                <span>Project Deadline</span>
                 <input
                   type="date"
                   value={editProject.end_date}
@@ -2190,12 +2400,12 @@ const exportProjectData = async () => {
               </div>
 
               <div style={styles.selectedAssigneeChips}>
-                {selectedProjectAssignees.length === 0 ? (
+                {selectedEditProjectAssignees.length === 0 ? (
                   <span style={styles.noAssigneeText}>
                     No project assignees selected.
                   </span>
                 ) : (
-                  selectedProjectAssignees.map((user) => (
+                  selectedEditProjectAssignees.map((user) => (
                     <span
                       style={styles.selectedAssigneeChip}
                       key={getUserId(user) || getUserEmail(user)}
@@ -2298,38 +2508,36 @@ const styles = {
     gap: "14px",
     marginBottom: "26px",
   },
-
-  refreshButton: {
-    border: "1px solid #e5e7eb",
-    background: "#ffffff",
-    color: "#111827",
-    borderRadius: "16px",
-    padding: "14px 22px",
-    fontSize: "16px",
-    fontWeight: 900,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
-    cursor: "pointer",
-    boxShadow: "0 10px 26px rgba(15, 23, 42, 0.06)",
-  },
-
+refreshButton: {
+  border: "none",
+  background: "#ff5733",
+  color: "#ffffff",
+  borderRadius: "14px",
+  padding: "12px 20px",
+  fontSize: "14px",
+  fontWeight: 900,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  cursor: "pointer",
+  boxShadow: "0 10px 22px rgba(255, 87, 51, 0.22)",
+},
   assignButton: {
-    border: "none",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "16px",
-    padding: "15px 24px",
-    fontSize: "16px",
-    fontWeight: 900,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
-    cursor: "pointer",
-    boxShadow: "0 14px 28px rgba(255, 87, 51, 0.22)",
-  },
+  border: "none",
+  background: "#ff5733",
+  color: "#ffffff",
+  borderRadius: "14px",
+  padding: "12px 20px",
+  fontSize: "14px",
+  fontWeight: 900,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  cursor: "pointer",
+  boxShadow: "0 10px 22px rgba(255, 87, 51, 0.22)",
+},
 
   errorBox: {
     background: "#fff1f2",
@@ -2466,25 +2674,35 @@ const styles = {
   },
 
   kanbanScroll: {
-    width: "100%",
-    overflowX: "auto",
-    paddingBottom: "14px",
-  },
+  width: "100%",
+  overflowX: "auto",
+  overflowY: "hidden",
+  paddingBottom: "10px",
+},
 
   kanbanBoard: {
-    minWidth: "1160px",
-    display: "grid",
-    gridTemplateColumns: "repeat(6, 360px)",
-    gap: "22px",
-  },
+  display: "grid",
+  gridTemplateColumns: "repeat(6, calc((100vw - 470px) / 3))",
+  gap: "20px",
+  width: "max-content",
+},
 
-  kanbanColumn: {
-    background: "#ffffff",
-    border: "1px solid #e5e7eb",
-    borderRadius: "22px",
-    padding: "18px",
-    minHeight: "470px",
-  },
+ kanbanColumn: {
+  width: "calc((100vw - 470px) / 3)",
+  height: "660px",
+  minHeight: "660px",
+  maxHeight: "660px",
+
+  boxSizing: "border-box",
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "22px",
+  padding: "18px",
+
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+},
 
   columnHeader: {
     minHeight: "96px",
@@ -2530,13 +2748,18 @@ const styles = {
   },
 
   columnBody: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    maxHeight: "372px",
-    overflowY: "auto",
-    paddingRight: "6px",
-  },
+  display: "flex",
+  flexDirection: "column",
+  gap: "12px",
+
+  flex: 1,
+  minHeight: 0,
+
+  overflowY: "auto",
+  overflowX: "hidden",
+
+  paddingRight: "6px",
+},
 
   emptyColumn: {
     border: "1px dashed #cbd5e1",
@@ -2603,28 +2826,34 @@ const styles = {
   },
 
   closeButton: {
-    position: "absolute",
-    top: "26px",
-    right: "26px",
-    width: "52px",
-    height: "52px",
-    borderRadius: "16px",
-    border: "none",
-    background: "#111827",
-    color: "#ffffff",
-    display: "grid",
-    placeItems: "center",
-    cursor: "pointer",
-  },
+  position: "sticky",
+  top: "10px",
+  marginLeft: "auto",
+  marginBottom: "-52px",
+
+  width: "52px",
+  height: "52px",
+
+  borderRadius: "16px",
+  border: "none",
+
+  background: "#111827",
+  color: "#ffffff",
+
+  display: "grid",
+  placeItems: "center",
+
+  cursor: "pointer",
+  zIndex: 1000,
+},
 
 floatingCloseLayer: {
-  position: "sticky",
-  top: "0px",
-  zIndex: 100,
-  height: 0,
-  display: "flex",
-  justifyContent: "flex-end",
-  paddingRight: "8px",
+  position: "absolute",
+  top: "20px",
+  right: "20px",
+  zIndex: 1000,
+  height: "52px",
+  width: "52px",
   pointerEvents: "none",
 },
   modalTitle: {
@@ -2680,18 +2909,16 @@ projectModalCloseButton: {
   width: "52px",
   height: "52px",
   minWidth: "52px",
-  borderRadius: "0",
+  borderRadius: "14px",
   border: "none",
-  background: "transparent",
-  color: "#111827",
+  background: "#111827",
+  color: "#ffffff",
   display: "grid",
   placeItems: "center",
   cursor: "pointer",
-  boxShadow: "none",
+  boxShadow: "0 10px 24px rgba(15,23,42,0.15)",
   pointerEvents: "auto",
-  marginTop: "0px",
 },
-
   editProjectOverlay: {
     position: "fixed",
     inset: 0,
@@ -3161,6 +3388,16 @@ disabledReviewButton: {
     flex: 1,
   },
 
+  mainTaskDateLine: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px 16px",
+    marginTop: "10px",
+    color: "#64748b",
+    fontSize: "12px",
+    fontWeight: 800,
+  },
+
   mainTaskActions: {
     display: "flex",
     alignItems: "center",
@@ -3269,18 +3506,36 @@ exportButton: {
   border: "1px solid #111827",
   background: "#111827",
   color: "#ffffff",
-  borderRadius: "16px",
-  padding: "15px 24px",
-  fontSize: "16px",
+  borderRadius: "14px",
+  padding: "12px 20px",
+  fontSize: "14px",
   fontWeight: 900,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: "10px",
+  gap: "8px",
   cursor: "pointer",
-  boxShadow: "0 12px 26px rgba(15, 23, 42, 0.14)",
+  boxShadow: "0 10px 22px rgba(15, 23, 42, 0.14)",
+},
+modalFooter: {
+  display: "flex",
+  justifyContent: "flex-end",
+  marginTop: "30px",
+  paddingTop: "20px",
+  borderTop: "1px solid #e5e7eb",
 },
 
+cancelModalButton: {
+  height: "48px",
+  padding: "0 28px",
+  borderRadius: "14px",
+  border: "1px solid #d1d5db",
+  background: "#ffffff",
+  color: "#111827",
+  fontSize: "15px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
 
 };
 

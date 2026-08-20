@@ -354,8 +354,14 @@ const reviewProjectAction = async (req, res) => {
     const adminUserId = req.user.user_id;
     const projectId = Number(req.params.projectId);
     const action = String(req.body.action || "").toLowerCase().trim();
+    const remark = String(req.body.remark || "").trim();
 
-    const allowedActions = ["done", "reject", "on_hold"];
+    const allowedActions = [
+  "done",
+  "reject",
+  "on_hold",
+  "in_progress",
+];
 
     if (!projectId) {
       return res.status(400).json({
@@ -367,7 +373,7 @@ const reviewProjectAction = async (req, res) => {
     if (!allowedActions.includes(action)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid action. Use done, reject, or on_hold.",
+        message: "Invalid action. Use done, reject, on_hold, or in_progress.",
       });
     }
 
@@ -407,25 +413,37 @@ const reviewProjectAction = async (req, res) => {
     }
 
     const nextStatus =
-      action === "done"
-        ? "completed"
-        : action === "reject"
-        ? "rejected"
-        : "on_hold";
+  action === "done"
+    ? "completed"
+    : action === "reject"
+    ? "rejected"
+    : action === "in_progress"
+    ? "in_progress"
+    : "on_hold";
 
     await connection.query(
-      `
-      UPDATE projects
-      SET
-        status = ?,
-        overall_progress = CASE
-          WHEN ? = 'completed' THEN 100
-          ELSE overall_progress
-        END
-      WHERE project_id = ?
-      `,
-      [nextStatus, nextStatus, projectId]
-    );
+  `
+  UPDATE projects
+  SET
+    status = ?,
+    rejection_remark = CASE
+      WHEN ? = 'rejected' THEN ?
+      ELSE rejection_remark
+    END,
+    overall_progress = CASE
+      WHEN ? = 'completed' THEN 100
+      ELSE overall_progress
+    END
+  WHERE project_id = ?
+  `,
+  [
+    nextStatus,
+    nextStatus,
+    remark,
+    nextStatus,
+    projectId,
+  ]
+);
 
     if (nextStatus === "completed") {
       await safeUpdateAllTasksForProject(connection, projectId, "completed", 100, 1);
@@ -438,6 +456,10 @@ const reviewProjectAction = async (req, res) => {
     if (nextStatus === "on_hold") {
       await safeUpdateAllTasksForProject(connection, projectId, "on_hold", 0, 0);
     }
+
+    if (nextStatus === "in_progress") {
+  await safeUpdateAllTasksForProject(connection, projectId, "in_progress", 0, 0);
+}
 
     try {
       await connection.query(
@@ -470,10 +492,14 @@ const reviewProjectAction = async (req, res) => {
         action === "done"
           ? "Project marked as done."
           : action === "reject"
-          ? "Project rejected."
-          : "Project put on hold.",
+            ? "Project rejected."
+            : action === "in_progress"
+              ? "Project resumed."
+              : "Project put on hold.",
       project_id: projectId,
       status: nextStatus,
+      rejection_remark:
+        nextStatus === "rejected" ? remark : null,
     });
   } catch (error) {
     await connection.rollback();

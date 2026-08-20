@@ -135,7 +135,15 @@ const getTaskStartDate = (task) => {
 const getTaskEndDate = (task) => {
   return formatDateForInput(task?.due_date || task?.end_date || task?.task_end_date);
 };
-
+const getSubtaskAssignedByName = (subtask) => {
+  return (
+    subtask?.assigned_by_name ||
+    subtask?.created_by_name ||
+    subtask?.assigned_by ||
+    subtask?.created_by ||
+    "-"
+  );
+};
 const getAssignedByName = (task) => {
   return (
     task?.created_by_name ||
@@ -159,20 +167,7 @@ const getTaskProgress = (task) => {
   return Number(task?.progress ?? task?.task_progress ?? task?.overall_progress ?? 0);
 };
 
-const getTaskPriority = (task) => {
-  const value = String(
-    task?.priority || task?.task_priority || task?.urgency || task?.priority_level || ""
-  )
-    .trim()
-    .toLowerCase();
 
-  if (["critical", "urgent"].includes(value)) return "urgent";
-  if (["high", "high_priority"].includes(value)) return "high";
-  if (["medium", "normal", "moderate"].includes(value)) return "medium";
-  if (["low", "low_priority"].includes(value)) return "low";
-
-  return value;
-};
 
 const getTaskAssignedAt = (task) => {
   return (
@@ -246,25 +241,11 @@ const isUrgentTask = (task) => {
   const status = normalizeStatus(task?.status, task?.progress);
   if (["completed", "rejected", "on_hold"].includes(status)) return false;
 
-  const priority = getTaskPriority(task);
-  if (["urgent", "high", "critical"].includes(priority)) return true;
-
+  
   const deadline = getDeadlineInfo(task);
   return deadline.days !== null && deadline.days <= 2;
 };
 
-const getPriorityLabel = (task) => {
-  const priority = getTaskPriority(task);
-  if (!priority) return isUrgentTask(task) ? "Urgent" : "Normal";
-  if (priority === "urgent") return "Urgent";
-  if (priority === "high") return "High";
-  if (priority === "medium") return "Medium";
-  if (priority === "low") return "Low";
-
-  return priority
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-};
 
 const normalizeSubtask = (subtask) => {
   const progress = Number(subtask?.progress || 0);
@@ -318,6 +299,7 @@ const normalizeMainTask = (task) => {
 
   return {
     ...task,
+    rejection_reason: task?.rejection_reason || task?.review_note || "",
     task_id: getTaskId(task),
     task_title: getTaskTitle(task),
     task_description: getTaskDescription(task),
@@ -326,7 +308,6 @@ const normalizeMainTask = (task) => {
     due_date: getTaskEndDate(task),
     created_by_name: getAssignedByName(task),
     created_by_email: getAssignedByEmail(task),
-    priority: getTaskPriority(task),
     assigned_at: getTaskAssignedAt(task),
     updated_at: getTaskUpdatedAt(task),
     status,
@@ -334,6 +315,7 @@ const normalizeMainTask = (task) => {
     subtasks,
     total_subtasks: totalSubtasks,
     completed_subtasks: completedSubtasks,
+    work_state: task?.work_state || "stopped",
   };
 };
 
@@ -397,17 +379,9 @@ const STATUS_SORT_RANK = {
   on_hold: 5,
 };
 
-const PRIORITY_SORT_RANK = {
-  urgent: 0,
-  critical: 0,
-  high: 1,
-  medium: 2,
-  normal: 3,
-  low: 4,
-  "": 5,
-};
 
 const EmployeeTasks = () => {
+  const [tasks, setTasks] = useState([]);
   const [mainTasks, setMainTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState("");
@@ -416,6 +390,7 @@ const EmployeeTasks = () => {
   const [loading, setLoading] = useState(false);
   const [savingSubtask, setSavingSubtask] = useState(false);
   const [taskActionId, setTaskActionId] = useState(null);
+  const [confirmSubtask, setConfirmSubtask] = useState(null);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [modalError, setModalError] = useState("");
@@ -595,7 +570,6 @@ const EmployeeTasks = () => {
         task.created_by_name,
         task.created_by_email,
         formatStatus(task.status, task.progress),
-        getPriorityLabel(task),
         getDeadlineInfo(task).label,
       ]
         .join(" ")
@@ -609,16 +583,7 @@ const EmployeeTasks = () => {
     const tasks = [...filteredTasks];
 
     tasks.sort((a, b) => {
-      if (sortBy === "priority") {
-        const aPriority = getTaskPriority(a) || (isUrgentTask(a) ? "urgent" : "normal");
-        const bPriority = getTaskPriority(b) || (isUrgentTask(b) ? "urgent" : "normal");
-
-        const rankDifference =
-          (PRIORITY_SORT_RANK[aPriority] ?? 5) -
-          (PRIORITY_SORT_RANK[bPriority] ?? 5);
-
-        if (rankDifference !== 0) return rankDifference;
-      }
+     
 
       if (sortBy === "status") {
         const statusDifference =
@@ -777,96 +742,102 @@ const EmployeeTasks = () => {
     }
   };
 
-  const markSubtaskDone = async (subtask) => {
-    const subtaskId = getSubtaskId(subtask);
+    const requestMarkSubtaskDone = (subtask) => {
+  const subtaskId = getSubtaskId(subtask);
 
-    if (!subtaskId || Number(subtask.is_checked) === 1) return;
+  if (!subtaskId || Number(subtask.is_checked) === 1) return;
 
-    setModalError("");
-    setModalSuccess("");
+  setModalError("");
+  setModalSuccess("");
+  setConfirmSubtask(subtask);
+};
 
-    try {
-      await callFirstWorkingPatch(
-        [
-          { method: "patch", url: `/employee-tasks/subtasks/${subtaskId}/check` },
-          { method: "put", url: `/employee-tasks/subtasks/${subtaskId}/check` },
-          { method: "patch", url: `/employee/tasks/subtasks/${subtaskId}/check` },
-          { method: "put", url: `/employee/tasks/subtasks/${subtaskId}/check` },
-          { method: "put", url: `/employee/tasks/${subtaskId}/check` },
-        ],
-        {
-          is_checked: true,
-          checked: true,
-          status: "completed",
-        }
-      );
 
-      await fetchTasks();
-      await fetchTaskDetails(selectedTask);
-      setModalSuccess("Subtask marked as done.");
-    } catch (err) {
-      setModalError(
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        "Failed to update subtask."
-      );
-    }
-  };
+const confirmMarkSubtaskDone = async () => {
+  if (!confirmSubtask) return;
 
-  const handleTaskAction = async (task, action) => {
-  const taskId = getTaskId(task);
-
-  if (!taskId || taskActionId) return;
-
-  setError("");
-  setSuccessMessage("");
-  setTaskActionId(taskId);
+  const subtaskId = getSubtaskId(confirmSubtask);
 
   try {
-    let endpoint = "";
-
-    if (action === "start") {
-      endpoint = `/employee-tasks/${taskId}/start`;
-    }
-
-    if (action === "pause") {
-      endpoint = `/employee-tasks/${taskId}/pause`;
-    }
-
-    if (action === "resume") {
-      endpoint = `/employee-tasks/${taskId}/resume`;
-    }
-
-    if (action === "submit-review") {
-      endpoint = `/employee-tasks/${taskId}/submit-review`;
-    }
-
-    if (!endpoint) return;
-
-    const response = await api.post(endpoint);
-
-    setSuccessMessage(
-      response.data?.message || "Task updated successfully."
+    await callFirstWorkingPatch(
+      [
+        { method: "patch", url: `/employee-tasks/subtasks/${subtaskId}/check` },
+        { method: "put", url: `/employee-tasks/subtasks/${subtaskId}/check` },
+        { method: "patch", url: `/employee/tasks/subtasks/${subtaskId}/check` },
+        { method: "put", url: `/employee/tasks/subtasks/${subtaskId}/check` },
+        { method: "put", url: `/employee/tasks/${subtaskId}/check` },
+      ],
+      {
+        is_checked: true,
+        checked: true,
+        status: "completed",
+      }
     );
 
     await fetchTasks();
+    await fetchTaskDetails(selectedTask);
 
-    if (selectedTask?.task_id === taskId) {
-      await fetchTaskDetails({
-        ...selectedTask,
-        task_id: taskId,
-      });
-    }
+    setModalSuccess("Subtask marked as done.");
+
   } catch (err) {
-    setError(
+    setModalError(
       err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        "Failed to update task."
+      err?.response?.data?.error ||
+      "Failed to update subtask."
     );
   } finally {
-    setTaskActionId(null);
+    // IMPORTANT RESET
+    setConfirmSubtask(null);
   }
 };
+    const handleTaskAction = async (task, action) => {
+    const taskId = getTaskId(task);
+    if (!taskId || taskActionId) return;
+
+    setError("");
+    setSuccessMessage("");
+    setTaskActionId(taskId);
+
+    try {
+      let endpoint = "";
+
+      if (action === "start") endpoint = `/employee-tasks/${taskId}/start`;
+      if (action === "pause") endpoint = `/employee-tasks/${taskId}/pause`;
+      if (action === "resume") endpoint = `/employee-tasks/${taskId}/resume`;
+      if (action === "submit-review") {
+        endpoint = `/employee-tasks/${taskId}/submit-review`;
+      }
+
+      if (!endpoint) return;
+
+      const response = await api.post(endpoint);
+
+      setSuccessMessage(
+        response.data?.message || "Task updated successfully."
+      );
+
+      await fetchTasks();
+
+      if (
+        selectedTask &&
+        String(getTaskId(selectedTask)) === String(taskId)
+      ) {
+        await fetchTaskDetails({
+          ...selectedTask,
+          task_id: taskId,
+        });
+      }
+    } catch (err) {
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Failed to update task."
+      );
+    } finally {
+      setTaskActionId(null);
+    }
+  };
+
 
   const closeModal = () => {
     setSelectedTask(null);
@@ -886,7 +857,9 @@ const EmployeeTasks = () => {
 
   const canAddSubtask =
     selectedTask &&
-    !["completed", "rejected", "on_hold"].includes(selectedTaskStatus);
+    !["under_review", "completed", "rejected", "on_hold"].includes(
+      selectedTaskStatus
+    );
 
   return (
     <div style={styles.page}>
@@ -944,201 +917,212 @@ const EmployeeTasks = () => {
       {error && <div style={styles.errorBox}>{error}</div>}
       {successMessage && <div style={styles.successBox}>{successMessage}</div>}
 
-      {loading && mainTasks.length === 0 ? (
-        <div style={styles.emptyBox}>Loading tasks...</div>
-      ) : sortedTasks.length === 0 ? (
-        <div style={styles.emptyBox}>No tasks match this filter.</div>
-      ) : (
-            <section
-              style={styles.kanbanRow}
-              className="employee-kanban-scroll"
-            >
-          {visibleColumns.map((column) => (
-            <div style={styles.kanbanColumn} key={column.key}>
-              <div style={styles.kanbanHeader}>
-                <div style={{ minWidth: 0 }}>
-                  <h2 style={styles.kanbanTitle}>{column.title}</h2>
-                  <p style={styles.kanbanSubtitle}>{column.subtitle}</p>
+      {loading && mainTasks.length === 0 && (
+  <div style={styles.loadingNotice}>Loading tasks...</div>
+)}
+
+<section
+  style={styles.kanbanRow}
+  className="employee-kanban-scroll"
+>
+  {visibleColumns.map((column) => (
+    <div style={styles.kanbanColumn} key={column.key}>
+      <div style={styles.kanbanHeader}>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={styles.kanbanTitle}>{column.title}</h2>
+          <p style={styles.kanbanSubtitle}>{column.subtitle}</p>
+        </div>
+
+        <span style={styles.kanbanCount}>
+          {groupedTasks[column.key]?.length || 0}
+        </span>
+      </div>
+
+      <div style={styles.kanbanBody}>
+        {groupedTasks[column.key]?.length === 0 ? (
+          <div style={styles.emptyKanbanColumn}>
+            No tasks here.
+          </div>
+        ) : (
+          groupedTasks[column.key].map((task) => {
+            const deadline = getDeadlineInfo(task);
+
+            return (
+              <button
+                type="button"
+                style={styles.kanbanTaskCard}
+                key={task.task_id}
+                onClick={() => fetchTaskDetails(task)}
+              >
+                <div style={styles.kanbanTaskTop}>
+                  <div style={{ minWidth: 0 }}>
+                    <h3 style={styles.kanbanTaskTitle}>
+                      {task.task_title}
+                    </h3>
+                  </div>
+
+                  <span
+                    style={{
+                      ...styles.statusBadge,
+                      ...getStatusBadgeStyle(
+                        task.status,
+                        task.progress
+                      ),
+                    }}
+                  >
+                    {formatStatus(task.status, task.progress)}
+                  </span>
                 </div>
 
-                <span style={styles.kanbanCount}>
-                  {groupedTasks[column.key]?.length || 0}
-                </span>
-              </div>
+                <p style={styles.kanbanTaskDescription}>
+                  {task.task_description || "-"}
+                </p>
 
-              <div style={styles.kanbanBody}>
-                {groupedTasks[column.key]?.length === 0 ? (
-                  <div style={styles.emptyKanbanColumn}>No tasks here.</div>
-                ) : (
-                  groupedTasks[column.key].map((task) => {
-                    const deadline = getDeadlineInfo(task);
-                    const priorityLabel = getPriorityLabel(task);
+                <div style={styles.cardBadgeRow}>
+                  <span
+                    style={{
+                      ...styles.deadlineBadge,
+                      ...getDeadlineBadgeStyle(deadline.tone),
+                    }}
+                  >
+                    {deadline.label}
+                  </span>
+                </div>
 
-                    return (
-                      <button
-                        type="button"
-                        style={styles.kanbanTaskCard}
-                        key={task.task_id}
-                        onClick={() => fetchTaskDetails(task)}
-                      >
-                        <div style={styles.kanbanTaskTop}>
-                          <div style={{ minWidth: 0 }}>
-                            <h3 style={styles.kanbanTaskTitle}>
-                              {task.task_title}
-                            </h3>
-                          </div>
+                <div style={styles.kanbanMetaLine}>
+                  <span>Assigned by</span>
+                  <strong>{getAssignedByName(task)}</strong>
+                </div>
 
-                          <span
-                            style={{
-                              ...styles.statusBadge,
-                              ...getStatusBadgeStyle(task.status, task.progress),
-                            }}
-                          >
-                            {formatStatus(task.status, task.progress)}
-                          </span>
-                        </div>
+                <div style={styles.kanbanDates}>
+                  <span>
+                    {formatDisplayDate(task.start_date)}
+                  </span>
 
-                        <p style={styles.kanbanTaskDescription}>
-                          {task.task_description || "-"}
-                        </p>
+                  <span>→</span>
 
-                        <div style={styles.cardBadgeRow}>
-                          <span
-                            style={{
-                              ...styles.deadlineBadge,
-                              ...getDeadlineBadgeStyle(deadline.tone),
-                            }}
-                          >
-                            {deadline.label}
-                          </span>
+                  <span>
+                    {formatDisplayDate(task.due_date)}
+                  </span>
+                </div>
 
-                          <span style={styles.priorityBadge}>{priorityLabel}</span>
-                        </div>
+                <div style={styles.progressMeta}>
+                  <strong>
+                    {task.total_subtasks > 0
+                      ? `${task.completed_subtasks}/${task.total_subtasks} subtasks`
+                      : "No subtasks"}
+                  </strong>
 
-                        <div style={styles.kanbanMetaLine}>
-                          <span>Assigned by</span>
-                          <strong>{getAssignedByName(task)}</strong>
-                        </div>
+                  <strong>{task.progress}%</strong>
+                </div>
 
-                        <div style={styles.kanbanDates}>
-                          <span>{formatDisplayDate(task.start_date)}</span>
-                          <span>→</span>
-                          <span>{formatDisplayDate(task.due_date)}</span>
-                        </div>
+                <div style={styles.progressTrack}>
+                  <div
+                    style={{
+                      ...styles.progressFill,
+                      width: `${Math.min(
+                        100,
+                        Math.max(0, task.progress)
+                      )}%`,
+                    }}
+                  />
+                </div>
+               <div
+  style={styles.taskActions}
+  onClick={(event) => event.stopPropagation()}
+>
+  {normalizeStatus(task.status, task.progress) === "not_started" && (
+    <button
+      type="button"
+      style={styles.primaryActionBtn}
+      disabled={taskActionId === task.task_id}
+      onClick={(event) => {
+        event.stopPropagation();
+        handleTaskAction(task, "start");
+      }}
+    >
+      <Play size={14} />
+      {taskActionId === task.task_id ? "Starting..." : "Start"}
+    </button>
+  )}
 
-                        <div style={styles.progressMeta}>
-                          <strong>
-                            {task.total_subtasks > 0
-                              ? `${task.completed_subtasks}/${task.total_subtasks} subtasks`
-                              : "No subtasks"}
-                          </strong>
-                          <strong>{task.progress}%</strong>
-                        </div>
-
-                        <div style={styles.progressTrack}>
-                          <div
-                            style={{
-                              ...styles.progressFill,
-                              width: `${Math.min(100, Math.max(0, task.progress))}%`,
-                            }}
-                          />
-                        </div>
-                        <div
-                          style={styles.taskActions}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {normalizeStatus(task.status, task.progress) === "not_started" && (
-                            <button
-                              type="button"
-                              style={styles.primaryActionBtn}
-                              disabled={taskActionId === task.task_id}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleTaskAction(task, "start");
-                              }}
-                            >
-                              <Play size={14} />
-                              {taskActionId === task.task_id ? "Starting..." : "Start"}
-                            </button>
-                          )}
-
-                          {normalizeStatus(task.status, task.progress) === "ongoing" && (
-                            <div style={styles.compactActionRow}>
-                              {task.work_state === "running" ? (
-                                <button
-                                  type="button"
-                                  style={styles.iconActionBtn}
-                                  disabled={taskActionId === task.task_id}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleTaskAction(task, "pause");
-                                  }}
-                                  title="Pause task"
-                                >
-                                  <Pause size={14} />
-                                  Pause
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  style={styles.iconActionBtn}
-                                  disabled={taskActionId === task.task_id}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleTaskAction(task, "resume");
-                                  }}
-                                  title="Resume task"
-                                >
-                                  <Play size={14} />
-                                  Resume
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                style={{
-                                  ...styles.reviewActionBtn,
-                                  ...(task.total_subtasks > 0 &&
-                                    task.completed_subtasks < task.total_subtasks
-                                    ? styles.disabledActionBtn
-                                    : {}),
-                                }}
-                                disabled={
-                                  taskActionId === task.task_id ||
-                                  (task.total_subtasks > 0 &&
-                                    task.completed_subtasks < task.total_subtasks)
-                                }
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleTaskAction(task, "submit-review");
-                                }}
-                              >
-                                <CheckCircle2 size={14} />
-                                Submit Review
-                              </button>
-                            </div>
-                          )}
-
-                          {normalizeStatus(task.status, task.progress) === "under_review" && (
-                            <div style={styles.awaitingReview}>
-                              <CheckCircle2 size={14} />
-                              Awaiting Review
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          ))}
-        </section>
+  {normalizeStatus(task.status, task.progress) === "ongoing" && (
+    <div style={styles.compactActionRow}>
+      {task.work_state === "running" ? (
+        
+        <button
+          type="button"
+          style={styles.iconActionBtn}
+          disabled={taskActionId === task.task_id}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleTaskAction(task, "pause");
+          }}
+        >
+          <Pause size={14} />
+          Pause
+        </button>
+      ) : (
+        <button
+          type="button"
+          style={styles.iconActionBtn}
+          disabled={taskActionId === task.task_id}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleTaskAction(task, "resume");
+          }}
+        >
+          <Play size={14} />
+          Resume
+        </button>
       )}
+      
 
-      <div style={{ marginTop: "22px" }}>
-        <EmployeeMiniTasks />
+      <button
+        type="button"
+        style={{
+          ...styles.reviewActionBtn,
+          ...(task.total_subtasks > 0 &&
+          task.completed_subtasks < task.total_subtasks
+            ? styles.disabledActionBtn
+            : {}),
+        }}
+        disabled={
+  taskActionId === task.task_id ||
+  Number(task.total_subtasks || 0) > 0 &&
+  Number(task.completed_subtasks || 0) <
+    Number(task.total_subtasks || 0)
+}
+        onClick={(event) => {
+          event.stopPropagation();
+          handleTaskAction(task, "submit-review");
+        }}
+      >
+        <CheckCircle2 size={14} />
+        Submit Review
+      </button>
+    </div>
+  )}
+
+  {normalizeStatus(task.status, task.progress) === "under_review" && (
+    <div style={styles.awaitingReview}>
+      <CheckCircle2 size={14} />
+      Awaiting Review
+    </div>
+  )}
+</div> 
+              </button>
+            );
+          })
+        )}
       </div>
+    </div>
+  ))}
+</section>
+
+      <div style={styles.miniTasksWrapper}>
+  <EmployeeMiniTasks />
+</div>
 
       {selectedTask && (
         <div style={styles.modalOverlay} onMouseDown={closeModal}>
@@ -1149,7 +1133,9 @@ const EmployeeTasks = () => {
 
             <div style={styles.modalHeader}>
               <h2 style={styles.modalTitle}>{selectedTask.task_title}</h2>
-              <p style={styles.modalSubtitle}>{selectedTask.project_title}</p>
+              <p style={styles.modalSubtitle}>
+                Project: {selectedTask.project_title || "-"}
+              </p>
             </div>
 
             {modalError && <div style={styles.modalError}>{modalError}</div>}
@@ -1160,6 +1146,21 @@ const EmployeeTasks = () => {
                 <span>Status</span>
                 <strong>{formatStatus(selectedTask.status, selectedTask.progress)}</strong>
               </div>
+              {normalizeStatus(
+  selectedTask.status,
+  selectedTask.progress
+) === "rejected" && (
+  <div style={styles.detailBox}>
+    <span>Admin Remark</span>
+
+    <strong>
+  {selectedTask.review_note ||
+    selectedTask.rejection_reason ||
+    selectedTask.rejection_remark ||
+    "-"}
+</strong>
+  </div>
+)}
 
               <div style={styles.detailBox}>
                 <span>Assigned By</span>
@@ -1190,9 +1191,16 @@ const EmployeeTasks = () => {
               </div>
             </div>
 
-            <div style={styles.descriptionBox}>
-              <span>Main Task Description</span>
-              <p>{selectedTask.task_description || "-"}</p>
+            <div style={styles.descriptionGrid}>
+              <div style={styles.descriptionBox}>
+                <span>Project Description</span>
+                <p>{selectedTask.project_description || "-"}</p>
+              </div>
+
+              <div style={styles.descriptionBox}>
+                <span>Main Task Description</span>
+                <p>{selectedTask.task_description || "-"}</p>
+              </div>
             </div>
 
             <div style={styles.modalProgressBox}>
@@ -1332,20 +1340,41 @@ const EmployeeTasks = () => {
                 <div style={styles.subtaskList}>
                   {selectedTask.subtasks.map((subtask) => {
                     const checked = Number(subtask.is_checked) === 1;
-                    const subtaskDeadline = getDeadlineInfo(subtask);
+const subtaskDeadline = getDeadlineInfo(subtask);
+
+const currentUser = JSON.parse(
+  sessionStorage.getItem("user") ||
+  localStorage.getItem("user") ||
+  "{}"
+);
+
+const canModifySubtask =
+  Number(subtask.assigned_to_user_id) === Number(currentUser?.user_id);
 
                     return (
                       <div style={styles.subtaskItem} key={subtask.task_id}>
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={checked || ["rejected", "on_hold"].includes(selectedTaskStatus)}
-                          onChange={() => markSubtaskDone(subtask)}
+                          disabled={
+                            checked ||
+                            !canModifySubtask ||
+                            [
+                              "under_review",
+                              "completed",
+                              "rejected",
+                              "on_hold",
+                            ].includes(selectedTaskStatus)
+                          }
+                          onChange={() => requestMarkSubtaskDone(subtask)}
                           style={styles.checkbox}
                         />
 
                         <div style={styles.subtaskContent}>
                           <h4 style={styles.subtaskTitle}>{subtask.task_title}</h4>
+                          <p style={styles.subtaskAssigned}>
+                            Assigned by: {getSubtaskAssignedByName(subtask)}
+                          </p>
 
                           {subtask.task_description && (
                             <p style={styles.subtaskDescription}>
@@ -1385,12 +1414,52 @@ const EmployeeTasks = () => {
                 </div>
               )}
             </div>
+                        <div style={styles.modalFooter}>
+              <button
+                type="button"
+                style={styles.cancelModalButton}
+                onClick={closeModal}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
+      {confirmSubtask && (
+        <div style={styles.confirmOverlay}>
+          <div style={styles.confirmBox}>
+            <h3 style={{ margin: "0 0 10px" }}>
+              Mark this Subtask as Done?
+            </h3>
+
+            <p style={{ color: "#64748b", margin: "0 0 20px" }}>
+              Completed subtasks cannot be unchecked.
+            </p>
+
+            <div style={styles.confirmActions}>
+              <button
+                type="button"
+                onClick={() => setConfirmSubtask(null)}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmMarkSubtaskDone}
+              >
+                Yes, Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+  
 
 const getStatusBadgeStyle = (status, progress = 0) => {
   const normalized = normalizeStatus(status, progress);
@@ -1439,6 +1508,16 @@ const styles = {
     width: "100%",
     padding: 0,
   },
+  loadingNotice: {
+  marginBottom: "14px",
+  padding: "12px 16px",
+  borderRadius: "14px",
+  background: "#ffffff",
+  color: "#64748b",
+  fontSize: "13px",
+  fontWeight: 800,
+  boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
+},
 
   taskToolbar: {
     width: "100%",
@@ -1554,39 +1633,46 @@ const styles = {
   },
 
   kanbanRow: {
+  width: "100%",
   display: "flex",
   flexWrap: "nowrap",
-  alignItems: "flex-start",
+  alignItems: "stretch",
   gap: "20px",
-
   overflowX: "auto",
   overflowY: "hidden",
-
-  paddingBottom: "14px",
+  paddingBottom: "16px",
+  scrollBehavior: "smooth",
 },
-  kanbanColumn: {
-  flex: "0 0 300px",
 
-  height: "560px",
-  minHeight: "560px",
-  maxHeight: "560px",
+kanbanColumn: {
+  flex: "0 0 calc((100% - 40px) / 3)",
+  width: "calc((100% - 40px) / 3)",
 
+  height: "620px",
+  minHeight: "620px",
+  maxHeight: "620px",
+
+  boxSizing: "border-box",
   background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: "22px",
+  border: "none",
+  borderRadius: "20px",
   padding: "18px",
-  boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+
+  boxShadow: "0 6px 20px rgba(15, 23, 42, 0.06)",
 
   display: "flex",
   flexDirection: "column",
-
   overflow: "hidden",
 },
 
-  kanbanHeader: {
-  background: "#f8fafc",
+kanbanHeader: {
+  width: "100%",
+  minHeight: "105px",
+  boxSizing: "border-box",
+
+  background: "#f7f9fc",
   borderRadius: "18px",
-  padding: "16px",
+  padding: "17px",
 
   display: "flex",
   justifyContent: "space-between",
@@ -1594,40 +1680,43 @@ const styles = {
   alignItems: "center",
 
   marginBottom: "16px",
-
   flexShrink: 0,
 },
 
-  kanbanTitle: {
+kanbanTitle: {
   margin: 0,
   color: "#111827",
   fontSize: "22px",
   fontWeight: 900,
 },
 
-  kanbanSubtitle: {
-    margin: "5px 0 0",
-    color: "#667085",
-    fontSize: "13px",
-    lineHeight: 1.35,
-  },
+kanbanSubtitle: {
+  margin: "6px 0 0",
+  color: "#64748b",
+  fontSize: "13px",
+  lineHeight: 1.35,
+},
 
+kanbanCount: {
+  width: "40px",
+  height: "40px",
+  minWidth: "40px",
+  padding: 0,
 
-  kanbanCount: {
-    minWidth: "38px",
-    height: "38px",
-    padding: "0 10px",
-    borderRadius: "999px",
-    background: "#e5e7eb",
-    display: "grid",
-    placeItems: "center",
-    fontSize: "13px",
-    fontWeight: 900,
-    color: "#111827",
-    flexShrink: 0,
-  },
+  borderRadius: "50%",
+  background: "#e9edf3",
 
-  kanbanBody: {
+  display: "grid",
+  placeItems: "center",
+
+  fontSize: "13px",
+  fontWeight: 900,
+  color: "#111827",
+
+  flexShrink: 0,
+},
+
+kanbanBody: {
   display: "flex",
   flexDirection: "column",
   gap: "12px",
@@ -1638,20 +1727,27 @@ const styles = {
   overflowY: "auto",
   overflowX: "hidden",
 
-  paddingRight: "6px",
+  paddingRight: "5px",
 },
 
-  emptyKanbanColumn: {
-    border: "1px dashed #d1d5db",
-    borderRadius: "13px",
-    padding: "16px",
-    textAlign: "center",
-    color: "#94a3b8",
-    fontSize: "12px",
-    fontWeight: 800,
-  },
+emptyKanbanColumn: {
+  width: "100%",
+  boxSizing: "border-box",
 
-  kanbanTaskCard: {
+  border: "1px dashed #d5dbe5",
+  borderRadius: "14px",
+
+  padding: "16px 12px",
+
+  textAlign: "center",
+  color: "#94a3b8",
+  fontSize: "12px",
+  fontWeight: 800,
+
+  background: "#ffffff",
+},
+
+kanbanTaskCard: {
   width: "100%",
   textAlign: "left",
   border: "1px solid #e5e7eb",
@@ -1729,18 +1825,6 @@ const styles = {
     fontWeight: 900,
   },
 
-  priorityBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    minHeight: "28px",
-    padding: "5px 10px",
-    borderRadius: "999px",
-    background: "#f1f5f9",
-    color: "#475569",
-    fontSize: "11px",
-    fontWeight: 900,
-  },
-
   kanbanMetaLine: {
     display: "flex",
     flexDirection: "column",
@@ -1805,6 +1889,12 @@ const styles = {
     position: "relative",
     boxShadow: "0 30px 90px rgba(15, 23, 42, 0.28)",
   },
+  miniTasksWrapper: {
+  width: "1260px",
+  maxWidth: "100%",
+  boxSizing: "border-box",
+  marginTop: "22px",
+},
 
   closeBtn: {
     position: "absolute",
@@ -1892,12 +1982,18 @@ const styles = {
     fontWeight: 900,
   },
 
+  descriptionGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+    gap: "12px",
+    marginBottom: "16px",
+  },
+
   descriptionBox: {
     border: "1px solid #e5e7eb",
     background: "#ffffff",
     borderRadius: "14px",
     padding: "15px",
-    marginBottom: "16px",
   },
 
   modalProgressBox: {
@@ -2159,6 +2255,55 @@ awaitingReview: {
   gap: "6px",
   fontSize: "11px",
   fontWeight: 900,
+},
+subtaskAssigned: {
+  margin: "0 0 6px",
+  color: "#64748b",
+  fontSize: "12px",
+  fontWeight: 800,
+},
+confirmOverlay: {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(15,23,42,0.45)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 20000,
+},
+
+confirmBox: {
+  width: "380px",
+  background: "#ffffff",
+  borderRadius: "20px",
+  padding: "28px",
+  textAlign: "center",
+},
+
+confirmActions: {
+  display: "flex",
+  justifyContent: "center",
+  gap: "12px",
+  marginTop: "20px",
+},
+modalFooter: {
+  display: "flex",
+  justifyContent: "flex-end",
+  marginTop: "30px",
+  paddingTop: "20px",
+  borderTop: "1px solid #e5e7eb",
+},
+
+cancelModalButton: {
+  height: "48px",
+  padding: "0 28px",
+  borderRadius: "14px",
+  border: "1px solid #d1d5db",
+  background: "#ffffff",
+  color: "#111827",
+  fontSize: "15px",
+  fontWeight: 900,
+  cursor: "pointer",
 },
 };     
 
