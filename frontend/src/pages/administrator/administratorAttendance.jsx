@@ -334,57 +334,89 @@ const AdministratorAttendance = () => {
       ) : (
         <>
           <section className="my-attendance-card">
-            <div className="attendance-percentage-circle">
-              <span>
-                {getMyAttendancePercentage()}%
-              </span>
 
-              <p>My Attendance</p>
-            </div>
+  <div className="my-attendance-info">
 
-            <div className="my-attendance-info">
-              <h2>Jay More</h2>
+    <h2>
+      Jay More
+    </h2>
 
-              <p>
-                Your attendance percentage based on marked
-                working days.
-              </p>
 
-              <div className="attendance-mini-grid">
-                <div>
-                  <strong>
-                    {myAttendance?.present_days || 0}
-                  </strong>
+    <p>
+      Your attendance percentage based on marked
+      working days.
+    </p>
 
-                  <span>Present</span>
-                </div>
 
-                <div>
-                  <strong>
-                    {myAttendance?.absent_days || 0}
-                  </strong>
 
-                  <span>Absent</span>
-                </div>
+    <div className="attendance-mini-grid">
 
-                <div>
-                  <strong>
-                    {getMyHalfDays()}
-                  </strong>
 
-                  <span>Half Day</span>
-                </div>
+      <div>
 
-                <div>
-                  <strong>
-                    {myAttendance?.leave_days || 0}
-                  </strong>
+        <strong>
+          {myAttendance?.present_days || 0}
+        </strong>
 
-                  <span>Leave</span>
-                </div>
-              </div>
-            </div>
-          </section>
+        <span>
+          Present
+        </span>
+
+      </div>
+
+
+
+      <div>
+
+        <strong>
+          {myAttendance?.absent_days || 0}
+        </strong>
+
+        <span>
+          Absent
+        </span>
+
+      </div>
+
+
+
+
+      <div>
+
+        <strong>
+          {getMyHalfDays()}
+        </strong>
+
+        <span>
+          Half Day
+        </span>
+
+      </div>
+
+
+
+
+      <div>
+
+        <strong>
+          {myAttendance?.leave_days || 0}
+        </strong>
+
+        <span>
+          Leave
+        </span>
+
+      </div>
+
+
+
+    </div>
+
+
+  </div>
+
+
+</section>
 
           <section className="overall-attendance-section">
             <div className="section-title-row">

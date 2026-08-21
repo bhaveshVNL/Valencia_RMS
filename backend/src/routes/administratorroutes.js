@@ -28,20 +28,32 @@ const {
   updateAdministratorUserStatus,
   resetAdministratorUserPassword,
   deleteAdministratorUser,
+
   getAdministratorAttendance,
   importAdministratorAttendanceCsv,
+
   updateAdministratorUserRole,
   updateAdministratorUserDetails,
+
 } = require("../controllers/administratorcontroller");
+
 
 const router = express.Router();
 
+
 const upload = multer({
   storage: multer.memoryStorage(),
+
   limits: {
     fileSize: 5 * 1024 * 1024,
   },
 });
+
+
+
+// =========================
+// OVERVIEW
+// =========================
 
 router.get(
   "/overview",
@@ -50,12 +62,19 @@ router.get(
   getAdministratorOverview
 );
 
+
+
+// =========================
+// PROJECTS
+// =========================
+
 router.get(
   "/projects/my",
   authMiddleware,
   requireJayAdministrator,
   getAdministratorMyProjects
 );
+
 
 router.get(
   "/projects/all",
@@ -64,12 +83,14 @@ router.get(
   getAdministratorAllProjects
 );
 
+
 router.get(
   "/projects/export",
   authMiddleware,
   requireJayAdministrator,
   exportAdministratorProjectsCsv
 );
+
 
 router.post(
   "/projects/import",
@@ -79,12 +100,19 @@ router.post(
   importAdministratorProjectsCsv
 );
 
+
+
+// =========================
+// TASKS
+// =========================
+
 router.get(
   "/tasks/my",
   authMiddleware,
   requireJayAdministrator,
   getAdministratorMyTasks
 );
+
 
 router.get(
   "/tasks/all",
@@ -93,12 +121,14 @@ router.get(
   getAdministratorAllTasks
 );
 
+
 router.get(
   "/tasks/export",
   authMiddleware,
   requireJayAdministrator,
   exportAdministratorTasksCsv
 );
+
 
 router.post(
   "/tasks/import",
@@ -108,12 +138,24 @@ router.post(
   importAdministratorTasksCsv
 );
 
+
+
+// =========================
+// REPORTS
+// =========================
+
 router.get(
   "/reports",
   authMiddleware,
   requireJayAdministrator,
   getAdministratorReports
 );
+
+
+
+// =========================
+// PROFILE
+// =========================
 
 router.get(
   "/profile",
@@ -122,12 +164,19 @@ router.get(
   getAdministratorProfile
 );
 
+
 router.put(
   "/profile/skills",
   authMiddleware,
   requireJayAdministrator,
   updateAdministratorSkills
 );
+
+
+
+// =========================
+// USERS
+// =========================
 
 router.get(
   "/users/meta",
@@ -136,6 +185,7 @@ router.get(
   getAdministratorUsersMeta
 );
 
+
 router.get(
   "/users",
   authMiddleware,
@@ -143,12 +193,14 @@ router.get(
   getAdministratorUsers
 );
 
+
 router.post(
   "/users",
   authMiddleware,
   requireJayAdministrator,
   createAdministratorUser
 );
+
 
 router.post(
   "/users/import",
@@ -158,12 +210,14 @@ router.post(
   importAdministratorUsersCsv
 );
 
+
 router.put(
   "/users/:userId/status",
   authMiddleware,
   requireJayAdministrator,
   updateAdministratorUserStatus
 );
+
 
 router.put(
   "/users/:userId/reset-password",
@@ -172,12 +226,35 @@ router.put(
   resetAdministratorUserPassword
 );
 
+
 router.delete(
   "/users/:userId",
   authMiddleware,
   requireJayAdministrator,
   deleteAdministratorUser
 );
+
+
+router.put(
+  "/users/:userId/role",
+  authMiddleware,
+  requireJayAdministrator,
+  updateAdministratorUserRole
+);
+
+
+router.put(
+  "/users/:userId/details",
+  authMiddleware,
+  requireJayAdministrator,
+  updateAdministratorUserDetails
+);
+
+
+
+// =========================
+// ATTENDANCE
+// =========================
 
 router.get(
   "/attendance",
@@ -186,6 +263,7 @@ router.get(
   getAdministratorAttendance
 );
 
+
 router.post(
   "/attendance/import",
   authMiddleware,
@@ -193,16 +271,7 @@ router.post(
   upload.single("file"),
   importAdministratorAttendanceCsv
 );
-router.put(
-  "/users/:userId/role",
-  authMiddleware,
-  requireJayAdministrator,
-  updateAdministratorUserRole
-);
-router.put(
-  "/users/:userId/details",
-  authMiddleware,
-  requireJayAdministrator,
-  updateAdministratorUserDetails
-);
+
+
+
 module.exports = router;
