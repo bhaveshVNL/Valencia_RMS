@@ -8,7 +8,7 @@ export default defineConfig({
   // Hostinger root domain needs "/".
   base:
     process.env.GITHUB_ACTIONS === "true"
-      ? "/Valencia-RMS/"
+      ? "/Valencia_RMS/"
       : "/",
 
   server: {
