@@ -65,7 +65,7 @@
   padding: 0;
   cursor: pointer;
   z-index: 20;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+box-shadow: none !important;
   transition: background 0.18s ease, color 0.18s ease,
     transform 0.18s ease;
 }

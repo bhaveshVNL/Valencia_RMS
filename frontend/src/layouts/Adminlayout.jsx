@@ -105,6 +105,15 @@ const AdminLayout = () => {
           </NavLink>
 
           <NavLink
+            to="/admin/calendar"
+            className={({ isActive }) => (isActive ? "active" : "")}
+            title="Calendar"
+          >
+            <CalendarDays size={20} />
+            <span>Calendar</span>
+          </NavLink>
+
+          <NavLink
             to="/admin/profile"
             className={({ isActive }) => (isActive ? "active" : "")}
             title="Profile"

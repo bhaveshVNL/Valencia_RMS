@@ -27,7 +27,7 @@ const employeeMiniTaskRoutes = require("./routes/employeeminitaskroutes");
 const adminMiniTaskRoutes = require("./routes/adminminitaskroutes");
 const employeeProjectRoutes = require("./routes/employeeprojectroutes");
 const adminReviewRoutes = require("./routes/adminreviewroutes");
-
+const calendarRoutes = require("./routes/calendarroutes");
 /*
 |--------------------------------------------------------------------------
 | CORS Configuration
@@ -167,7 +167,7 @@ app.use(
 app.use("/api/admin-mini-tasks", adminMiniTaskRoutes);
 app.use("/api/employee-projects", employeeProjectRoutes);
 app.use("/api/admin-review", adminReviewRoutes);
-
+app.use("/api/calendar", calendarRoutes);
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || "0.0.0.0";
 

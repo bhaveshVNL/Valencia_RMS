@@ -71,7 +71,7 @@ body {
   place-items: center;
   cursor: pointer;
   z-index: 30;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+  box-shadow: none !important;
 }
 
 .admin-sidebar-toggle:hover {
@@ -1349,7 +1349,7 @@ body,
   padding: 0 !important;
   cursor: pointer !important;
   z-index: 50 !important;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12) !important;
+box-shadow: none !important;
 }
 
 .admin-sidebar-toggle:hover {
@@ -1440,7 +1440,7 @@ body,
   cursor: pointer !important;
 
   z-index: 100 !important;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12) !important;
+ box-shadow: none !important;
 }
 
 .admin-sidebar-toggle:hover {
@@ -1512,7 +1512,7 @@ body,
   place-items: center !important;
   cursor: pointer !important;
   z-index: 60 !important;
-  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12) !important;
+  box-shadow: none !important;
   padding: 0 !important;
   margin: 0 !important;
 }
@@ -1832,7 +1832,7 @@ body,
   border: 1px solid #e5e7eb !important;
   display: grid !important;
   place-items: center !important;
-  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12) !important;
+  box-shadow: none !important;
   z-index: 60 !important;
 }
 
@@ -1878,7 +1878,7 @@ body,
 .admin-nav a.active {
   background: #ff5733 !important;
   color: #ffffff !important;
-  box-shadow: 0 14px 28px rgba(255, 87, 51, 0.18) !important;
+  box-shadow: none !important;
 }
 
 .admin-nav a.active svg {
@@ -2101,7 +2101,7 @@ body,
   place-items: center !important;
   cursor: pointer !important;
   z-index: 80 !important;
-  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12) !important;
+ box-shadow: none !important;
   padding: 0 !important;
   margin: 0 !important;
 }

@@ -18,6 +18,15 @@ import {
 } from "lucide-react";
 import api from "../../api/axios";
 import * as XLSX from "xlsx";
+const PROJECT_DIVISIONS = [
+  "POS",
+  "NutraCare",
+  "ADV",
+  "Cans",
+  "PET",
+  "Crunzo",
+  "Healthybites",
+];
 
 const asArray = (value) => {
   if (Array.isArray(value)) return value;
@@ -212,6 +221,11 @@ const normalizeProject = (project) => {
 
   return {
     ...project,
+    division:
+  project.division ||
+  project.project_division ||
+  project.category ||
+  "-",
     project_id: project.project_id || project.id,
     project_title:
       project.project_title ||
@@ -332,20 +346,22 @@ const AdminProjects = () => {
   const [reviewSuccess, setReviewSuccess] = useState("");
 
   const [newProject, setNewProject] = useState({
-    project_title: "",
-    start_date: "",
-    end_date: "",
-    project_description: "",
-    assignee_ids: [],
-  });
+  project_title: "",
+  division: "",
+  start_date: "",
+  end_date: "",
+  project_description: "",
+  assignee_ids: [],
+});
 
   const [editProject, setEditProject] = useState({
-    project_title: "",
-    start_date: "",
-    end_date: "",
-    project_description: "",
-    assignee_ids: [],
-  });
+  project_title: "",
+  division: "",
+  start_date: "",
+  end_date: "",
+  project_description: "",
+  assignee_ids: [],
+});
 
   const [newMainTask, setNewMainTask] = useState({
     task_title: "",
@@ -563,8 +579,9 @@ const fetchUsers = async () => {
     setReviewError("");
     setReviewSuccess("");
 
-    setEditProject({
-      project_title: normalizedProject.project_title || "",
+setEditProject({
+  project_title: normalizedProject.project_title || "",
+  division: normalizedProject.division || "",
       start_date: normalizeDateForInput(normalizedProject.start_date),
       end_date: normalizeDateForInput(normalizedProject.end_date),
       project_description: normalizedProject.project_description || "",
@@ -603,8 +620,9 @@ const fetchUsers = async () => {
 
   const resetAssignForm = () => {
     setNewProject({
-      project_title: "",
-      start_date: "",
+  project_title: "",
+  division: "",
+  start_date: "",
       end_date: "",
       project_description: "",
       assignee_ids: [],
@@ -749,6 +767,7 @@ const fetchUsers = async () => {
     try {
       const payload = {
         project_title: newProject.project_title.trim(),
+        division: newProject.division,
         title: newProject.project_title.trim(),
         project_description: newProject.project_description.trim(),
         description: newProject.project_description.trim(),
@@ -813,6 +832,7 @@ const fetchUsers = async () => {
 
       const payload = {
         project_title: editProject.project_title.trim(),
+        division: editProject.division,
         title: editProject.project_title.trim(),
         project_description: editProject.project_description.trim(),
         description: editProject.project_description.trim(),
@@ -1196,11 +1216,12 @@ const exportProjectData = async () => {
       projectMap.set(String(project.project_id), {
         project_id: project.project_id,
         project_title: project.project_title || "Untitled Project",
-        status: getStatusLabel(project.status),
-        start_date: project.start_date || "",
-        end_date: project.end_date || "",
-        department: project.department_name || "-",
-        total_seconds: 0,
+status: getStatusLabel(project.status),
+start_date: project.start_date || "",
+end_date: project.end_date || "",
+department: project.department_name || "-",
+division: project.division || "-",
+total_seconds: 0,
         employees: new Map(),
         tasks: new Map(),
         sessions: [],
@@ -1221,6 +1242,7 @@ const exportProjectData = async () => {
             start_date: "",
             end_date: "",
             department: employee.department_name || "-",
+            division: project.division || "-",
             total_seconds: 0,
             employees: new Map(),
             tasks: new Map(),
@@ -1293,10 +1315,11 @@ const exportProjectData = async () => {
       summaryRows.push([`PROJECT: ${project.project_title}`]);
       summaryRows.push([]);
       summaryRows.push(["Project Status", project.status]);
-      summaryRows.push(["Start Date", project.start_date || "-"]);
-      summaryRows.push(["End Date", project.end_date || "-"]);
-      summaryRows.push(["Department", project.department || "-"]);
-      summaryRows.push([]);
+summaryRows.push(["Start Date", project.start_date || "-"]);
+summaryRows.push(["End Date", project.end_date || "-"]);
+summaryRows.push(["Department", project.department || "-"]);
+summaryRows.push(["Division", project.division || "-"]);
+summaryRows.push([]);
       summaryRows.push([
         "Total Tracked Time",
         formatExportDuration(project.total_seconds),
@@ -1621,8 +1644,8 @@ const exportProjectData = async () => {
       </section>
 
       {showAssignModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
+  <div style={styles.modalOverlay}>
+    <div style={styles.assignModal}>
             <button
               type="button"
               style={styles.closeButton}
@@ -1654,6 +1677,28 @@ const exportProjectData = async () => {
                   placeholder="Example: Website Optimization"
                 />
               </label>
+              
+              <label style={styles.field}>
+  <span>Project Division</span>
+
+  <select
+    value={newProject.division}
+    onChange={(event) =>
+      setNewProject((previous) => ({
+        ...previous,
+        division: event.target.value,
+      }))
+    }
+  >
+    <option value="">Select Division</option>
+
+    {PROJECT_DIVISIONS.map((division) => (
+      <option key={division} value={division}>
+        {division}
+      </option>
+    ))}
+  </select>
+</label>
 
               <label style={styles.field}>
                 <span>Project Start Date</span>
@@ -1758,15 +1803,31 @@ const exportProjectData = async () => {
               </div>
             </div>
 
-            <button
-              type="button"
-              style={styles.fullPrimaryButton}
-              onClick={createProject}
-              disabled={actionLoading}
-            >
-              <CalendarDays size={19} />
-              {actionLoading ? "Assigning..." : "Assign Project"}
-            </button>
+            <div style={styles.modalFooter}>
+
+<button
+  type="button"
+  style={styles.fullPrimaryButton}
+  onClick={createProject}
+  disabled={actionLoading}
+>
+  <CalendarDays size={19} />
+  {actionLoading ? "Assigning..." : "Assign Project"}
+</button>
+
+
+<button
+  type="button"
+  style={styles.cancelModalButton}
+  onClick={()=>{
+    setShowAssignModal(false);
+    resetAssignForm();
+  }}
+>
+  Cancel
+</button>
+
+</div>
           </div>
         </div>
       )}
@@ -1805,10 +1866,18 @@ const exportProjectData = async () => {
             <div style={styles.detailsGrid}>
               <div style={styles.detailBox}>
                 <span style={styles.detailLabel}>Department</span>
+
                 <strong style={styles.detailValue}>
                   {selectedProject.department_name || "-"}
                 </strong>
               </div>
+              <div style={styles.detailBox}>
+  <span style={styles.detailLabel}>Division</span>
+
+  <strong style={styles.detailValue}>
+    {selectedProject.division || "-"}
+  </strong>
+</div>
 
               <div style={styles.detailBox}>
                 <span style={styles.detailLabel}>Created By</span>
@@ -2825,26 +2894,20 @@ refreshButton: {
     boxShadow: "0 24px 60px rgba(15, 23, 42, 0.28)",
   },
 
-  closeButton: {
-  position: "sticky",
-  top: "10px",
-  marginLeft: "auto",
-  marginBottom: "-52px",
-
-  width: "52px",
-  height: "52px",
-
-  borderRadius: "16px",
-  border: "none",
-
-  background: "#111827",
-  color: "#ffffff",
-
-  display: "grid",
-  placeItems: "center",
-
-  cursor: "pointer",
-  zIndex: 1000,
+  closeButton:{
+ position:"absolute",
+ top:"20px",
+ right:"20px",
+ width:"52px",
+ height:"52px",
+ borderRadius:"16px",
+ border:"none",
+ background:"#111827",
+ color:"#ffffff",
+ display:"grid",
+ placeItems:"center",
+ cursor:"pointer",
+ zIndex:1000,
 },
 
 floatingCloseLayer: {
@@ -3326,9 +3389,13 @@ disabledReviewButton: {
     fontSize: "14px",
     fontWeight: 900,
   },
+  assignFooterButton:{
+  flex:1,
+},
 
   fullPrimaryButton: {
-    width: "100%",
+     width:"auto",
+  minWidth:"220px",
     minHeight: "56px",
     border: "none",
     borderRadius: "16px",
@@ -3517,12 +3584,14 @@ exportButton: {
   cursor: "pointer",
   boxShadow: "0 10px 22px rgba(15, 23, 42, 0.14)",
 },
-modalFooter: {
-  display: "flex",
-  justifyContent: "flex-end",
-  marginTop: "30px",
-  paddingTop: "20px",
-  borderTop: "1px solid #e5e7eb",
+modalFooter:{
+  display:"flex",
+  justifyContent:"flex-end",
+  alignItems:"center",
+  gap:"14px",
+  marginTop:"30px",
+  paddingTop:"20px",
+  borderTop:"1px solid #e5e7eb",
 },
 
 cancelModalButton: {
@@ -3536,7 +3605,16 @@ cancelModalButton: {
   fontWeight: 900,
   cursor: "pointer",
 },
-
+assignModal:{
+  position:"relative",
+  width:"min(1250px, 96vw)",
+  maxHeight:"90vh",
+  background:"#ffffff",
+  borderRadius:"26px",
+  padding:"34px",
+  boxShadow:"0 24px 60px rgba(15,23,42,0.28)",
+  overflowY:"auto",
+},
 };
 
 export default AdminProjects;

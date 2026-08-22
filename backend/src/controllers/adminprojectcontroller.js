@@ -428,6 +428,7 @@ const getAdminProjects = async (
         p.project_description,
         p.priority,
         p.status,
+        p.division,
 
         DATE_FORMAT(
           p.start_date,
@@ -1203,6 +1204,7 @@ const createAdminProject = async (
         INSERT INTO projects (
           created_by_user_id,
           department_id,
+          division,
           project_title,
           project_description,
           priority,
@@ -1219,6 +1221,7 @@ const createAdminProject = async (
           ?,
           ?,
           ?,
+          ?,
           'not_started',
           ?,
           ?,
@@ -1228,16 +1231,11 @@ const createAdminProject = async (
         )
         `,
         [
-          adminUserId || null,
-          adminDepartmentId || null,
-          String(
-            projectTitle
-          ).trim(),
-
-          String(
-            projectDescription
-          ).trim(),
-
+          adminUserId,
+          adminDepartmentId,
+          req.body.division || null,
+          String(projectTitle).trim(),
+          String(projectDescription).trim(),
           priority,
           startDate,
           dueDate,
@@ -1349,6 +1347,8 @@ const updateAdminProject = async (
         req.user?.email ||
         process.env.SMTP_USER,
     };
+    const division =
+  req.body.division || null;
 
     const projectTitle =
       req.body.project_title ||
@@ -1464,24 +1464,26 @@ const updateAdminProject = async (
         priority = ?,
         start_date = ?,
         due_date = ?,
+        division = ?,
         updated_at = NOW()
 
       WHERE project_id = ?
       `,
       [
-        String(
-          projectTitle
-        ).trim(),
+  String(
+    projectTitle
+  ).trim(),
 
-        String(
-          projectDescription
-        ).trim(),
+  String(
+    projectDescription
+  ).trim(),
 
-        priority,
-        startDate,
-        dueDate,
-        projectId,
-      ]
+  priority,
+  startDate,
+  dueDate,
+  division,
+  projectId,
+]
     );
 
     await syncProjectAssignments(
@@ -2604,9 +2606,78 @@ Keep aliases so current frontend does not suddenly
 lose compatibility.
 ========================================================
 */
+const exportAdminProjectsCsv = async (req, res) => {
+  try {
+    const [projects] = await db.query(
+      `
+     SELECT
+  p.project_title,
+  p.project_description,
+  p.division,
+  p.status,
+  p.priority,
+  DATE_FORMAT(p.start_date,'%Y-%m-%d') AS start_date,
+  DATE_FORMAT(p.due_date,'%Y-%m-%d') AS due_date,
+  creator.full_name AS created_by
+
+      FROM projects p
+
+      LEFT JOIN users creator
+      ON creator.user_id = p.created_by_user_id
+
+      ORDER BY p.project_id DESC
+      `
+    );
+
+
+    const headers = [
+      "project_title",
+      "project_description",
+      "division",
+      "status",
+      "priority",
+      "start_date",
+      "due_date",
+      "created_by",
+    ];
+
+
+    const csv = [
+      headers.join(","),
+      ...projects.map(project =>
+        headers.map(
+          h => `"${String(project[h] || "").replace(/"/g,'""')}"`
+        ).join(",")
+      )
+    ].join("\n");
+
+
+    res.setHeader(
+      "Content-Type",
+      "text/csv"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=admin-projects.csv"
+    );
+
+    return res.send(csv);
+
+  } catch(error){
+
+    return res.status(500).json({
+      success:false,
+      message:"Failed to export projects.",
+      error:error.message
+    });
+
+  }
+};
 
 module.exports = {
   getAdminProjects,
+  exportAdminProjectsCsv,
 
   getDepartmentProjects:
     getAdminProjects,

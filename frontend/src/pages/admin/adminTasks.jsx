@@ -769,19 +769,14 @@ useEffect(() => {
           )}
         </div>
 
-        {loading ? (
-          <div style={styles.messageBox}>
-            Loading department tasks...
-          </div>
-        ) : filteredTasks.length ===
-          0 ? (
-          <div style={styles.messageBox}>
-            No tasks found.
-          </div>
-        ) : (
-          <div style={styles.kanbanViewport}>
-            <div style={styles.kanbanScroll}>
-              <div style={styles.kanbanBoard}>
+{loading ? (
+  <div style={styles.messageBox}>
+    Loading department tasks...
+  </div>
+) : (
+  <div style={styles.kanbanViewport}>
+    <div style={styles.kanbanScroll}>
+      <div style={styles.kanbanBoard}>
                 {kanbanColumns.map(
                   (column) => (
                     <div

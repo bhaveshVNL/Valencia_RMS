@@ -1,5 +1,115 @@
 const db = require("../config/db");
+const bcrypt = require("bcryptjs");
+const changeAdminPassword = async (req,res)=>{
+  try {
 
+    const userId =
+      req.user?.user_id ||
+      req.user?.id ||
+      req.user?.userId;
+
+
+    if (!userId) {
+      return res.status(401).json({
+        message:"Unauthorized"
+      });
+    }
+
+
+    const {
+      oldPassword,
+      newPassword
+    } = req.body;
+
+
+    if(!oldPassword || !newPassword){
+
+      return res.status(400).json({
+        message:
+        "Old and new password are required"
+      });
+
+    }
+
+
+    const [users] = await db.query(
+      `
+      SELECT password_hash
+      FROM users
+      WHERE user_id = ?
+      `,
+      [userId]
+    );
+
+
+    if(!users.length){
+
+      return res.status(404).json({
+        message:"User not found"
+      });
+
+    }
+
+
+    const match =
+      await bcrypt.compare(
+        oldPassword,
+        users[0].password_hash
+      );
+
+
+    if(!match){
+
+      return res.status(400).json({
+        message:
+        "Current password incorrect"
+      });
+
+    }
+
+
+    const hashedPassword =
+      await bcrypt.hash(
+        newPassword,
+        10
+      );
+
+
+    await db.query(
+      `
+      UPDATE users
+      SET password_hash = ?,
+          force_password_change = 0
+      WHERE user_id = ?
+      `,
+      [
+        hashedPassword,
+        userId
+      ]
+    );
+
+
+    res.json({
+      message:
+      "Password changed successfully"
+    });
+
+
+  } catch(error){
+
+    console.error(
+      "Administrator password change:",
+      error
+    );
+
+
+    res.status(500).json({
+      message:"Server error"
+    });
+
+  }
+
+};
 const getAdminProfile = async (req, res) => {
   try {
     const loggedInUserId =
@@ -74,4 +184,5 @@ const getAdminProfile = async (req, res) => {
 
 module.exports = {
   getAdminProfile,
+  changeAdminPassword,
 };
