@@ -26,6 +26,7 @@ import AdminLayout from "./layouts/Adminlayout";
 import AdminOverview from "./pages/admin/adminOverview";
 import AdminProjects from "./pages/admin/adminProjects";
 import AdminTasks from "./pages/admin/adminTasks";
+import AdminCalendar from "./pages/admin/adminCalendar";
 import AdminProfile from "./pages/admin/adminProfile";
 import AdminUsers from "./pages/admin/adminUsers";
 import AdminAttendance from "./pages/admin/adminAttendance";
@@ -293,6 +294,7 @@ const App = () => {
         <Route path="users" element={<AdminUsers />} />
 
         <Route path="attendance" element={<AdminAttendance />} />
+<<<<<<< HEAD
 
 
         <Route
@@ -301,6 +303,10 @@ const App = () => {
         />
 
 
+=======
+        <Route path="leave-applications" element={<AdminLeaveApplications />} />
+        <Route path="calendar" element={<AdminCalendar />} />
+>>>>>>> 69c14eac343afb9aa7a52d14ef158296dc2314ea
       </Route>
 
 

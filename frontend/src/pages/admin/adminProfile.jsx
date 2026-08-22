@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Eye, EyeOff, Lock, X } from "lucide-react";
 import api from "../../api/axios";
 
 const getStoredUser = () => {
@@ -30,6 +31,21 @@ const AdminProfile = () => {
 
   const [profile, setProfile] = useState(storedUser);
   const [error, setError] = useState("");
+  const [showPasswordBox, setShowPasswordBox] = useState(false);
+
+const [passwordForm, setPasswordForm] = useState({
+  oldPassword:"",
+  newPassword:"",
+  confirmPassword:"",
+});
+
+const [showPasswords,setShowPasswords] = useState({
+  old:false,
+  new:false,
+  confirm:false,
+});
+
+const [passwordMessage,setPasswordMessage] = useState("");
 
   const fetchProfile = async () => {
     try {
@@ -65,7 +81,62 @@ const AdminProfile = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
+const changePassword = async()=>{
 
+  setPasswordMessage("");
+
+  if(
+    !passwordForm.oldPassword ||
+    !passwordForm.newPassword ||
+    !passwordForm.confirmPassword
+  ){
+    setPasswordMessage("All fields are required");
+    return;
+  }
+
+
+  if(
+    passwordForm.newPassword !== passwordForm.confirmPassword
+  ){
+    setPasswordMessage("New passwords do not match");
+    return;
+  }
+
+
+  try{
+
+    const response = await api.put(
+      "/admin-profile/change-password",
+      {
+        oldPassword:passwordForm.oldPassword,
+        newPassword:passwordForm.newPassword
+      }
+    );
+
+
+    setPasswordMessage(
+      response.data.message
+    );
+
+
+    setPasswordForm({
+      oldPassword:"",
+      newPassword:"",
+      confirmPassword:"",
+    });
+
+
+  }
+  catch(err){
+
+    setPasswordMessage(
+      err.response?.data?.message ||
+      "Password change failed"
+    );
+
+  }
+
+};
   const adminName = profile?.full_name || profile?.name || "Admin";
   const adminEmail = profile?.email || "-";
   const adminRole = profile?.role_name || profile?.role || "admin";
@@ -111,9 +182,19 @@ const AdminProfile = () => {
           <p style={styles.adminEmail}>{adminEmail}</p>
 
           <div style={styles.badgeRow}>
-            <span style={styles.roleBadge}>{adminRole}</span>
-            <span style={styles.departmentBadge}>{adminDepartment}</span>
-          </div>
+  <span style={styles.roleBadge}>{adminRole}</span>
+  <span style={styles.departmentBadge}>{adminDepartment}</span>
+</div>
+
+
+<button
+  type="button"
+  style={styles.passwordButton}
+  onClick={() => setShowPasswordBox(true)}
+>
+  <Lock size={16}/>
+  Change Password
+</button>
         </div>
       </section>
 
@@ -133,7 +214,211 @@ const AdminProfile = () => {
             </div>
           ))}
         </div>
-      </section>
+            </section>
+
+
+      {showPasswordBox && (
+
+        <div style={styles.passwordOverlay}>
+
+          <div style={styles.passwordModal}>
+            <button
+  type="button"
+  style={styles.closePasswordModal}
+  onClick={()=>{
+    setShowPasswordBox(false);
+    setPasswordMessage("");
+  }}
+>
+  <X size={20}/>
+</button>
+
+
+            <h2 style={styles.modalTitle}>
+              Change Password
+            </h2>
+
+
+            {passwordMessage && (
+              <p style={styles.passwordMessage}>
+                {passwordMessage}
+              </p>
+            )}
+
+
+
+            <div style={styles.passwordField}>
+
+              <input
+                type={
+                  showPasswords.old
+                  ? "text"
+                  : "password"
+                }
+                placeholder="Current Password"
+
+                value={passwordForm.oldPassword}
+
+                onChange={(e)=>
+                  setPasswordForm({
+                    ...passwordForm,
+                    oldPassword:e.target.value
+                  })
+                }
+
+                style={styles.passwordInput}
+              />
+
+
+              <button
+                type="button"
+                style={styles.eyeButton}
+                onClick={()=>
+                  setShowPasswords({
+                    ...showPasswords,
+                    old:!showPasswords.old
+                  })
+                }
+              >
+                {
+                  showPasswords.old
+                  ?
+                  <EyeOff size={18}/>
+                  :
+                  <Eye size={18}/>
+                }
+              </button>
+
+            </div>
+
+
+
+            <div style={styles.passwordField}>
+
+              <input
+                type={
+                  showPasswords.new
+                  ? "text"
+                  : "password"
+                }
+
+                placeholder="New Password"
+
+                value={passwordForm.newPassword}
+
+                onChange={(e)=>
+                  setPasswordForm({
+                    ...passwordForm,
+                    newPassword:e.target.value
+                  })
+                }
+
+                style={styles.passwordInput}
+              />
+
+
+              <button
+                type="button"
+                style={styles.eyeButton}
+                onClick={()=>
+                  setShowPasswords({
+                    ...showPasswords,
+                    new:!showPasswords.new
+                  })
+                }
+              >
+                {
+                  showPasswords.new
+                  ?
+                  <EyeOff size={18}/>
+                  :
+                  <Eye size={18}/>
+                }
+              </button>
+
+            </div>
+
+
+
+
+            <div style={styles.passwordField}>
+
+              <input
+                type={
+                  showPasswords.confirm
+                  ? "text"
+                  : "password"
+                }
+
+                placeholder="Confirm Password"
+
+                value={passwordForm.confirmPassword}
+
+                onChange={(e)=>
+                  setPasswordForm({
+                    ...passwordForm,
+                    confirmPassword:e.target.value
+                  })
+                }
+
+                style={styles.passwordInput}
+              />
+
+
+              <button
+                type="button"
+                style={styles.eyeButton}
+                onClick={()=>
+                  setShowPasswords({
+                    ...showPasswords,
+                    confirm:!showPasswords.confirm
+                  })
+                }
+              >
+                {
+                  showPasswords.confirm
+                  ?
+                  <EyeOff size={18}/>
+                  :
+                  <Eye size={18}/>
+                }
+              </button>
+
+
+            </div>
+
+
+
+            <div style={styles.passwordActions}>
+
+              <button
+  style={styles.cancelButton}
+  onClick={()=>{
+    setShowPasswordBox(false);
+    setPasswordMessage("");
+  }}
+>
+  Cancel
+</button>
+
+
+              <button
+                style={styles.saveButton}
+                onClick={changePassword}
+              >
+                Save Password
+              </button>
+
+            </div>
+
+
+          </div>
+
+        </div>
+
+      )}
+
+
     </div>
   );
 };
@@ -307,6 +592,125 @@ const styles = {
     overflowWrap: "anywhere",
     textTransform: "none",
   },
+  passwordButton:{
+  marginTop:"20px",
+  border:"none",
+  background:"transparent",
+  color:"#ff5733",
+  fontSize:"15px",
+  fontWeight:900,
+  cursor:"pointer",
+  display:"flex",
+  alignItems:"center",
+  gap:"8px",
+},
+
+
+passwordOverlay:{
+  position:"fixed",
+  inset:0,
+  background:"rgba(0,0,0,0.25)",
+  display:"flex",
+  alignItems:"center",
+  justifyContent:"center",
+  zIndex:9999,
+},
+
+
+passwordModal:{
+  width:"420px",
+  background:"#fff",
+  borderRadius:"24px",
+  padding:"30px",
+  position:"relative",
+  boxShadow:"0 20px 50px rgba(0,0,0,.15)",
+},
+
+
+modalTitle:{
+  margin:"0 0 24px",
+  fontSize:"24px",
+  fontWeight:900,
+},
+
+
+passwordField:{
+  position:"relative",
+  marginBottom:"15px",
+},
+
+
+passwordInput:{
+  width:"100%",
+  height:"48px",
+  border:"1px solid #d6dde8",
+  borderRadius:"14px",
+  padding:"0 45px 0 15px",
+  fontSize:"15px",
+  outline:"none",
+},
+
+
+eyeButton:{
+  position:"absolute",
+  right:"12px",
+  top:"50%",
+  transform:"translateY(-50%)",
+  border:"none",
+  background:"transparent",
+  cursor:"pointer",
+  color:"#64748b",
+},
+
+
+passwordActions:{
+  display:"flex",
+  justifyContent:"flex-end",
+  gap:"12px",
+  marginTop:"20px",
+},
+
+
+cancelButton:{
+  border:"1px solid #e5e7eb",
+  background:"#ffffff",
+  color:"#111827",
+  padding:"12px 22px",
+  borderRadius:"12px",
+  cursor:"pointer",
+  fontWeight:800,
+  fontSize:"15px",
+},
+
+saveButton:{
+  border:"none",
+  background:"#ff5733",
+  color:"#ffffff",
+  padding:"12px 22px",
+  borderRadius:"12px",
+  fontWeight:900,
+  fontSize:"15px",
+  cursor:"pointer",
+},
+
+
+passwordMessage:{
+  color:"#ff5733",
+  fontWeight:800,
+  marginBottom:"15px",
+},
+closePasswordModal:{
+  position:"absolute",
+  top:"18px",
+  right:"18px",
+  border:"none",
+  background:"transparent",
+  cursor:"pointer",
+  color:"#64748b",
+  display:"flex",
+  alignItems:"center",
+  justifyContent:"center",
+},
 };
 
 export default AdminProfile;

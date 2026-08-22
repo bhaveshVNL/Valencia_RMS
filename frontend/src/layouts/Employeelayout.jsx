@@ -20,24 +20,16 @@ const EmployeeLayout = () => {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Custom logout confirmation popup
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
   const user = JSON.parse(
     sessionStorage.getItem("user") || "{}"
   );
 
   const logout = () => {
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("user");
+  sessionStorage.clear();
+  localStorage.clear();
 
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-
-    setShowLogoutConfirm(false);
-
-    navigate("/login", { replace: true });
-  };
+  navigate("/login", { replace: true });
+};
 
   const initials =
     user?.full_name
@@ -171,13 +163,13 @@ const EmployeeLayout = () => {
           </div>
 
           <button
-            type="button"
-            className="employee-logout-btn"
-            onClick={() => setShowLogoutConfirm(true)}
-          >
-            <LogOut size={18} />
-            <span>Logout</span>
-          </button>
+  type="button"
+  className="employee-logout-btn"
+  onClick={logout}
+>
+  <LogOut size={18} />
+  <span>Logout</span>
+</button>
         </div>
       </aside>
 
@@ -187,39 +179,7 @@ const EmployeeLayout = () => {
       </main>
 
       {/* ================= LOGOUT CONFIRMATION ================= */}
-      {showLogoutConfirm && (
-        <div
-          className="employee-logout-confirm-overlay"
-          onClick={() => setShowLogoutConfirm(false)}
-        >
-          <div
-            className="employee-logout-confirm-box"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2>Are you sure?</h2>
-
-            <div className="employee-logout-confirm-actions">
-              <button
-                type="button"
-                className="employee-logout-cancel-btn"
-                onClick={() =>
-                  setShowLogoutConfirm(false)
-                }
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="employee-logout-yes-btn"
-                onClick={logout}
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 };
