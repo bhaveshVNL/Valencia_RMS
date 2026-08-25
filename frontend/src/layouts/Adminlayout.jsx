@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import {
+  NavLink,
+  Outlet,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
+
 import {
   BarChart3,
   CalendarDays,
@@ -28,6 +34,10 @@ const getStoredUser = () => {
 
 const AdminLayout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+const isCalendarPage =
+  location.pathname === "/admin/calendar";
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const user = getStoredUser();
@@ -174,9 +184,15 @@ const AdminLayout = () => {
         </div>
       </aside>
 
-      <main className="admin-main">
-        <Outlet />
-      </main>
+      <main
+  className={
+    isCalendarPage
+      ? "admin-main admin-main-calendar"
+      : "admin-main"
+  }
+>
+  <Outlet />
+</main>
     </div>
   );
 };

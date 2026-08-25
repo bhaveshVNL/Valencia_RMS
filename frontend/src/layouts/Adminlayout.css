@@ -3210,3 +3210,26 @@ div:has(> svg + input[placeholder="Search mini task, employee, date, designation
   gap: 16px !important;
   flex: 1 !important;
 }
+/* =========================================================
+   ADMIN CALENDAR ONLY
+   Remove wasted layout padding
+========================================================= */
+.admin-main.admin-main-calendar {
+  padding:
+    4px   /* top */
+    8px   /* right */
+    4px   /* bottom */
+    4px   /* left */
+    !important;
+
+  height: 100vh;
+  min-height: 100vh;
+
+  overflow: hidden !important;
+}
+.admin-main.admin-main-calendar > div {
+  width: 100% !important;
+  max-width: none !important;
+
+  margin: 0 !important;
+}

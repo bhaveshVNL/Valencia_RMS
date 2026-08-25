@@ -1,5 +1,9 @@
 const db = require("../config/db");
-
+const {
+  sendMeetingScheduledEmail,
+  sendMeetingUpdatedEmail,
+  sendMeetingCancelledEmail,
+} = require("../utils/emailservice");
 /*
 ========================================================
 HELPERS
@@ -104,7 +108,6 @@ const calculateMinutes = (startTime, endTime) => {
 ADMIN - EMPLOYEES FOR MEETING
 ========================================================
 */
-
 const getMeetingEmployees = async (req, res) => {
   try {
     const { user, error } =
@@ -131,39 +134,50 @@ const getMeetingEmployees = async (req, res) => {
 
     const [employees] = await db.query(
       `
-      SELECT
-        u.user_id,
-        u.employee_code,
-        u.full_name,
-        u.email,
-        u.designation,
-        u.department_id,
-        d.department_name
+        SELECT
+          u.user_id,
+          u.employee_code,
+          u.full_name,
+          u.email,
+          u.designation,
+          u.department_id,
+          d.department_name,
+          LOWER(r.role_name) AS role_name
 
-      FROM users u
+        FROM users u
 
-      LEFT JOIN roles r
-        ON r.role_id = u.role_id
+        LEFT JOIN roles r
+          ON r.role_id = u.role_id
 
-      LEFT JOIN departments d
-        ON d.department_id =
-        u.department_id
+        LEFT JOIN departments d
+          ON d.department_id =
+          u.department_id
 
-      WHERE
-        u.department_id = ?
+        WHERE
+          (
+            (
+              u.department_id = ?
+              AND LOWER(r.role_name) = 'employee'
+            )
 
-      AND LOWER(r.role_name) =
-        'employee'
+            OR LOWER(r.role_name) = 'administrator'
+          )
 
-      AND LOWER(
-        COALESCE(
-          u.status,
-          'active'
-        )
-      ) != 'deleted'
+        AND LOWER(
+          COALESCE(
+            u.status,
+            'active'
+          )
+        ) != 'deleted'
 
-      ORDER BY
-        u.full_name ASC
+        ORDER BY
+          CASE
+            WHEN LOWER(r.role_name) = 'administrator'
+            THEN 0
+            ELSE 1
+          END,
+
+          u.full_name ASC
       `,
       [user.department_id]
     );
@@ -172,6 +186,7 @@ const getMeetingEmployees = async (req, res) => {
       success: true,
       employees,
     });
+
   } catch (error) {
     console.error(
       "Get meeting employees error:",
@@ -202,8 +217,6 @@ const createMeeting = async (req, res) => {
       await getLoggedInUser(req);
 
     if (error) {
-      connection.release();
-
       return res
         .status(error.status)
         .json({
@@ -213,14 +226,14 @@ const createMeeting = async (req, res) => {
     }
 
     if (
-      String(user.role_name).toLowerCase() !==
-      "admin"
+      String(
+        user.role_name
+      ).toLowerCase() !== "admin"
     ) {
-      connection.release();
-
       return res.status(403).json({
         success: false,
-        message: "Admin access required.",
+        message:
+          "Admin access required.",
       });
     }
 
@@ -237,7 +250,9 @@ const createMeeting = async (req, res) => {
       String(title || "").trim();
 
     const cleanDescription =
-      String(description || "").trim();
+      String(
+        description || ""
+      ).trim();
 
     const employeeIds =
       Array.isArray(employee_ids)
@@ -251,8 +266,6 @@ const createMeeting = async (req, res) => {
         : [];
 
     if (!cleanTitle) {
-      connection.release();
-
       return res.status(400).json({
         success: false,
         message:
@@ -265,8 +278,6 @@ const createMeeting = async (req, res) => {
       !start_time ||
       !end_time
     ) {
-      connection.release();
-
       return res.status(400).json({
         success: false,
         message:
@@ -275,8 +286,6 @@ const createMeeting = async (req, res) => {
     }
 
     if (end_time <= start_time) {
-      connection.release();
-
       return res.status(400).json({
         success: false,
         message:
@@ -285,23 +294,12 @@ const createMeeting = async (req, res) => {
     }
 
     if (!employeeIds.length) {
-      connection.release();
-
       return res.status(400).json({
         success: false,
         message:
           "Please select at least one employee.",
       });
     }
-
-    /*
-    --------------------------------------------------------
-    SECURITY
-
-    Admin may only assign employees
-    belonging to their department.
-    --------------------------------------------------------
-    */
 
     const placeholders =
       employeeIds
@@ -314,20 +312,39 @@ const createMeeting = async (req, res) => {
         SELECT
           u.user_id,
           u.full_name,
-          u.department_id
+          u.email,
+          u.department_id,
+          LOWER(r.role_name)
+            AS role_name
 
         FROM users u
 
         LEFT JOIN roles r
-          ON r.role_id = u.role_id
+          ON r.role_id =
+          u.role_id
 
         WHERE
           u.user_id IN (${placeholders})
 
-        AND u.department_id = ?
+        AND (
+          (
+            u.department_id = ?
+            AND LOWER(
+              r.role_name
+            ) = 'employee'
+          )
 
-        AND LOWER(r.role_name) =
-          'employee'
+          OR LOWER(
+            r.role_name
+          ) = 'administrator'
+        )
+
+        AND LOWER(
+          COALESCE(
+            u.status,
+            'active'
+          )
+        ) != 'deleted'
         `,
         [
           ...employeeIds,
@@ -339,8 +356,6 @@ const createMeeting = async (req, res) => {
       validEmployees.length !==
       employeeIds.length
     ) {
-      connection.release();
-
       return res.status(400).json({
         success: false,
         message:
@@ -350,38 +365,37 @@ const createMeeting = async (req, res) => {
 
     await connection.beginTransaction();
 
-    /*
-    --------------------------------------------------------
-    CREATE MEETING
-    --------------------------------------------------------
-    */
+    const [meetingResult] =
+      await connection.query(
+        `
+        INSERT INTO meetings (
+          title,
+          description,
+          meeting_date,
+          start_time,
+          end_time,
+          created_by,
+          department_id,
+          status
+        )
+        VALUES (
+          ?, ?, ?, ?, ?, ?, ?,
+          'scheduled'
+        )
+        `,
+        [
+          cleanTitle,
+          cleanDescription || null,
+          meeting_date,
+          start_time,
+          end_time,
+          user.user_id,
+          user.department_id,
+        ]
+      );
 
-    const [meetingResult] = await connection.query(
-  `
-  INSERT INTO meetings (
-    title,
-    description,
-    meeting_date,
-    start_time,
-    end_time,
-    created_by,
-    department_id,
-    status
-  )
-  VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled')
-  `,
-  [
-    cleanTitle,
-    cleanDescription || null,
-    meeting_date,
-    start_time,
-    end_time,
-    user.user_id,
-    user.department_id,
-  ]
-);
-
-const meetingId = meetingResult.insertId;
+    const meetingId =
+      meetingResult.insertId;
 
     const totalMinutes =
       calculateMinutes(
@@ -389,16 +403,9 @@ const meetingId = meetingResult.insertId;
         end_time
       );
 
-    /*
-    --------------------------------------------------------
-    EMPLOYEE ASSIGNMENT
-    +
-    AUTOMATIC MINI TASK
-    --------------------------------------------------------
-    */
-
     for (
-      const employee of validEmployees
+      const employee of
+        validEmployees
     ) {
       await connection.query(
         `
@@ -429,15 +436,7 @@ const meetingId = meetingResult.insertId;
           status
         )
         VALUES (
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
-          ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?,
           'logged'
         )
         `,
@@ -461,25 +460,105 @@ const meetingId = meetingResult.insertId;
 
     await connection.commit();
 
-    return res.status(201).json({
-      success: true,
+    /*
+    ========================================================
+    SEND SCHEDULED EMAILS
+    ========================================================
+    */
 
-      message:
-        "Meeting scheduled successfully.",
+    const participants =
+      validEmployees.map(
+        (employee) => ({
+          user_id:
+            employee.user_id,
 
-      meeting_id: meetingId,
+          full_name:
+            employee.full_name,
 
-      employees:
-        validEmployees.map(
-          (employee) => ({
-            user_id:
-              employee.user_id,
+          email:
+            employee.email,
+        })
+      );
 
-            full_name:
-              employee.full_name,
-          })
-        ),
-    });
+    for (
+      const employee of
+        validEmployees
+    ) {
+      const email =
+        String(
+          employee.email || ""
+        ).trim();
+
+      if (!email) {
+        continue;
+      }
+
+      try {
+        await sendMeetingScheduledEmail({
+          to: email,
+
+          participantName:
+            employee.full_name,
+
+          meetingTitle:
+            cleanTitle,
+
+          description:
+            cleanDescription,
+
+          meetingDate:
+            meeting_date,
+
+          startTime:
+            start_time,
+
+          endTime:
+            end_time,
+
+          scheduledBy:
+            user.full_name,
+
+          scheduledByEmail:
+            user.email,
+
+          participants,
+        });
+
+        console.log(
+          `Meeting email sent to ${email}`
+        );
+
+      } catch (emailError) {
+        console.error(
+          `Meeting email failed for ${email}:`,
+          emailError
+        );
+      }
+    }
+
+    return res
+      .status(201)
+      .json({
+        success: true,
+
+        message:
+          "Meeting scheduled successfully.",
+
+        meeting_id:
+          meetingId,
+
+        employees:
+          validEmployees.map(
+            (employee) => ({
+              user_id:
+                employee.user_id,
+
+              full_name:
+                employee.full_name,
+            })
+          ),
+      });
+
   } catch (error) {
     try {
       await connection.rollback();
@@ -492,24 +571,23 @@ const meetingId = meetingResult.insertId;
 
     return res.status(500).json({
       success: false,
+
       message:
         "Failed to schedule meeting.",
-      error: error.message,
+
+      error:
+        error.message,
+
       sqlMessage:
         error.sqlMessage || null,
     });
+
   } finally {
     try {
       connection.release();
     } catch {}
   }
 };
-
-/*
-========================================================
-ADMIN CALENDAR
-========================================================
-*/
 
 const getAdminCalendar = async (
   req,
@@ -671,10 +749,16 @@ const getAdminCalendar = async (
         AS created_by_name,
 
       GROUP_CONCAT(
-        DISTINCT employee.full_name
-        ORDER BY employee.full_name
-        SEPARATOR ', '
-      ) AS employees
+  DISTINCT employee.full_name
+  ORDER BY employee.full_name
+  SEPARATOR ', '
+) AS employees,
+
+GROUP_CONCAT(
+  DISTINCT employee.user_id
+  ORDER BY employee.user_id
+  SEPARATOR ','
+) AS employee_ids
 
     FROM meetings m
 
@@ -702,6 +786,21 @@ const getAdminCalendar = async (
     `,
     [user.department_id]
   );
+
+  const formattedMeetings =
+  meetings.map((meeting) => ({
+    ...meeting,
+
+    employee_ids:
+      meeting.employee_ids
+        ? String(
+            meeting.employee_ids
+          )
+            .split(",")
+            .map(Number)
+            .filter(Boolean)
+        : [],
+  }));
 
     /*
     MINI TASKS
@@ -770,9 +869,9 @@ const getAdminCalendar = async (
       success: true,
 
       projects,
-      tasks,
-      meetings,
-      mini_tasks: miniTasks,
+tasks,
+meetings: formattedMeetings,
+mini_tasks: miniTasks,
     });
   } catch (error) {
     console.error(
@@ -926,7 +1025,7 @@ const getEmployeeCalendar = async (
       await db.query(
         `
         SELECT
-          m.id AS id
+          m.id AS id,
           m.title,
           m.description,
 
@@ -1091,6 +1190,7 @@ const updateMeeting = async (
 
     const meetingId =
       Number(req.params.meetingId);
+    
 
     if (!meetingId) {
       connection.release();
@@ -1207,30 +1307,44 @@ WHERE id = ?
         .join(",");
 
     const [employees] =
-      await connection.query(
-        `
-        SELECT
-          u.user_id,
-          u.full_name
+  await connection.query(
+    `
+      SELECT
+        u.user_id,
+        u.full_name,
+        u.email,
+        u.department_id,
+        LOWER(r.role_name) AS role_name
 
-        FROM users u
+      FROM users u
 
-        LEFT JOIN roles r
-          ON r.role_id = u.role_id
+      LEFT JOIN roles r
+        ON r.role_id = u.role_id
 
-        WHERE
-          u.user_id IN (${placeholders})
+      WHERE
+        u.user_id IN (${placeholders})
 
-        AND u.department_id = ?
+      AND (
+        (
+          u.department_id = ?
+          AND LOWER(r.role_name) = 'employee'
+        )
 
-        AND LOWER(r.role_name) =
-          'employee'
-        `,
-        [
-          ...employeeIds,
-          user.department_id,
-        ]
-      );
+        OR LOWER(r.role_name) = 'administrator'
+      )
+
+      AND LOWER(
+        COALESCE(
+          u.status,
+          'active'
+        )
+      ) != 'deleted'
+    `,
+    [
+      ...employeeIds,
+      user.department_id,
+    ]
+  );
 
     if (
       employees.length !==
@@ -1365,13 +1479,102 @@ WHERE id = ?
       );
     }
 
-    await connection.commit();
+  await connection.commit();
 
-    return res.json({
-      success: true,
-      message:
-        "Meeting updated successfully.",
-    });
+/*
+========================================================
+SEND MEETING UPDATED EMAILS
+========================================================
+*/
+
+try {
+  const participants =
+    employees.map(
+      (employee) => ({
+        user_id:
+          employee.user_id,
+
+        full_name:
+          employee.full_name,
+
+        email:
+          employee.email,
+      })
+    );
+
+  const emailJobs =
+    employees
+      .filter(
+        (employee) =>
+          employee.email &&
+          String(
+            employee.email
+          ).trim()
+      )
+      .map(
+        async (employee) => {
+          try {
+            await sendMeetingUpdatedEmail({
+              to:
+                employee.email,
+
+              participantName:
+                employee.full_name,
+
+              meetingTitle:
+                String(title).trim(),
+
+              description:
+                String(
+                  description || ""
+                ).trim(),
+
+              meetingDate:
+                meeting_date,
+
+              startTime:
+                start_time,
+
+              endTime:
+                end_time,
+
+              updatedBy:
+                user.full_name,
+
+              updatedByEmail:
+                user.email,
+
+              participants,
+            });
+
+            console.log(
+              `Meeting update email sent to ${employee.email}`
+            );
+          } catch (emailError) {
+            console.error(
+              `Meeting update email failed for ${employee.email}:`,
+              emailError
+            );
+          }
+        }
+      );
+
+  await Promise.allSettled(
+    emailJobs
+  );
+
+} catch (emailError) {
+  console.error(
+    "Meeting update notification email error:",
+    emailError
+  );
+}
+
+return res.json({
+  success: true,
+  message:
+    "Meeting updated successfully.",
+});
   } catch (error) {
     try {
       await connection.rollback();
@@ -1401,6 +1604,12 @@ CANCEL MEETING
 ========================================================
 */
 
+/*
+========================================================
+CANCEL MEETING
+========================================================
+*/
+
 const cancelMeeting = async (
   req,
   res
@@ -1408,13 +1617,19 @@ const cancelMeeting = async (
   const connection =
     await db.getConnection();
 
+  let transactionStarted = false;
+
   try {
+    /*
+    --------------------------------------------------------
+    LOGGED IN USER
+    --------------------------------------------------------
+    */
+
     const { user, error } =
       await getLoggedInUser(req);
 
     if (error) {
-      connection.release();
-
       return res
         .status(error.status)
         .json({
@@ -1423,20 +1638,66 @@ const cancelMeeting = async (
         });
     }
 
+    /*
+    --------------------------------------------------------
+    MEETING ID
+    --------------------------------------------------------
+    */
+
     const meetingId =
       Number(req.params.meetingId);
+
+    if (!meetingId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid meeting.",
+      });
+    }
+
+    console.log(
+      "CANCEL MEETING ENDPOINT HIT:",
+      meetingId
+    );
+
+    /*
+    --------------------------------------------------------
+    GET MEETING
+    --------------------------------------------------------
+    */
 
     const [rows] =
       await connection.query(
         `
         SELECT
-  id,
-  title,
-  status
-FROM meetings
-WHERE id = ?
+          id,
+          title,
+          description,
 
-        AND department_id = ?
+          DATE_FORMAT(
+            meeting_date,
+            '%Y-%m-%d'
+          ) AS meeting_date,
+
+          TIME_FORMAT(
+            start_time,
+            '%H:%i'
+          ) AS start_time,
+
+          TIME_FORMAT(
+            end_time,
+            '%H:%i'
+          ) AS end_time,
+
+          status
+
+        FROM meetings
+
+        WHERE
+          id = ?
+
+        AND
+          department_id = ?
 
         LIMIT 1
         `,
@@ -1446,9 +1707,13 @@ WHERE id = ?
         ]
       );
 
-    if (!rows.length) {
-      connection.release();
+    /*
+    --------------------------------------------------------
+    MEETING NOT FOUND
+    --------------------------------------------------------
+    */
 
+    if (!rows.length) {
       return res.status(404).json({
         success: false,
         message:
@@ -1456,29 +1721,108 @@ WHERE id = ?
       });
     }
 
-    await connection.beginTransaction();
+    const meeting =
+      rows[0];
 
     /*
-    We KEEP meeting history.
+    --------------------------------------------------------
+    ALREADY CANCELLED
+    --------------------------------------------------------
+    */
+
+    if (
+      String(
+        meeting.status || ""
+      ).toLowerCase() ===
+      "cancelled"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Meeting is already cancelled.",
+      });
+    }
+
+    /*
+    --------------------------------------------------------
+    FETCH PARTICIPANTS BEFORE CANCELLING
+    --------------------------------------------------------
+
+    Important:
+    We fetch participants before changing anything
+    because these users must receive the cancellation
+    email.
+    --------------------------------------------------------
+    */
+
+    const [participants] =
+      await connection.query(
+        `
+        SELECT
+          u.user_id,
+          u.full_name,
+          u.email
+
+        FROM meeting_employees me
+
+        INNER JOIN users u
+          ON u.user_id =
+          me.employee_id
+
+        WHERE
+          me.meeting_id = ?
+
+        ORDER BY
+          u.full_name ASC
+        `,
+        [meetingId]
+      );
+
+    console.log(
+      "CANCEL PARTICIPANTS:",
+      participants
+    );
+
+    /*
+    --------------------------------------------------------
+    START TRANSACTION
+    --------------------------------------------------------
+    */
+
+    await connection.beginTransaction();
+
+    transactionStarted = true;
+
+    /*
+    --------------------------------------------------------
+    CANCEL MEETING
+    --------------------------------------------------------
     */
 
     await connection.query(
       `
       UPDATE meetings
-SET status = 'cancelled'
-WHERE id = ?
+
+      SET
+        status = 'cancelled'
+
+      WHERE
+        id = ?
       `,
       [meetingId]
     );
 
     /*
-    mini_tasks status only supports:
+    --------------------------------------------------------
+    UPDATE GENERATED MINI TASKS
+
+    mini_tasks status currently supports:
       logged
       reviewed
 
-    So don't force "cancelled" into that enum.
-
-    Instead prefix title and keep the record.
+    Therefore we keep the Mini Task record and mark
+    cancellation through its title + description.
+    --------------------------------------------------------
     */
 
     await connection.query(
@@ -1486,51 +1830,220 @@ WHERE id = ?
       UPDATE mini_tasks
 
       SET
+
         mini_task_title =
           CASE
-            WHEN mini_task_title
-              LIKE 'CANCELLED - %'
-            THEN mini_task_title
 
-            ELSE CONCAT(
-              'CANCELLED - ',
+            WHEN
               mini_task_title
-            )
+              LIKE 'CANCELLED - %'
+
+            THEN
+              mini_task_title
+
+            ELSE
+              CONCAT(
+                'CANCELLED - ',
+                mini_task_title
+              )
+
           END,
 
         mini_task_description =
           CONCAT(
+
             COALESCE(
               mini_task_description,
               ''
             ),
+
             CASE
-              WHEN COALESCE(
-                mini_task_description,
+
+              WHEN
+                COALESCE(
+                  mini_task_description,
+                  ''
+                ) = ''
+
+              THEN
                 ''
-              ) = ''
-              THEN ''
-              ELSE '\\n'
+
+              ELSE
+                '\\n'
+
             END,
+
             'This meeting has been cancelled.'
           )
 
-      WHERE meeting_id = ?
+      WHERE
+        meeting_id = ?
       `,
       [meetingId]
     );
 
+    /*
+    --------------------------------------------------------
+    COMMIT DATABASE FIRST
+    --------------------------------------------------------
+    */
+
     await connection.commit();
+
+    transactionStarted = false;
+
+    /*
+    ========================================================
+    SEND MEETING CANCELLED EMAILS
+    ========================================================
+
+    Meeting is already safely cancelled in DB.
+
+    Email failures must NOT undo the cancellation.
+    ========================================================
+    */
+
+    console.log(
+      "Cancellation email participants:",
+      participants.map(
+        (employee) => ({
+          name:
+            employee.full_name,
+
+          email:
+            employee.email,
+        })
+      )
+    );
+
+    /*
+    --------------------------------------------------------
+    CHECK EMAIL FUNCTION
+    --------------------------------------------------------
+    */
+
+    if (
+      typeof sendMeetingCancelledEmail !==
+      "function"
+    ) {
+      console.error(
+        "sendMeetingCancelledEmail is not exported correctly from emailservice.js"
+      );
+
+    } else {
+      /*
+      --------------------------------------------------------
+      SEND ONE EMAIL TO EACH PARTICIPANT
+      --------------------------------------------------------
+      */
+
+      for (
+        const employee of
+          participants
+      ) {
+        const email =
+          String(
+            employee.email || ""
+          ).trim();
+
+        /*
+        Employee has no email
+        */
+
+        if (!email) {
+          console.warn(
+            `Cancellation email skipped for ${employee.full_name}: no email address.`
+          );
+
+          continue;
+        }
+
+        try {
+          console.log(
+            "SENDING CANCELLATION EMAIL TO:",
+            email
+          );
+
+          const result =
+            await sendMeetingCancelledEmail({
+              to:
+                email,
+
+              participantName:
+                employee.full_name,
+
+              meetingTitle:
+                meeting.title,
+
+              description:
+                meeting.description,
+
+              meetingDate:
+                meeting.meeting_date,
+
+              startTime:
+                meeting.start_time,
+
+              endTime:
+                meeting.end_time,
+
+              cancelledBy:
+                user.full_name,
+
+              cancelledByEmail:
+                user.email,
+
+              participants,
+            });
+
+          console.log(
+            `Meeting cancellation email sent to ${email}`,
+            result
+          );
+
+        } catch (
+          emailError
+        ) {
+          console.error(
+            `Meeting cancellation email FAILED for ${email}:`,
+            emailError
+          );
+        }
+      }
+    }
+
+    /*
+    --------------------------------------------------------
+    SUCCESS
+    --------------------------------------------------------
+    */
 
     return res.json({
       success: true,
+
       message:
         "Meeting cancelled successfully.",
     });
+
   } catch (error) {
-    try {
-      await connection.rollback();
-    } catch {}
+    /*
+    --------------------------------------------------------
+    ROLLBACK ONLY IF TRANSACTION IS STILL ACTIVE
+    --------------------------------------------------------
+    */
+
+    if (transactionStarted) {
+      try {
+        await connection.rollback();
+      } catch (
+        rollbackError
+      ) {
+        console.error(
+          "Cancel meeting rollback error:",
+          rollbackError
+        );
+      }
+    }
 
     console.error(
       "Cancel meeting error:",
@@ -1539,17 +2052,29 @@ WHERE id = ?
 
     return res.status(500).json({
       success: false,
+
       message:
         "Failed to cancel meeting.",
-      error: error.message,
+
+      error:
+        error.message,
+
+      sqlMessage:
+        error.sqlMessage || null,
     });
+
   } finally {
+    /*
+    --------------------------------------------------------
+    RELEASE CONNECTION ONCE
+    --------------------------------------------------------
+    */
+
     try {
       connection.release();
     } catch {}
   }
 };
-
 /*
 ========================================================
 UPCOMING MEETINGS
@@ -1585,8 +2110,9 @@ const getUpcomingMeetings = async (
       [rows] = await db.query(
         `
         SELECT
-          m.meeting_id,
+          m.id AS id,
           m.title,
+          m.description,
 
           DATE_FORMAT(
             m.meeting_date,
@@ -1603,17 +2129,24 @@ const getUpcomingMeetings = async (
             '%H:%i'
           ) AS end_time,
 
-          GROUP_CONCAT(
-            DISTINCT employee.full_name
-            ORDER BY employee.full_name
-            SEPARATOR ', '
-          ) AS employees
+          m.status,
+
+         GROUP_CONCAT(
+  DISTINCT employee.full_name
+  ORDER BY employee.full_name
+  SEPARATOR ', '
+) AS employees,
+
+GROUP_CONCAT(
+  DISTINCT employee.user_id
+  ORDER BY employee.user_id
+  SEPARATOR ','
+) AS employee_ids 
 
         FROM meetings m
 
         LEFT JOIN meeting_employees me
-          ON me.meeting_id =
-          m.meeting_id
+          ON me.meeting_id = m.id
 
         LEFT JOIN users employee
           ON employee.user_id =
@@ -1628,16 +2161,13 @@ const getUpcomingMeetings = async (
           m.meeting_date > CURDATE()
 
           OR (
-            m.meeting_date =
-            CURDATE()
-
-            AND m.end_time >=
-            CURTIME()
+            m.meeting_date = CURDATE()
+            AND m.end_time >= CURTIME()
           )
         )
 
         GROUP BY
-          m.meeting_id
+          m.id
 
         ORDER BY
           m.meeting_date ASC,
@@ -1647,12 +2177,14 @@ const getUpcomingMeetings = async (
         `,
         [user.department_id]
       );
+
     } else {
       [rows] = await db.query(
         `
         SELECT
-          m.meeting_id,
+          m.id AS id,
           m.title,
+          m.description,
 
           DATE_FORMAT(
             m.meeting_date,
@@ -1669,14 +2201,15 @@ const getUpcomingMeetings = async (
             '%H:%i'
           ) AS end_time,
 
+          m.status,
+
           creator.full_name
             AS created_by_name
 
         FROM meetings m
 
         INNER JOIN meeting_employees me
-          ON me.meeting_id =
-          m.meeting_id
+          ON me.meeting_id = m.id
 
         LEFT JOIN users creator
           ON creator.user_id =
@@ -1691,11 +2224,8 @@ const getUpcomingMeetings = async (
           m.meeting_date > CURDATE()
 
           OR (
-            m.meeting_date =
-            CURDATE()
-
-            AND m.end_time >=
-            CURTIME()
+            m.meeting_date = CURDATE()
+            AND m.end_time >= CURTIME()
           )
         )
 
@@ -1713,6 +2243,7 @@ const getUpcomingMeetings = async (
       success: true,
       meetings: rows,
     });
+
   } catch (error) {
     console.error(
       "Upcoming meetings error:",

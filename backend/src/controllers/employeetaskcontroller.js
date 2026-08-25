@@ -847,17 +847,19 @@ const recalculateMainTask = async (
     mainTask.review_status ||
     "none";
 
-  /*
-  Requirement:
-  All Subtasks Done -> Under Review
-  */
+ /*
+========================================================
+SUBTASK COMPLETION
 
-  if (
-  totalSubtasks > 0 &&
-  completedSubtasks === totalSubtasks
-) {
-  newStatus = "in_progress";
-}
+Completing Subtasks only updates progress.
+
+The Main Task remains In Progress until the
+employee explicitly clicks Submit Review.
+
+Time tracking therefore remains controlled by:
+Start -> Pause -> Resume -> Submit Review.
+========================================================
+*/
 
   await connection.query(
     `
@@ -2065,31 +2067,7 @@ const addEmployeeSubtask = async (
         ]
       );
 
-    /*
-    Requirement:
-    To Do + Add Subtask
-    -> Main Task becomes In Progress.
-    */
 
-    if (
-      mainTaskStatus ===
-      "not_started"
-    ) {
-      await connection.query(
-        `
-        UPDATE tasks
-
-        SET
-          status = 'ongoing',
-          review_status = 'none',
-          updated_at = NOW()
-
-        WHERE
-          task_id = ?
-        `,
-        [mainTaskId]
-      );
-    }
 
     const recalculated =
       await recalculateMainTask(

@@ -396,6 +396,24 @@ const EmployeeTasks = () => {
   const [modalError, setModalError] = useState("");
   const [modalSuccess, setModalSuccess] = useState("");
 
+  const storedCurrentUser = (() => {
+  try {
+    return JSON.parse(
+      sessionStorage.getItem("user") ||
+        localStorage.getItem("user") ||
+        "{}"
+    );
+  } catch {
+    return {};
+  }
+})();
+
+const currentUserId = Number(
+  storedCurrentUser?.user_id ||
+    storedCurrentUser?.id ||
+    0
+);
+
   const [subtaskForm, setSubtaskForm] = useState({
     title: "",
     description: "",
@@ -728,9 +746,19 @@ const EmployeeTasks = () => {
 
       setModalSuccess("Subtask added successfully.");
 
-      await fetchTasks();
-      await fetchTaskDetails({ ...selectedTask, task_id: selectedTask.task_id });
-      setModalSuccess("Subtask added successfully.");
+    await fetchTasks();
+
+if (selectedTask) {
+  await fetchTaskDetails({
+    ...selectedTask,
+    task_id: selectedTask.task_id,
+  });
+}
+
+setModalSuccess(
+  "Subtask added successfully."
+);
+
     } catch (err) {
       setModalError(
         err?.response?.data?.message ||
@@ -775,10 +803,20 @@ const confirmMarkSubtaskDone = async () => {
     );
 
     await fetchTasks();
-    await fetchTaskDetails(selectedTask);
 
-    setModalSuccess("Subtask marked as done.");
+if (selectedTask) {
+  await fetchTaskDetails(
+    selectedTask
+  );
 
+  setModalSuccess(
+    "Subtask marked as done."
+  );
+} else {
+  setSuccessMessage(
+    "Subtask marked as done."
+  );
+}
   } catch (err) {
     setModalError(
       err?.response?.data?.message ||
@@ -948,12 +986,30 @@ const confirmMarkSubtaskDone = async () => {
             const deadline = getDeadlineInfo(task);
 
             return (
-              <button
-                type="button"
-                style={styles.kanbanTaskCard}
-                key={task.task_id}
-                onClick={() => fetchTaskDetails(task)}
-              >
+  <div
+    role="button"
+    tabIndex={0}
+    style={styles.kanbanTaskCard}
+    key={task.task_id}
+    onClick={() => fetchTaskDetails(task)}
+    onKeyDown={(event) => {
+      if (
+        event.target !==
+        event.currentTarget
+      ) {
+        return;
+      }
+
+      if (
+        event.key === "Enter" ||
+        event.key === " "
+      ) {
+        event.preventDefault();
+
+        fetchTaskDetails(task);
+      }
+    }}
+  >
                 <div style={styles.kanbanTaskTop}>
                   <div style={{ minWidth: 0 }}>
                     <h3 style={styles.kanbanTaskTitle}>
@@ -1027,6 +1083,116 @@ const confirmMarkSubtaskDone = async () => {
                     }}
                   />
                 </div>
+
+                {normalizeStatus(
+  task.status,
+  task.progress
+) === "ongoing" &&
+  Array.isArray(task.subtasks) &&
+  task.subtasks.length > 0 && (
+    <div
+      style={styles.quickSubtasksBox}
+      onClick={(event) =>
+        event.stopPropagation()
+      }
+    >
+      <div
+        style={styles.quickSubtasksHeader}
+      >
+        <strong>Subtasks</strong>
+
+        <span>
+          {task.completed_subtasks}/
+          {task.total_subtasks}
+        </span>
+      </div>
+
+      <div
+        style={styles.quickSubtasksList}
+      >
+        {task.subtasks.map(
+          (subtask) => {
+            const checked =
+              Number(
+                subtask.is_checked
+              ) === 1;
+
+            const canModify =
+              Number(
+                subtask.assigned_to_user_id
+              ) === currentUserId;
+
+            return (
+              <label
+                key={subtask.task_id}
+                style={{
+                  ...styles.quickSubtaskRow,
+
+                  ...(checked
+                    ? styles.quickSubtaskDone
+                    : {}),
+                }}
+                onClick={(event) =>
+                  event.stopPropagation()
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={
+                    checked ||
+                    !canModify
+                  }
+                  style={
+                    styles.quickCheckbox
+                  }
+                  onClick={(event) =>
+                    event.stopPropagation()
+                  }
+                  onChange={(event) => {
+                    event.stopPropagation();
+
+                    if (
+                      checked ||
+                      !canModify
+                    ) {
+                      return;
+                    }
+
+                    requestMarkSubtaskDone(
+                      subtask
+                    );
+                  }}
+                />
+
+                <span
+                  style={{
+                    ...styles.quickSubtaskTitle,
+
+                    ...(checked
+                      ? styles.quickSubtaskTitleDone
+                      : {}),
+                  }}
+                >
+                  {subtask.task_title}
+                </span>
+
+                {checked && (
+                  <span
+                    style={
+                      styles.quickDoneText
+                    }
+                  >
+                    Done
+                  </span>
+                )}
+              </label>
+            );
+          }
+        )}
+      </div>
+    </div>
+  )}
                <div
   style={styles.taskActions}
   onClick={(event) => event.stopPropagation()}
@@ -1111,7 +1277,7 @@ const confirmMarkSubtaskDone = async () => {
     </div>
   )}
 </div> 
-              </button>
+              </div>
             );
           })
         )}
@@ -1427,34 +1593,55 @@ const canModifySubtask =
         </div>
       )}
       {confirmSubtask && (
-        <div style={styles.confirmOverlay}>
-          <div style={styles.confirmBox}>
-            <h3 style={{ margin: "0 0 10px" }}>
-              Mark this Subtask as Done?
-            </h3>
+  <div
+    style={styles.confirmOverlay}
+    onMouseDown={() =>
+      setConfirmSubtask(null)
+    }
+  >
+    <div
+      style={styles.confirmBox}
+      onMouseDown={(event) =>
+        event.stopPropagation()
+      }
+    >
+      <div style={styles.confirmIcon}>
+        <CheckCircle2 size={24} />
+      </div>
 
-            <p style={{ color: "#64748b", margin: "0 0 20px" }}>
-              Completed subtasks cannot be unchecked.
-            </p>
+      <h3 style={styles.confirmTitle}>
+        Mark this Subtask as Done?
+      </h3>
 
-            <div style={styles.confirmActions}>
-              <button
-                type="button"
-                onClick={() => setConfirmSubtask(null)}
-              >
-                Cancel
-              </button>
+      <p style={styles.confirmText}>
+        Completed subtasks cannot be unchecked.
+      </p>
 
-              <button
-                type="button"
-                onClick={confirmMarkSubtaskDone}
-              >
-                Yes, Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div style={styles.confirmActions}>
+        <button
+          type="button"
+          style={styles.confirmCancelBtn}
+          onClick={() =>
+            setConfirmSubtask(null)
+          }
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          style={styles.confirmDoneBtn}
+          onClick={
+            confirmMarkSubtaskDone
+          }
+        >
+          <CheckCircle2 size={16} />
+          Yes, Done
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
   );
@@ -1862,6 +2049,101 @@ kanbanTaskCard: {
     overflow: "hidden",
   },
 
+  quickSubtasksBox: {
+  marginTop: "12px",
+  paddingTop: "10px",
+  paddingBottom: "10px",
+
+  borderTop: "1px solid #e5e7eb",
+  borderBottom: "1px solid #e5e7eb",
+
+  cursor: "default",
+},
+
+quickSubtasksHeader: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+
+  marginBottom: "8px",
+
+  fontSize: "12px",
+  fontWeight: 900,
+  color: "#334155",
+},
+
+quickSubtasksList: {
+  display: "flex",
+  flexDirection: "column",
+
+  gap: "6px",
+
+  maxHeight: "140px",
+  overflowY: "auto",
+},
+
+quickSubtaskRow: {
+  display: "grid",
+
+  gridTemplateColumns:
+    "18px minmax(0, 1fr) auto",
+
+  alignItems: "center",
+
+  gap: "8px",
+
+  minHeight: "32px",
+
+  padding: "6px 8px",
+
+  border: "1px solid #e5e7eb",
+  borderRadius: "9px",
+
+  background: "#ffffff",
+
+  cursor: "pointer",
+},
+
+quickSubtaskDone: {
+  background: "#f8fafc",
+},
+
+quickCheckbox: {
+  width: "16px",
+  height: "16px",
+
+  margin: 0,
+
+  accentColor: "#ff5733",
+
+  cursor: "pointer",
+},
+
+quickSubtaskTitle: {
+  minWidth: 0,
+
+  color: "#334155",
+
+  fontSize: "11px",
+  fontWeight: 800,
+
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+},
+
+quickSubtaskTitleDone: {
+  color: "#94a3b8",
+  textDecoration: "line-through",
+},
+
+quickDoneText: {
+  color: "#16a34a",
+
+  fontSize: "10px",
+  fontWeight: 900,
+},
+
   progressFill: {
     height: "100%",
     borderRadius: "999px",
@@ -2265,27 +2547,133 @@ subtaskAssigned: {
 confirmOverlay: {
   position: "fixed",
   inset: 0,
-  background: "rgba(15,23,42,0.45)",
+
+  background:
+    "rgba(15, 23, 42, 0.52)",
+
+  backdropFilter: "blur(3px)",
+
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
+
+  padding: "20px",
+
   zIndex: 20000,
 },
 
 confirmBox: {
-  width: "380px",
+  width: "100%",
+  maxWidth: "440px",
+
+  boxSizing: "border-box",
+
   background: "#ffffff",
-  borderRadius: "20px",
-  padding: "28px",
+
+  border:
+    "1px solid #e5e7eb",
+
+  borderRadius: "18px",
+
+  padding: "28px 30px 26px",
+
   textAlign: "center",
+
+  boxShadow:
+    "0 24px 60px rgba(15, 23, 42, 0.20)",
+},
+
+confirmIcon: {
+  width: "52px",
+  height: "52px",
+
+  margin: "0 auto 16px",
+
+  borderRadius: "50%",
+
+  background: "#fff0eb",
+  color: "#ff5733",
+
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+confirmTitle: {
+  margin: "0",
+
+  color: "#111827",
+
+  fontSize: "20px",
+  lineHeight: 1.3,
+  fontWeight: 900,
+},
+
+confirmText: {
+  margin: "9px 0 0",
+
+  color: "#64748b",
+
+  fontSize: "13px",
+  lineHeight: 1.5,
+  fontWeight: 600,
 },
 
 confirmActions: {
-  display: "flex",
-  justifyContent: "center",
-  gap: "12px",
-  marginTop: "20px",
+  display: "grid",
+
+  gridTemplateColumns:
+    "1fr 1fr",
+
+  gap: "10px",
+
+  marginTop: "24px",
 },
+
+confirmCancelBtn: {
+  height: "44px",
+
+  border:
+    "1px solid #d1d5db",
+
+  borderRadius: "10px",
+
+  background: "#ffffff",
+
+  color: "#344054",
+
+  fontSize: "13px",
+  fontWeight: 800,
+
+  cursor: "pointer",
+},
+
+confirmDoneBtn: {
+  height: "44px",
+
+  border: "none",
+
+  borderRadius: "10px",
+
+  background: "#ff5733",
+
+  color: "#ffffff",
+
+  fontSize: "13px",
+  fontWeight: 900,
+
+  cursor: "pointer",
+
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+
+  gap: "7px",
+
+  boxShadow:
+    "0 8px 18px rgba(255, 87, 51, 0.22)",
+},
+
 modalFooter: {
   display: "flex",
   justifyContent: "flex-end",
