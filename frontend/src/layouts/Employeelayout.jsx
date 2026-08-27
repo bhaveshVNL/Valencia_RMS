@@ -109,6 +109,17 @@ const EmployeeLayout = () => {
           </NavLink>
 
           <NavLink
+  to="/employee/calendar"
+  className={({ isActive }) =>
+    isActive ? "active" : ""
+  }
+  title="Calendar"
+>
+  <CalendarDays size={20} />
+  <span>Calendar</span>
+</NavLink>
+
+          <NavLink
             to="/employee/profile"
             className={({ isActive }) =>
               isActive ? "active" : ""

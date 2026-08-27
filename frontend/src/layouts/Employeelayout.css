@@ -3516,3 +3516,66 @@
 .employee-dashboard-shell.sidebar-collapsed .employee-sidebar-toggle {
   box-shadow: none !important;
 }
+
+/* =========================================================
+   EMPLOYEE SIDEBAR - FIX USER CARD + LOGOUT POSITION
+========================================================= */
+
+.employee-sidebar {
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  display: flex;
+  flex-direction: column;
+
+  box-sizing: border-box;
+}
+
+/* Keep navigation from consuming the bottom area */
+.employee-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* User + logout stay together at the bottom */
+.employee-sidebar-bottom {
+  flex: 0 0 auto;
+
+  margin-top: auto;
+
+  padding: 14px 28px 18px;
+
+  box-sizing: border-box;
+
+  background: #ffffff;
+}
+
+/* User card */
+.employee-user-card {
+  margin-bottom: 12px;
+}
+
+/* Logout directly below user card */
+.employee-logout-btn {
+  width: 100%;
+  min-height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+
+  box-sizing: border-box;
+}
+
+/* Hide scrollbar but keep sidebar scrollable */
+.employee-sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.employee-sidebar {
+  scrollbar-width: none;
+}

@@ -308,19 +308,26 @@ const AdminOverview = () => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [selectedReviewProject, setSelectedReviewProject] = useState(null);
+  const [upcomingMeetings, setUpcomingMeetings] = useState([]);
 
   const fetchOverview = async () => {
     try {
       setLoading(true);
       setMessage("");
 
-      const [profileResult, tasksResult, attendanceResult, miniTasksResult] =
-        await Promise.allSettled([
-          api.get("/admin-profile/me"),
-          api.get("/admin-tasks/department-tasks"),
-          api.get("/admin-attendance/department-attendance"),
-          api.get("/admin-mini-tasks/department"),
-        ]);
+      const [
+        profileResult,
+        tasksResult,
+        attendanceResult,
+        miniTasksResult,
+        meetingsResult,
+      ] = await Promise.allSettled([
+        api.get("/admin-profile/me"),
+        api.get("/admin-tasks/department-tasks"),
+        api.get("/admin-attendance/department-attendance"),
+        api.get("/admin-mini-tasks/department"),
+        api.get("/calendar/upcoming"),
+      ]);
 
       if (profileResult.status === "fulfilled") {
         const profileData =
@@ -339,10 +346,15 @@ const AdminOverview = () => {
       }
 
       if (miniTasksResult.status === "fulfilled") {
-  setMiniTasks(
-    miniTasksResult.value.data?.mini_tasks || []
-  );
-}
+        setMiniTasks(
+          miniTasksResult.value.data?.mini_tasks || []
+        );
+      }
+      if (meetingsResult.status === "fulfilled") {
+        setUpcomingMeetings(
+          meetingsResult.value.data?.meetings || []
+        );
+      }
 
       if (attendanceResult.status === "fulfilled") {
         const attendanceData = attendanceResult.value.data || {};
@@ -629,7 +641,128 @@ const AdminOverview = () => {
     </strong>
   </div>
 </section>
+<section style={styles.card}>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "16px",
+      marginBottom: "18px",
+    }}
+  >
+    <div>
+      <h2 style={styles.sectionTitle}>
+        <CalendarCheck size={22} color="#ff5733" />
+        Upcoming Meetings
+      </h2>
 
+      <p style={styles.sectionSubtitle}>
+        Meetings scheduled for your department.
+      </p>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => navigate("/admin/calendar")}
+      style={{
+        border: "none",
+        background: "#fff1eb",
+        color: "#ff5733",
+        borderRadius: "12px",
+        padding: "10px 14px",
+        fontWeight: 900,
+        cursor: "pointer",
+      }}
+    >
+      View Calendar
+    </button>
+  </div>
+
+  {upcomingMeetings.length > 0 ? (
+    <div
+      style={{
+        display: "grid",
+        gap: "12px",
+      }}
+    >
+      {upcomingMeetings.slice(0, 3).map((meeting) => (
+        <div
+          key={meeting.id}
+          style={{
+            border: "1px solid #edf0f4",
+            background: "#f8fafc",
+            borderRadius: "16px",
+            padding: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "18px",
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <h3
+              style={{
+                margin: 0,
+                color: "#111827",
+                fontSize: "16px",
+                fontWeight: 900,
+              }}
+            >
+              {meeting.title || "Meeting"}
+            </h3>
+
+            <p
+              style={{
+                margin: "7px 0 0",
+                color: "#667085",
+                fontSize: "13px",
+                fontWeight: 700,
+              }}
+            >
+              {meeting.meeting_date}
+              {" · "}
+              {meeting.start_time?.slice(0, 5)}
+              {" – "}
+              {meeting.end_time?.slice(0, 5)}
+            </p>
+
+            {meeting.employees && (
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  color: "#98a2b3",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                }}
+              >
+                Employees: {meeting.employees}
+              </p>
+            )}
+          </div>
+
+          <span
+            style={{
+              flexShrink: 0,
+              padding: "6px 10px",
+              borderRadius: "999px",
+              background: "#ecfdf3",
+              color: "#027a48",
+              fontSize: "11px",
+              fontWeight: 900,
+            }}
+          >
+            Scheduled
+          </span>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div style={styles.empty}>
+      No upcoming meetings.
+    </div>
+  )}
+</section>
       <section style={styles.card}>
         <div style={styles.reviewHeader}>
           <div>

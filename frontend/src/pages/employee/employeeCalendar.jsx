@@ -3,14 +3,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Plus,
-  Pencil,
-  Trash2,
   X,
   CalendarDays,
 } from "lucide-react";
 
 import "../../layouts/adminCalendar.css";
+
 
 const API =
   import.meta.env.VITE_API_URL ||
@@ -102,7 +100,7 @@ const displayTime = (value) => {
    COMPONENT
 ========================================================= */
 
-const AdminCalendar = () => {
+const EmployeeCalendar = () => {
   const now = new Date();
 
   const todayString = localDateString(now);
@@ -112,41 +110,22 @@ const AdminCalendar = () => {
   );
 
   const [events, setEvents] = useState({
-    projects: [],
-    tasks: [],
-    meetings: [],
-    mini_tasks: [],
-  });
+  projects: [],
+  tasks: [],
+  subtasks: [],
+  meetings: [],
+  mini_tasks: [],
+});
 
-  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
+ 
 
   const [selectedDate, setSelectedDate] = useState("");
 
   const [activeFilter, setActiveFilter] = useState("all");
 
-  const [showMeeting, setShowMeeting] = useState(false);
 
-  const [selectedEmployees, setSelectedEmployees] = useState([]);
-
-  const [loading, setLoading] = useState(false);
-
-  const [savingMeeting, setSavingMeeting] = useState(false);
-
-  const [meetingForm, setMeetingForm] = useState({
-    title: "",
-    description: "",
-    date: "",
-    start_time: "",
-    end_time: "",
-  });
-  const [editingMeeting, setEditingMeeting] =
-    useState(null);
-
-  const [cancellingMeeting, setCancellingMeeting] =
-    useState(null);
-
-  const [showCancelConfirm, setShowCancelConfirm] =
-    useState(false);
+  
 
   /* =========================================================
      API
@@ -157,21 +136,24 @@ const AdminCalendar = () => {
       setLoading(true);
 
       const response = await fetch(
-        `${API}/calendar/admin`,
-        {
-          headers: getAuthHeaders(),
-        }
-      );
+  `${API}/calendar/employee`,
+  {
+    headers: getAuthHeaders(),
+  }
+);
 
       const data = await response.json();
 
+      console.log("EMPLOYEE CALENDAR DATA:", data);
+
       if (data.success) {
         setEvents({
-          projects: data.projects || [],
-          tasks: data.tasks || [],
-          meetings: data.meetings || [],
-          mini_tasks: data.mini_tasks || [],
-        });
+  projects: data.projects || [],
+  tasks: data.tasks || [],
+  subtasks: data.subtasks || [],
+  meetings: data.meetings || [],
+  mini_tasks: data.mini_tasks || [],
+});
       }
     } catch (error) {
       console.error("Calendar loading error:", error);
@@ -180,37 +162,10 @@ const AdminCalendar = () => {
     }
   };
 
-  const loadEmployees = async () => {
-    try {
-      const response = await fetch(
-        `${API}/calendar/employees`,
-        {
-          headers: getAuthHeaders(),
-        }
-      );
 
-      const data = await response.json();
-
-      if (data.success) {
-        console.log(
-          "Calendar selectable users:",
-          data.employees
-        );
-
-        setEmployees(data.employees || []);
-      }
-    } catch (error) {
-      console.error(
-        "Employee loading error:",
-        error
-      );
-    }
-  };
-
-  useEffect(() => {
-    loadCalendar();
-    loadEmployees();
-  }, []);
+useEffect(() => {
+  loadCalendar();
+}, []);
 
   /* =========================================================
      CALENDAR GRID
@@ -350,6 +305,33 @@ const AdminCalendar = () => {
       }
     });
 
+    /* ---------------- SUBTASKS ---------------- */
+
+events.subtasks.forEach((item) => {
+  const start = normalizeDate(item.start_date);
+  const end = normalizeDate(item.end_date);
+
+  if (
+    start &&
+    end &&
+    start <= weekEnd &&
+    end >= weekStart
+  ) {
+    result.push({
+      type: "subtask",
+      title:
+        item.title ||
+        item.task_title ||
+        "Subtask",
+      start,
+      end,
+      source: item,
+    });
+  }
+});
+
+
+
     /* ---------------- MEETINGS ---------------- */
 
     events.meetings.forEach((item) => {
@@ -372,29 +354,29 @@ const AdminCalendar = () => {
       }
     });
 
-    /* ---------------- MINI TASKS ---------------- */
+ /* ---------------- MINI TASKS ---------------- */
 
-    events.mini_tasks.forEach((item) => {
-      const date = normalizeDate(
-        item.task_date ||
-        item.date ||
-        item.due_date
-      );
+events.mini_tasks.forEach((item) => {
+  const date = normalizeDate(
+    item.task_date ||
+      item.date ||
+      item.due_date
+  );
 
-      if (
-        date &&
-        date >= weekStart &&
-        date <= weekEnd
-      ) {
-        result.push({
-          type: "mini",
-          title: miniTaskTitle(item),
-          start: date,
-          end: date,
-          source: item,
-        });
-      }
+  if (
+    date &&
+    date >= weekStart &&
+    date <= weekEnd
+  ) {
+    result.push({
+      type: "mini",
+      title: miniTaskTitle(item),
+      start: date,
+      end: date,
+      source: item,
     });
+  }
+}); 
 
     if (activeFilter !== "all") {
       return result.filter(
@@ -565,9 +547,15 @@ const AdminCalendar = () => {
     (item) => item.type === "task"
   );
 
+   const selectedSubtasks = selectedEvents.filter(
+  (item) => item.type === "subtask"
+);
+
   const selectedMeetings = selectedEvents.filter(
     (item) => item.type === "meeting"
   );
+  
+ 
 
   const selectedMiniTasks = selectedEvents.filter(
     (item) => item.type === "mini"
@@ -613,287 +601,7 @@ const AdminCalendar = () => {
     );
   };
 
-  /* =========================================================
-     MEETING MODAL
-  ========================================================= */
-
-  const openMeeting = (date = "") => {
-    setEditingMeeting(null);
-
-    setMeetingForm({
-      title: "",
-      description: "",
-      date:
-        date ||
-        selectedDate ||
-        todayString,
-      start_time: "",
-      end_time: "",
-    });
-
-    setSelectedEmployees([]);
-
-    setShowMeeting(true);
-  };
-
-  const closeMeeting = () => {
-    if (savingMeeting) return;
-
-    setShowMeeting(false);
-
-    setEditingMeeting(null);
-
-    setSelectedEmployees([]);
-  };
-
-  const toggleEmployee = (employeeId) => {
-    setSelectedEmployees((previous) =>
-      previous.includes(employeeId)
-        ? previous.filter(
-          (id) => id !== employeeId
-        )
-        : [...previous, employeeId]
-    );
-  };
-
-  const allSelectableIds = employees
-    .map((employee) =>
-      Number(
-        employee.user_id ??
-        employee.id
-      )
-    )
-    .filter((id) => !Number.isNaN(id));
-
-  const allSelected =
-    allSelectableIds.length > 0 &&
-    allSelectableIds.every((id) =>
-      selectedEmployees.includes(id)
-    );
-
-  const toggleAllEmployees = () => {
-    if (allSelected) {
-      setSelectedEmployees([]);
-    } else {
-      setSelectedEmployees(allSelectableIds);
-    }
-  };
-
-  /* =========================================================
-     CREATE MEETING
-  ========================================================= */
-
-  const createMeeting = async () => {
-    if (!meetingForm.title.trim()) {
-      alert("Please enter the meeting title.");
-      return;
-    }
-
-    if (!meetingForm.date) {
-      alert("Please select the meeting date.");
-      return;
-    }
-
-    if (!meetingForm.start_time) {
-      alert("Please select start time.");
-      return;
-    }
-
-    if (!meetingForm.end_time) {
-      alert("Please select end time.");
-      return;
-    }
-
-    if (
-      meetingForm.end_time <=
-      meetingForm.start_time
-    ) {
-      alert(
-        "End time must be later than start time."
-      );
-      return;
-    }
-
-    if (selectedEmployees.length === 0) {
-      alert(
-        "Please select at least one employee."
-      );
-      return;
-    }
-
-    try {
-      setSavingMeeting(true);
-
-      const response = await fetch(
-        `${API}/calendar/meetings`,
-        {
-          method: "POST",
-          headers: getAuthHeaders(),
-
-          body: JSON.stringify({
-            title: meetingForm.title.trim(),
-
-            description:
-              meetingForm.description.trim(),
-
-            meeting_date:
-              meetingForm.date,
-
-            start_time:
-              meetingForm.start_time,
-
-            end_time:
-              meetingForm.end_time,
-
-            employee_ids:
-              selectedEmployees,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!data.success) {
-        alert(
-          data.message ||
-          "Unable to schedule meeting."
-        );
-
-        return;
-      }
-
-      setShowMeeting(false);
-      setSelectedEmployees([]);
-
-      await loadCalendar();
-    } catch (error) {
-      console.error(
-        "Create meeting error:",
-        error
-      );
-
-      alert(
-        "Something went wrong while scheduling the meeting."
-      );
-    } finally {
-      setSavingMeeting(false);
-    }
-  };
-
-  /* =========================================================
-     RIGHT PANEL SECTION
-  ========================================================= */
-  const openEditMeeting = (meeting) => {
-    if (!meeting) return;
-
-    setEditingMeeting(meeting);
-
-    setMeetingForm({
-      title:
-        meeting.title || "",
-
-      description:
-        meeting.description || "",
-
-      date:
-        normalizeDate(
-          meeting.meeting_date
-        ),
-
-      start_time:
-        String(
-          meeting.start_time || ""
-        ).slice(0, 5),
-
-      end_time:
-        String(
-          meeting.end_time || ""
-        ).slice(0, 5),
-    });
-
-    /*
-      We need actual participant IDs for editing.
-  
-      Until the Admin Calendar API returns them,
-      populate them from the meeting once we add
-      employee_ids to the backend response below.
-    */
-    setSelectedEmployees(
-      Array.isArray(
-        meeting.employee_ids
-      )
-        ? meeting.employee_ids.map(Number)
-        : []
-    );
-
-    setShowMeeting(true);
-  };
-
-  const askCancelMeeting = (
-    meeting
-  ) => {
-    if (!meeting) return;
-
-    setCancellingMeeting(
-      meeting
-    );
-
-    setShowCancelConfirm(
-      true
-    );
-  };
-
-  const closeCancelConfirm = () => {
-    setShowCancelConfirm(false);
-
-    setCancellingMeeting(null);
-  };
-
-  const cancelMeeting = async () => {
-    if (
-      !cancellingMeeting?.id
-    ) {
-      return;
-    }
-
-    try {
-      const response =
-        await fetch(
-          `${API}/calendar/meetings/${cancellingMeeting.id}/cancel`,
-          {
-            method: "PATCH",
-            headers:
-              getAuthHeaders(),
-          }
-        );
-
-      const data =
-        await response.json();
-
-      if (!data.success) {
-        alert(
-          data.message ||
-          "Unable to cancel meeting."
-        );
-
-        return;
-      }
-
-      closeCancelConfirm();
-
-      await loadCalendar();
-
-    } catch (error) {
-      console.error(
-        "Cancel meeting error:",
-        error
-      );
-
-      alert(
-        "Something went wrong while cancelling the meeting."
-      );
-    }
-  };
+ 
 
   const renderDetailSection = (
     title,
@@ -916,9 +624,10 @@ const AdminCalendar = () => {
           let meta = "";
 
           if (
-            type === "project" ||
-            type === "task"
-          ) {
+  type === "project" ||
+  type === "task" ||
+  type === "subtask"
+) {
             meta = `${shortDate(
               item.start_date
             )} – ${shortDate(item.end_date)}`;
@@ -978,57 +687,9 @@ const AdminCalendar = () => {
                       {item.description}
                     </p>
                   )}
-                {type === "meeting" &&
-                  String(
-                    item.status || ""
-                  ).toLowerCase() !==
-                  "cancelled" && (
-                    <div className="admin-cal-meeting-actions">
+                
 
-                      <button
-                        type="button"
-                        className="admin-cal-edit-meeting"
-                        onClick={(event) => {
-                          event.stopPropagation();
-
-                          openEditMeeting(
-                            item
-                          );
-                        }}
-                      >
-                        <Pencil size={13} />
-
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        className="admin-cal-cancel-meeting"
-                        onClick={(event) => {
-                          event.stopPropagation();
-
-                          askCancelMeeting(
-                            item
-                          );
-                        }}
-                      >
-                        <Trash2 size={13} />
-
-                        Cancel
-                      </button>
-
-                    </div>
-                  )}
-
-                {type === "meeting" &&
-                  String(
-                    item.status || ""
-                  ).toLowerCase() ===
-                  "cancelled" && (
-                    <span className="admin-cal-cancelled-label">
-                      Cancelled
-                    </span>
-                  )}
+                
 
               </div>
             </div>
@@ -1043,21 +704,19 @@ const AdminCalendar = () => {
   ========================================================= */
 
   return (
+  <div className="admin-main-calendar">
     <div
       className="admin-cal-page"
       style={{
   width: "100%",
-  maxWidth: "1320px",
-  margin: "0 auto",
-  padding: "0 18px",
+  maxWidth: "none",
+  margin: "0",
+  padding: "0",
   boxSizing: "border-box",
-  height: "calc(100vh - 70px)",
+  height: "100%",
   display: "flex",
   flexDirection: "column",
-  overflowY: "auto",
-  overflowX: "hidden",
-  transform: "translateY(-125px)",
-  transform: "translateX(-15px)",
+  overflow: "hidden",
 }}
     >
       {/* ==================== TITLE ==================== */}
@@ -1157,15 +816,7 @@ const AdminCalendar = () => {
             </span>
           </div>
 
-          <button
-            type="button"
-            className="admin-cal-schedule-main"
-            onClick={() => openMeeting()}
-          >
-            <Plus size={17} />
-
-            Schedule Meeting
-          </button>
+          
         </div>
 
         {/* =============== CALENDAR LAYOUT =============== */}
@@ -1280,10 +931,7 @@ const AdminCalendar = () => {
                             const item =
                               event.source || {};
 
-                            const creator =
-                              item.created_by_name ||
-                              item.created_by ||
-                              "";
+                           
 
                             return (
                               <div
@@ -1294,10 +942,7 @@ const AdminCalendar = () => {
                                     } / span ${segment.span
                                     }`,
 
-                                  gridRow: `${Math.min(
-                                    eventIndex + 1,
-                                    3
-                                  )}`,
+                                  gridRow: `${eventIndex + 1}`,
                                 }}
                                 onClick={(clickEvent) => {
                                   clickEvent.stopPropagation();
@@ -1306,11 +951,7 @@ const AdminCalendar = () => {
                                     segment.start
                                   );
                                 }}
-                                title={
-                                  creator
-                                    ? `${event.title} • ${creator}`
-                                    : event.title
-                                }
+                                title={event.title}
                               >
 
                                 <span className="admin-cal-event-bar-dot" />
@@ -1323,16 +964,7 @@ const AdminCalendar = () => {
                                   }
                                 </span>
 
-                                {/* Show creator only once
-                        on the first segment */}
-                                {!segment.continuesBefore &&
-                                  creator &&
-                                  segment.span >= 2 && (
-                                    <span className="admin-cal-event-bar-creator">
-                                      {creator}
-                                    </span>
-                                  )}
-
+                               
                                 {event.type === "meeting" &&
                                   event.source?.start_time && (
                                     <span className="admin-cal-event-bar-time">
@@ -1374,6 +1006,11 @@ const AdminCalendar = () => {
                 <span className="admin-cal-legend-dot mini" />
                 Mini Task
               </div>
+
+              <div>
+  <span className="admin-cal-legend-dot subtask" />
+  Subtask
+</div>
             </div>
 
             {loading && (
@@ -1429,16 +1066,22 @@ const AdminCalendar = () => {
                     )}
 
                     {renderDetailSection(
-                      "TASKS",
-                      "task",
-                      selectedTasks
-                    )}
+  "TASKS",
+  "task",
+  selectedTasks
+)}
 
-                    {renderDetailSection(
-                      "MEETINGS",
-                      "meeting",
-                      selectedMeetings
-                    )}
+{renderDetailSection(
+  "SUBTASKS",
+  "subtask",
+  selectedSubtasks
+)}
+
+{renderDetailSection(
+  "MEETINGS",
+  "meeting",
+  selectedMeetings
+)}
 
                     {renderDetailSection(
                       "MINI TASKS",
@@ -1454,291 +1097,9 @@ const AdminCalendar = () => {
       </div>
 
 
-      {/* =====================================================
-          SCHEDULE MEETING MODAL
-      ===================================================== */}
-
-      {showMeeting && (
-        <div
-          className="admin-cal-modal-overlay"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              closeMeeting();
-            }
-          }}
-        >
-          <div className="admin-cal-modal">
-            <div className="admin-cal-modal-header">
-              <h2>
-                {editingMeeting
-                  ? "Update Meeting"
-                  : "Schedule Meeting"}
-              </h2>
-
-              <button
-                type="button"
-                onClick={closeMeeting}
-              >
-                <X size={19} />
-              </button>
-            </div>
-
-            <div className="admin-cal-modal-content">
-              <div className="admin-cal-form-field">
-                <label>
-                  Meeting Title
-                  <span>*</span>
-                </label>
-
-                <input
-                  type="text"
-                  placeholder="Project Review Meeting"
-                  value={meetingForm.title}
-                  onChange={(event) =>
-                    setMeetingForm({
-                      ...meetingForm,
-                      title:
-                        event.target.value,
-                    })
-                  }
-                />
-              </div>
-
-              <div className="admin-cal-form-field">
-                <label>
-                  Description / Notes
-                </label>
-
-                <textarea
-                  placeholder="Review of homepage development and next steps."
-                  value={
-                    meetingForm.description
-                  }
-                  onChange={(event) =>
-                    setMeetingForm({
-                      ...meetingForm,
-                      description:
-                        event.target.value,
-                    })
-                  }
-                />
-              </div>
-
-              <div className="admin-cal-form-field admin-cal-date-field">
-                <label>
-                  Date
-                  <span>*</span>
-                </label>
-
-                <input
-                  type="date"
-                  value={meetingForm.date}
-                  onChange={(event) =>
-                    setMeetingForm({
-                      ...meetingForm,
-                      date:
-                        event.target.value,
-                    })
-                  }
-                />
-              </div>
-
-              <div className="admin-cal-time-row">
-                <div className="admin-cal-form-field">
-                  <label>
-                    Start Time
-                    <span>*</span>
-                  </label>
-
-                  <input
-                    type="time"
-                    value={
-                      meetingForm.start_time
-                    }
-                    onChange={(event) =>
-                      setMeetingForm({
-                        ...meetingForm,
-                        start_time:
-                          event.target
-                            .value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="admin-cal-form-field">
-                  <label>
-                    End Time
-                    <span>*</span>
-                  </label>
-
-                  <input
-                    type="time"
-                    value={
-                      meetingForm.end_time
-                    }
-                    onChange={(event) =>
-                      setMeetingForm({
-                        ...meetingForm,
-                        end_time:
-                          event.target
-                            .value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="admin-cal-employee-block">
-                <div className="admin-cal-employee-heading">
-                  <label>
-                    Select Employees
-                    <span>*</span>
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={
-                      toggleAllEmployees
-                    }
-                  >
-                    {allSelected
-                      ? "Clear All"
-                      : "Select All"}
-                  </button>
-                </div>
-
-                <div className="admin-cal-employee-list">
-                  {employees.map(
-                    (employee) => {
-                      const rawId =
-                        employee.user_id ??
-                        employee.id;
-
-                      const employeeId =
-                        Number(rawId);
-
-                      return (
-                        <label
-                          className="admin-cal-employee-option"
-                          key={
-                            employeeId
-                          }
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedEmployees.includes(
-                              employeeId
-                            )}
-                            onChange={() =>
-                              toggleEmployee(
-                                employeeId
-                              )
-                            }
-                          />
-
-                          <span>
-                            {employee.full_name ||
-                              employee.name ||
-                              employee.email}
-                          </span>
-                        </label>
-                      );
-                    }
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="admin-cal-modal-footer">
-              <button
-                type="button"
-                className="admin-cal-modal-cancel"
-                onClick={closeMeeting}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="admin-cal-modal-save"
-                disabled={savingMeeting}
-                onClick={createMeeting}
-              >
-                {savingMeeting
-                  ? editingMeeting
-                    ? "Updating..."
-                    : "Scheduling..."
-                  : editingMeeting
-                    ? "Update Meeting"
-                    : "Schedule Meeting"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showCancelConfirm &&
-        cancellingMeeting && (
-          <div className="admin-cal-confirm-overlay">
-
-            <div className="admin-cal-confirm-box">
-
-              <div className="admin-cal-confirm-icon">
-                <Trash2 size={22} />
-              </div>
-
-              <h3>
-                Cancel Meeting?
-              </h3>
-
-              <p>
-                Are you sure you want
-                to cancel{" "}
-                <strong>
-                  {
-                    cancellingMeeting.title
-                  }
-                </strong>
-                ?
-              </p>
-
-              <p className="admin-cal-confirm-note">
-                All participants will
-                receive a cancellation
-                email.
-              </p>
-
-              <div className="admin-cal-confirm-actions">
-
-                <button
-                  type="button"
-                  className="admin-cal-confirm-back"
-                  onClick={
-                    closeCancelConfirm
-                  }
-                >
-                  Keep Meeting
-                </button>
-
-                <button
-                  type="button"
-                  className="admin-cal-confirm-delete"
-                  onClick={
-                    cancelMeeting
-                  }
-                >
-                  Cancel Meeting
-                </button>
-
-              </div>
-            </div>
-          </div>
-        )}
     </div>
+      </div>
   );
 };
 
-export default AdminCalendar;
+export default EmployeeCalendar;

@@ -173,6 +173,7 @@ const EmployeeOverview = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [upcomingMeetings, setUpcomingMeetings] = useState([]);
   const [overviewData, setOverviewData] = useState({
     summary: {},
     recentTasks: [],
@@ -199,6 +200,20 @@ const EmployeeOverview = () => {
 
       const normalized = normalizeOverviewData(getResponseData(response));
       setOverviewData(normalized);
+      try {
+  const meetingsResponse = await api.get("/calendar/upcoming");
+
+  setUpcomingMeetings(
+    meetingsResponse.data?.meetings || []
+  );
+} catch (meetingError) {
+  console.error(
+    "Failed to load upcoming meetings:",
+    meetingError
+  );
+
+  setUpcomingMeetings([]);
+}
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -362,26 +377,156 @@ const EmployeeOverview = () => {
       </div>
 
       <div className="employee-overview-main-grid">
-        <div className="employee-overview-left-column">
-          <section
-            className="employee-overview-card recent-tasks-card"
-            style={sectionShadowStyle}
-          >
-            <div className="employee-overview-card-header">
-              <div>
-                <h2>Recent Tasks</h2>
-                <p>Your latest assigned tasks</p>
-              </div>
-            </div>
+  <div className="employee-overview-left-column">
 
-            <div className="recent-tasks-scroll-area">
-              {overviewData.recentTasks.length === 0 ? (
-                <div className="employee-overview-empty">
-                  No recent tasks found.
-                </div>
-              ) : (
-                overviewData.recentTasks.map((task, index) => {
-                  const progress = getTaskProgress(task);
+    {/* ================= UPCOMING MEETINGS ================= */}
+
+    <section
+      className="employee-overview-card employee-upcoming-meetings-card"
+      style={{
+        border: "none",
+        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.07)",
+        marginBottom: "24px",
+      }}
+    >
+      <div
+        className="employee-overview-card-header"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+        }}
+      >
+        <div>
+          <h2>Upcoming Meetings</h2>
+          <p>Meetings scheduled for you</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate("/employee/calendar")}
+          style={{
+            border: "none",
+            background: "#fff1eb",
+            color: "#ff5733",
+            borderRadius: "12px",
+            padding: "10px 14px",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          View Calendar
+        </button>
+      </div>
+
+      {upcomingMeetings.length > 0 ? (
+        <div
+          style={{
+            display: "grid",
+            gap: "12px",
+            marginTop: "16px",
+          }}
+        >
+          {upcomingMeetings.slice(0, 3).map((meeting) => (
+            <div
+              key={meeting.id}
+              style={{
+                border: "1px solid #edf0f4",
+                background: "#f8fafc",
+                borderRadius: "16px",
+                padding: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "18px",
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    color: "#111827",
+                    fontSize: "16px",
+                    fontWeight: 900,
+                  }}
+                >
+                  {meeting.title || "Meeting"}
+                </h3>
+
+                <p
+                  style={{
+                    margin: "7px 0 0",
+                    color: "#667085",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                  }}
+                >
+                  {meeting.meeting_date}
+                  {" · "}
+                  {meeting.start_time?.slice(0, 5)}
+                  {" – "}
+                  {meeting.end_time?.slice(0, 5)}
+                </p>
+
+                {meeting.created_by_name && (
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      color: "#98a2b3",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Scheduled by {meeting.created_by_name}
+                  </p>
+                )}
+              </div>
+
+              <span
+                style={{
+                  flexShrink: 0,
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  background: "#ecfdf3",
+                  color: "#027a48",
+                  fontSize: "11px",
+                  fontWeight: 900,
+                }}
+              >
+                Scheduled
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="employee-overview-empty">
+          No upcoming meetings.
+        </div>
+      )}
+    </section>
+
+    {/* ================= RECENT TASKS ================= */}
+
+    <section
+      className="employee-overview-card recent-tasks-card"
+      style={sectionShadowStyle}
+    >
+      <div className="employee-overview-card-header">
+        <div>
+          <h2>Recent Tasks</h2>
+          <p>Your latest assigned tasks</p>
+        </div>
+      </div>
+
+      <div className="recent-tasks-scroll-area">
+        {overviewData.recentTasks.length === 0 ? (
+          <div className="employee-overview-empty">
+            No recent tasks found.
+          </div>
+        ) : (
+          overviewData.recentTasks.map((task, index) => {
+            const progress = getTaskProgress(task);
 
                   return (
                     <button

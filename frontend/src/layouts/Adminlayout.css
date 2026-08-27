@@ -3233,3 +3233,64 @@ div:has(> svg + input[placeholder="Search mini task, employee, date, designation
 
   margin: 0 !important;
 }
+/* =========================================================
+   ADMIN SIDEBAR - FIX USER CARD + LOGOUT POSITION
+========================================================= */
+
+.admin-sidebar {
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  display: flex;
+  flex-direction: column;
+
+  box-sizing: border-box;
+}
+
+/* Navigation takes available space */
+.admin-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* User card + logout remain together */
+.admin-sidebar-bottom {
+  flex: 0 0 auto;
+
+  margin-top: auto;
+
+  padding: 14px 28px 18px;
+
+  box-sizing: border-box;
+
+  background: #ffffff;
+}
+
+/* Keep logout close to user card */
+.admin-user-card {
+  margin-bottom: 12px;
+}
+
+.admin-logout-btn {
+  width: 100%;
+  min-height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+
+  box-sizing: border-box;
+}
+
+/* Scroll without visible scrollbar */
+.admin-sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.admin-sidebar {
+  scrollbar-width: none;
+}

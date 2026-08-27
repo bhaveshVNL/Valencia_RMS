@@ -893,256 +893,448 @@ mini_tasks: miniTasks,
   }
 };
 
+
 /*
 ========================================================
 EMPLOYEE CALENDAR
 ========================================================
 */
 
-const getEmployeeCalendar = async (
-  req,
-  res
-) => {
+const getEmployeeCalendar = async (req, res) => {
   try {
-    const { user, error } =
-      await getLoggedInUser(req);
+    const { user, error } = await getLoggedInUser(req);
 
     if (error) {
-      return res
-        .status(error.status)
-        .json({
-          success: false,
-          message: error.message,
-        });
+      return res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
     }
 
-    const employeeId =
-      Number(user.user_id);
+    const employeeId = Number(user.user_id);
+
+    if (!employeeId) {
+      return res.status(401).json({
+        success: false,
+        message: "Employee ID not found.",
+      });
+    }
 
     /*
-    PROJECTS ASSIGNED TO EMPLOYEE
+    ========================================================
+    PROJECTS
+    ========================================================
+
+    Employee sees a project when the employee is directly
+    assigned to that project.
+
+    project_assignments.employee_id is the same assignment
+    structure used by the RMS project/task system.
+    ========================================================
     */
 
-    const [projects] =
-      await db.query(
-        `
-        SELECT DISTINCT
-          p.project_id AS id,
-          p.project_title AS title,
-          p.project_description AS description,
-          p.status,
+    const [projects] = await db.query(
+  `
+  SELECT
+    p.project_id AS id,
 
-          DATE_FORMAT(
-            p.start_date,
-            '%Y-%m-%d'
-          ) AS start_date,
+    p.project_title AS title,
 
-          DATE_FORMAT(
-            p.due_date,
-            '%Y-%m-%d'
-          ) AS end_date
+    p.project_description AS description,
 
-        FROM projects p
+    p.status,
 
-        LEFT JOIN project_assignments pa
-          ON pa.project_id =
-          p.project_id
+    DATE_FORMAT(
+      p.start_date,
+      '%Y-%m-%d'
+    ) AS start_date,
 
-        LEFT JOIN tasks t
-          ON t.project_id =
-          p.project_id
+    DATE_FORMAT(
+      p.due_date,
+      '%Y-%m-%d'
+    ) AS end_date
 
-        WHERE
-          pa.employee_id = ?
+  FROM projects p
 
-          OR t.assigned_to_user_id = ?
+  WHERE
+    EXISTS (
+      SELECT 1
 
-        ORDER BY
-          p.start_date ASC
-        `,
-        [
-          employeeId,
-          employeeId,
-        ]
-      );
+      FROM project_assignments pa
+
+      WHERE
+        pa.project_id = p.project_id
+
+        AND pa.employee_id = ?
+
+        AND COALESCE(
+          pa.assignment_status,
+          'assigned'
+        ) <> 'removed'
+    )
+
+    OR EXISTS (
+      SELECT 1
+
+      FROM tasks mt
+
+      INNER JOIN task_assignments ta
+        ON ta.task_id = mt.task_id
+
+      WHERE
+        mt.project_id = p.project_id
+
+        AND ta.employee_id = ?
+
+        AND (
+          mt.parent_task_id IS NULL
+          OR mt.parent_task_id = 0
+        )
+    )
+
+  ORDER BY
+    p.start_date ASC,
+    p.project_id ASC
+  `,
+  [
+    employeeId,
+    employeeId,
+  ]
+);
 
     /*
+    ========================================================
     MAIN TASKS
+    ========================================================
+
+    A task can be assigned to an employee in TWO ways:
+
+    1. tasks.assigned_to_user_id
+    2. task_assignments.employee_id
+
+    We check both.
+    ========================================================
     */
 
-    const [tasks] =
-      await db.query(
-        `
-        SELECT
-          t.task_id AS id,
-          t.project_id,
-          t.task_title AS title,
-          t.task_description AS description,
-          t.status,
+    const [tasks] = await db.query(
+      `
+      SELECT
+        t.task_id AS id,
 
-          DATE_FORMAT(
-            t.start_date,
-            '%Y-%m-%d'
-          ) AS start_date,
+        t.project_id,
 
-          DATE_FORMAT(
-            t.due_date,
-            '%Y-%m-%d'
-          ) AS end_date,
+        t.task_title AS title,
 
-          p.project_title
+        t.task_description AS description,
 
-        FROM tasks t
+        t.status,
 
-        LEFT JOIN projects p
-          ON p.project_id =
-          t.project_id
+        DATE_FORMAT(
+          t.start_date,
+          '%Y-%m-%d'
+        ) AS start_date,
 
-        WHERE
+        DATE_FORMAT(
+          t.due_date,
+          '%Y-%m-%d'
+        ) AS end_date,
+
+        p.project_title,
+
+        creator.full_name
+          AS created_by_name
+
+      FROM tasks t
+
+      LEFT JOIN projects p
+        ON p.project_id = t.project_id
+
+      LEFT JOIN users creator
+        ON creator.user_id =
+           t.created_by_user_id
+
+      WHERE
+        (
           t.assigned_to_user_id = ?
 
-        AND (
-          t.parent_task_id IS NULL
-          OR t.parent_task_id = 0
+          OR EXISTS (
+            SELECT 1
+
+            FROM task_assignments ta
+
+            WHERE
+              ta.task_id = t.task_id
+
+              AND ta.employee_id = ?
+          )
         )
 
-        AND (
-          t.task_type IS NULL
-          OR t.task_type != 'subtask'
-        )
+      AND (
+        t.parent_task_id IS NULL
+        OR t.parent_task_id = 0
+      )
 
-        ORDER BY
-          t.start_date ASC
-        `,
-        [employeeId]
-      );
+      AND (
+        t.task_type IS NULL
+
+        OR LOWER(
+          t.task_type
+        ) NOT IN (
+          'subtask',
+          'sub_task'
+        )
+      )
+
+      ORDER BY
+        t.start_date ASC,
+        t.task_id ASC
+      `,
+      [
+        employeeId,
+        employeeId,
+      ]
+    );
 
     /*
+    ========================================================
+    SUBTASKS
+    ========================================================
+
+    Subtasks are also returned separately so the calendar
+    can show them.
+
+    We include subtasks belonging to the employee's
+    assigned main tasks.
+    ========================================================
+    */
+
+    const [subtasks] = await db.query(
+      `
+      SELECT
+        st.task_id AS id,
+
+        st.project_id,
+
+        st.parent_task_id,
+
+        st.task_title AS title,
+
+        st.task_description AS description,
+
+        st.status,
+
+        COALESCE(
+          st.is_checked,
+          0
+        ) AS is_checked,
+
+        DATE_FORMAT(
+          st.start_date,
+          '%Y-%m-%d'
+        ) AS start_date,
+
+        DATE_FORMAT(
+          st.due_date,
+          '%Y-%m-%d'
+        ) AS end_date,
+
+        p.project_title,
+
+        parent.task_title
+          AS parent_task_title
+
+      FROM tasks st
+
+      INNER JOIN tasks parent
+        ON parent.task_id =
+           st.parent_task_id
+
+      LEFT JOIN projects p
+        ON p.project_id =
+           st.project_id
+
+      WHERE
+        (
+          st.assigned_to_user_id = ?
+
+          OR EXISTS (
+            SELECT 1
+
+            FROM task_assignments ta
+
+            WHERE
+              ta.task_id = st.task_id
+
+              AND ta.employee_id = ?
+          )
+
+          OR EXISTS (
+            SELECT 1
+
+            FROM task_assignments ta_parent
+
+            WHERE
+              ta_parent.task_id =
+                st.parent_task_id
+
+              AND ta_parent.employee_id = ?
+          )
+        )
+
+      ORDER BY
+        st.start_date ASC,
+        st.task_id ASC
+      `,
+      [
+        employeeId,
+        employeeId,
+        employeeId,
+      ]
+    );
+
+    /*
+    ========================================================
     MEETINGS
+    ========================================================
     */
 
-    const [meetings] =
-      await db.query(
-        `
-        SELECT
-          m.id AS id,
-          m.title,
-          m.description,
+    const [meetings] = await db.query(
+      `
+      SELECT
+        m.id AS id,
 
-          DATE_FORMAT(
-            m.meeting_date,
-            '%Y-%m-%d'
-          ) AS meeting_date,
+        m.title,
 
-          TIME_FORMAT(
-            m.start_time,
-            '%H:%i'
-          ) AS start_time,
+        m.description,
 
-          TIME_FORMAT(
-            m.end_time,
-            '%H:%i'
-          ) AS end_time,
+        DATE_FORMAT(
+          m.meeting_date,
+          '%Y-%m-%d'
+        ) AS meeting_date,
 
-          m.status,
+        TIME_FORMAT(
+          m.start_time,
+          '%H:%i'
+        ) AS start_time,
 
-          creator.full_name
-            AS created_by_name,
+        TIME_FORMAT(
+          m.end_time,
+          '%H:%i'
+        ) AS end_time,
 
-          GROUP_CONCAT(
-            DISTINCT participant.full_name
-            ORDER BY participant.full_name
-            SEPARATOR ', '
-          ) AS participants
+        m.status,
 
-        FROM meetings m
+        creator.full_name
+          AS created_by_name,
 
-        INNER JOIN meeting_employees mine
-          ON mine.meeting_id = m.id
+        GROUP_CONCAT(
+          DISTINCT participant.full_name
+          ORDER BY participant.full_name
+          SEPARATOR ', '
+        ) AS participants
 
-        LEFT JOIN users creator
-          ON creator.user_id =
-          m.created_by
+      FROM meetings m
 
-        LEFT JOIN meeting_employees all_me
-          ON all_me.meeting_id = m.id
+      INNER JOIN meeting_employees mine
+        ON mine.meeting_id = m.id
 
-        LEFT JOIN users participant
-          ON participant.user_id =
-          all_me.employee_id
+      LEFT JOIN users creator
+        ON creator.user_id =
+           m.created_by
 
-        WHERE
-          mine.employee_id = ?
+      LEFT JOIN meeting_employees all_me
+        ON all_me.meeting_id = m.id
 
-        GROUP BY m.id
+      LEFT JOIN users participant
+        ON participant.user_id =
+           all_me.employee_id
 
-        ORDER BY
-          m.meeting_date ASC,
-          m.start_time ASC
-        `,
-        [employeeId]
-      );
+      WHERE
+        mine.employee_id = ?
+
+      GROUP BY
+        m.id
+
+      ORDER BY
+        m.meeting_date ASC,
+        m.start_time ASC
+      `,
+      [employeeId]
+    );
 
     /*
-    EMPLOYEE CREATED MINI TASKS
-
-    Meeting Mini Tasks are excluded from Calendar
-    because the Meeting itself is already shown.
-
-    They still remain visible on Employee Mini Tasks.
+    ========================================================
+    EMPLOYEE MINI TASKS
+    ========================================================
     */
 
-    const [miniTasks] =
-      await db.query(
-        `
-        SELECT
-          mt.mini_task_id AS id,
-          mt.meeting_id,
+    const [miniTasks] = await db.query(
+      `
+      SELECT
+        mt.mini_task_id AS id,
 
-          mt.mini_task_title AS title,
+        mt.employee_id,
 
-          mt.mini_task_description
-            AS description,
+        mt.meeting_id,
 
-          DATE_FORMAT(
-            mt.task_date,
-            '%Y-%m-%d'
-          ) AS task_date,
+        mt.mini_task_title AS title,
 
-          TIME_FORMAT(
-            mt.start_time,
-            '%H:%i'
-          ) AS start_time,
+        mt.mini_task_description
+          AS description,
 
-          TIME_FORMAT(
-            mt.end_time,
-            '%H:%i'
-          ) AS end_time,
+        DATE_FORMAT(
+          mt.task_date,
+          '%Y-%m-%d'
+        ) AS task_date,
 
-          mt.status
+        TIME_FORMAT(
+          mt.start_time,
+          '%H:%i'
+        ) AS start_time,
 
-        FROM mini_tasks mt
+        TIME_FORMAT(
+          mt.end_time,
+          '%H:%i'
+        ) AS end_time,
 
-        WHERE
-          mt.employee_id = ?
+        mt.status
 
-        AND mt.meeting_id IS NULL
+      FROM mini_tasks mt
 
-        ORDER BY
-          mt.task_date ASC,
-          mt.start_time ASC
-        `,
-        [employeeId]
-      );
+      WHERE
+        mt.employee_id = ?
+
+      AND mt.meeting_id IS NULL
+
+      ORDER BY
+        mt.task_date ASC,
+        mt.start_time ASC
+      `,
+      [employeeId]
+    );
+
+    /*
+    ========================================================
+    RESPONSE
+    ========================================================
+    */
 
     return res.json({
       success: true,
 
-      projects,
-      tasks,
-      meetings,
-      mini_tasks: miniTasks,
+      employee_id: employeeId,
+
+      projects: projects || [],
+
+      tasks: tasks || [],
+
+      subtasks: subtasks || [],
+
+      meetings: meetings || [],
+
+      mini_tasks: miniTasks || [],
     });
+
   } catch (error) {
     console.error(
       "Get employee calendar error:",
@@ -1151,9 +1343,12 @@ const getEmployeeCalendar = async (
 
     return res.status(500).json({
       success: false,
+
       message:
         "Failed to load employee calendar.",
+
       error: error.message,
+
       sqlMessage:
         error.sqlMessage || null,
     });

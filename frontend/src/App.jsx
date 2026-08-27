@@ -19,6 +19,7 @@ import EmployeeTasks from "./pages/employee/employeeTasks";
 import EmployeeProfile from "./pages/employee/employeeProfile";
 import EmployeeAttendance from "./pages/employee/employeeAttendance";
 import EmployeeLeaveApplications from "./pages/employee/employeeLeaveApplications";
+import EmployeeCalendar from "./pages/employee/employeeCalendar.jsx";
 
 import AdminLayout from "./layouts/Adminlayout";
 import AdminOverview from "./pages/admin/adminOverview";
@@ -203,9 +204,16 @@ const App = () => {
         />
 
         <Route
+          path="calendar"
+          element={<EmployeeCalendar />}
+        />
+
+        <Route
           path="profile"
           element={<EmployeeProfile />}
         />
+
+
 
         <Route
           path="attendance"

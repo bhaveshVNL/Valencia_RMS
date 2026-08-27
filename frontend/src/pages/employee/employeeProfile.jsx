@@ -1,21 +1,80 @@
 import { useEffect, useMemo, useState } from "react";
 import {
- RefreshCw,
- Save,
- UserRound,
- LockKeyhole,
+  Check,
   Eye,
- EyeOff
+  EyeOff,
+  LockKeyhole,
+  Palette,
+  Pencil,
+  RefreshCw,
+  Save,
+  Sparkles,
+  UserRound,
+  Wrench,
+  X,
 } from "lucide-react";
+
 import api from "../../api/axios";
+import "../../layouts/employeeProfile.css";
+const PROFILE_PREFS_KEY = "employee_profile_preferences";
+
+const DEFAULT_PREFS = {
+  accent: "orange",
+  banner: "paper",
+  avatar: "classic",
+  quote: "Driven by curiosity, inspired by impact.",
+};
+
+const ACCENTS = {
+  orange: {
+    main: "#ff5733",
+    soft: "#fff1ec",
+    line: "#ffd7cc",
+  },
+  blue: {
+    main: "#4169e1",
+    soft: "#eef3ff",
+    line: "#d6e1ff",
+  },
+  purple: {
+    main: "#7656d8",
+    soft: "#f2efff",
+    line: "#ded7ff",
+  },
+  green: {
+    main: "#159570",
+    soft: "#eaf8f3",
+    line: "#cceee2",
+  },
+  navy: {
+    main: "#111827",
+    soft: "#eef1f5",
+    line: "#d8dee8",
+  },
+};
 
 const getStoredUser = () => {
   try {
     return JSON.parse(
-      sessionStorage.getItem("user") || localStorage.getItem("user") || "{}"
+      sessionStorage.getItem("user") ||
+        localStorage.getItem("user") ||
+        "{}"
     );
   } catch {
     return {};
+  }
+};
+
+const getStoredPreferences = () => {
+  try {
+    return {
+      ...DEFAULT_PREFS,
+      ...JSON.parse(
+        localStorage.getItem(PROFILE_PREFS_KEY) || "{}"
+      ),
+    };
+  } catch {
+    return DEFAULT_PREFS;
   }
 };
 
@@ -59,26 +118,40 @@ const normalizeProfile = (rawProfile, fallbackUser) => {
 
   return {
     user_id: profile.user_id || user.user_id || "",
-    full_name: profile.full_name || profile.name || user.full_name || "Employee",
+    full_name:
+      profile.full_name ||
+      profile.name ||
+      user.full_name ||
+      "Employee",
+
     email: profile.email || user.email || "-",
     phone: profile.phone || user.phone || "-",
+
     department_name:
       profile.department_name ||
       profile.department ||
       user.department_name ||
       user.department ||
       "-",
+
     designation:
       profile.designation ||
       profile.designation_name ||
       user.designation ||
       "-",
+
     employee_code:
       profile.employee_code ||
       profile.employeeCode ||
       user.employee_code ||
       "-",
-    role_name: profile.role_name || profile.role || user.role_name || "employee",
+
+    role_name:
+      profile.role_name ||
+      profile.role ||
+      user.role_name ||
+      "employee",
+
     skills: profile.skills || user.skills || "",
   };
 };
@@ -89,22 +162,50 @@ const EmployeeProfile = () => {
   const [profile, setProfile] = useState(() =>
     normalizeProfile(storedUser, storedUser)
   );
+
+  const [preferences, setPreferences] = useState(
+    getStoredPreferences
+  );
+
+  const [draftPreferences, setDraftPreferences] = useState(
+    getStoredPreferences
+  );
+
   const [skillsText, setSkillsText] = useState("");
   const [editingSkills, setEditingSkills] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [savingSkills, setSavingSkills] = useState(false);
+
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [oldPassword,setOldPassword]=useState("");
-const [newPassword,setNewPassword]=useState("");
-const [confirmPassword,setConfirmPassword]=useState("");
-const [changingPassword,setChangingPassword]=useState(false);
-const [showPasswordBox,setShowPasswordBox]=useState(false);
 
-const [showOldPassword,setShowOldPassword]=useState(false);
-const [showNewPassword,setShowNewPassword]=useState(false);
-const [showConfirmPassword,setShowConfirmPassword]=useState(false); 
-const initials = useMemo(() => getInitials(profile.full_name), [profile.full_name]);
+  const [showCustomize, setShowCustomize] = useState(false);
+
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] =
+    useState("");
+
+  const [changingPassword, setChangingPassword] =
+    useState(false);
+
+  const [showPasswordBox, setShowPasswordBox] =
+    useState(false);
+
+  const [showOldPassword, setShowOldPassword] =
+    useState(false);
+
+  const [showNewPassword, setShowNewPassword] =
+    useState(false);
+
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
+
+  const initials = useMemo(
+    () => getInitials(profile.full_name),
+    [profile.full_name]
+  );
 
   const skillsList = useMemo(() => {
     return String(profile.skills || "")
@@ -113,859 +214,893 @@ const initials = useMemo(() => getInitials(profile.full_name), [profile.full_nam
       .filter(Boolean);
   }, [profile.skills]);
 
+  const activeAccent =
+    ACCENTS[preferences.accent] || ACCENTS.orange;
+
   const fetchProfile = async () => {
-  try {
-    setLoading(true);
-    setError("");
-    setSuccessMessage("");
+    try {
+      setLoading(true);
+      setError("");
+      setSuccessMessage("");
 
-    const response = await api.get(
-      "/employee-profile/me"
-    );
-
-    const normalized = normalizeProfile(
-      getResponseData(response),
-      storedUser
-    );
-
-    setProfile(normalized);
-    setSkillsText(normalized.skills || "");
-  } catch (err) {
-    console.error("Fetch employee profile error:", err);
-
-    setError(
-      err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Failed to load profile."
-    );
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const saveSkills = async () => {
-  try {
-    setSavingSkills(true);
-    setError("");
-    setSuccessMessage("");
-
-    const response = await api.put(
-      "/employee-profile/skills",
-      {
-        skills: skillsText,
-      }
-    );
-
-    const updatedSkills = Array.isArray(response.data?.skills)
-      ? response.data.skills
-          .map((skill) => skill.skill_name)
-          .filter(Boolean)
-          .join(", ")
-      : skillsText;
-
-    setProfile((previous) => ({
-      ...previous,
-      skills: updatedSkills,
-    }));
-
-    setSkillsText(updatedSkills);
-    setEditingSkills(false);
-    setSuccessMessage(
-      response.data?.message || "Skills updated successfully."
-    );
-  } catch (err) {
-    console.error("Save employee skills error:", err);
-
-    setError(
-      err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Failed to update skills."
-    );
-  } finally {
-    setSavingSkills(false);
-  }
-};
-const changePassword = async()=>{
-
-  try{
-
-    setError("");
-    setSuccessMessage("");
-
-    if(newPassword !== confirmPassword){
-
-      setError(
-        "New password and confirm password do not match"
+      const response = await api.get(
+        "/employee-profile/me"
       );
 
-      return;
+      const normalized = normalizeProfile(
+        getResponseData(response),
+        storedUser
+      );
 
+      setProfile(normalized);
+      setSkillsText(normalized.skills || "");
+    } catch (err) {
+      console.error(
+        "Fetch employee profile error:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to load profile."
+      );
+    } finally {
+      setLoading(false);
     }
+  };
 
+  const saveSkills = async () => {
+    try {
+      setSavingSkills(true);
+      setError("");
+      setSuccessMessage("");
 
-    setChangingPassword(true);
+      const response = await api.put(
+        "/employee-profile/skills",
+        {
+          skills: skillsText,
+        }
+      );
 
+      const updatedSkills = Array.isArray(
+        response.data?.skills
+      )
+        ? response.data.skills
+            .map((skill) => skill.skill_name)
+            .filter(Boolean)
+            .join(", ")
+        : skillsText;
 
-    await api.put(
-      "/employee-profile/change-password",
-      {
-        oldPassword,
-        newPassword
+      setProfile((previous) => ({
+        ...previous,
+        skills: updatedSkills,
+      }));
+
+      setSkillsText(updatedSkills);
+      setEditingSkills(false);
+
+      setSuccessMessage(
+        response.data?.message ||
+          "Skills updated successfully."
+      );
+    } catch (err) {
+      console.error(
+        "Save employee skills error:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update skills."
+      );
+    } finally {
+      setSavingSkills(false);
+    }
+  };
+
+  const changePassword = async () => {
+    try {
+      setError("");
+      setSuccessMessage("");
+
+      if (!oldPassword || !newPassword) {
+        setError("Please enter all password fields.");
+        return;
       }
+
+      if (newPassword !== confirmPassword) {
+        setError(
+          "New password and confirm password do not match."
+        );
+        return;
+      }
+
+      setChangingPassword(true);
+
+      await api.put(
+        "/employee-profile/change-password",
+        {
+          oldPassword,
+          newPassword,
+        }
+      );
+
+      setSuccessMessage(
+        "Password changed successfully."
+      );
+
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordBox(false);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          "Failed to change password."
+      );
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const openCustomization = () => {
+    setDraftPreferences(preferences);
+    setShowCustomize(true);
+  };
+
+  const savePreferences = () => {
+    setPreferences(draftPreferences);
+
+    localStorage.setItem(
+      PROFILE_PREFS_KEY,
+      JSON.stringify(draftPreferences)
     );
 
-
+    setShowCustomize(false);
     setSuccessMessage(
-      "Password changed successfully"
+      "Profile appearance saved on this device."
     );
-
-
-    setOldPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-
-
-  }
-  catch(err){
-
-    setError(
-      err.response?.data?.message ||
-      "Failed to change password"
-    );
-
-  }
-  finally{
-
-    setChangingPassword(false);
-
-  }
-
-};
+  };
 
   useEffect(() => {
     fetchProfile();
   }, []);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.profileTopBar}>
-        <div style={styles.profileIdentity}>
-          <div style={styles.avatar}>{initials}</div>
+    <div
+      className="vnl-profile-page"
+      style={{
+        "--profile-accent": activeAccent.main,
+        "--profile-accent-soft": activeAccent.soft,
+        "--profile-accent-line": activeAccent.line,
+      }}
+    >
+      {/* ======================================================
+          PROFILE HERO
+      ====================================================== */}
 
-          <div>
-            <h1 style={styles.employeeName}>{profile.full_name}</h1>
+      <section
+        className={`vnl-profile-hero banner-${preferences.banner}`}
+      >
+        <div className="vnl-profile-hero-decoration">
+          <span className="vnl-retro-grid" />
+          <span className="vnl-retro-dots" />
+          <span className="vnl-retro-shape shape-one" />
+          <span className="vnl-retro-shape shape-two" />
+        </div>
 
-            <div style={styles.identityMeta}>
-              <span style={styles.metaPill}>{profile.designation}</span>
-              <span style={styles.metaPill}>{profile.department_name}</span>
-              <span style={styles.rolePill}>{profile.role_name}</span>
+        <div className="vnl-profile-hero-content">
+          <div
+            className={`vnl-profile-avatar avatar-${preferences.avatar}`}
+          >
+            <div className="vnl-profile-avatar-inner">
+              {initials}
+            </div>
+
+            <button
+              type="button"
+              className="vnl-avatar-edit"
+              onClick={openCustomization}
+              title="Customize profile"
+            >
+              <Pencil size={15} />
+            </button>
+          </div>
+
+          <div className="vnl-profile-intro">
+            <span className="vnl-profile-eyebrow">
+              EMPLOYEE PROFILE
+            </span>
+
+            <h1>{profile.full_name}</h1>
+
+            <div className="vnl-profile-tags">
+              <span>{profile.designation}</span>
+              <span>{profile.department_name}</span>
+              <span className="role">
+                {profile.role_name}
+              </span>
+            </div>
+
+            <p className="vnl-profile-quote">
+              “{preferences.quote}”
+            </p>
+
+            <div className="vnl-profile-id-strip">
+              <span>
+                <small>User ID</small>
+                <strong>
+                  {profile.user_id || "-"}
+                </strong>
+              </span>
+
+              <span>
+                <small>Employee Code</small>
+                <strong>
+                  {profile.employee_code}
+                </strong>
+              </span>
+
+              <span>
+                <small>Department</small>
+                <strong>
+                  {profile.department_name}
+                </strong>
+              </span>
             </div>
           </div>
         </div>
 
-        <button
-          type="button"
-          style={styles.refreshBtn}
-          onClick={fetchProfile}
-          disabled={loading}
-        >
-          <RefreshCw size={18} />
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+        <div className="vnl-profile-hero-actions">
+          <button
+            type="button"
+            className="vnl-secondary-profile-btn"
+            onClick={openCustomization}
+          >
+            <Palette size={18} />
+            Customize
+          </button>
+
+          <button
+            type="button"
+            className="vnl-profile-refresh"
+            onClick={fetchProfile}
+            disabled={loading}
+          >
+            <RefreshCw
+              size={18}
+              className={
+                loading ? "profile-spin" : ""
+              }
+            />
+
+            {loading
+              ? "Refreshing..."
+              : "Refresh"}
+          </button>
+        </div>
       </section>
 
-      {error && <div style={styles.errorBox}>{error}</div>}
-      {successMessage && <div style={styles.successBox}>{successMessage}</div>}
+      {error && (
+        <div className="vnl-profile-message error">
+          {error}
+        </div>
+      )}
 
-      <section style={styles.detailsCard}>
-        <div style={styles.cardHeader}>
-          <div style={styles.cardTitleWrap}>
-            <UserRound size={25} color="#ff5733" />
+      {successMessage && (
+        <div className="vnl-profile-message success">
+          <Check size={18} />
+          {successMessage}
+        </div>
+      )}
+
+      {/* ======================================================
+          MAIN CONTENT
+      ====================================================== */}
+
+      <div className="vnl-profile-main-grid">
+        {/* DETAILS */}
+
+        <section className="vnl-profile-panel details-panel">
+          <div className="vnl-profile-section-heading">
+            <div className="vnl-section-icon">
+              <UserRound size={21} />
+            </div>
+
             <div>
-              <h2 style={styles.cardTitle}>Employee Details</h2>
-              <p style={styles.cardSubtitle}>
-                Your account information as saved in Valencia RMS.
+              <h2>Employee Details</h2>
+              <p>
+                Your information as saved in Valencia RMS.
               </p>
             </div>
           </div>
-        </div>
 
-        <div style={styles.detailsGrid}>
-          <div style={styles.detailBox}>
-            <span style={styles.detailLabel}>Name</span>
-            <strong style={styles.detailValue}>{profile.full_name}</strong>
-          </div>
-
-          <div style={styles.detailBox}>
-            <span style={styles.detailLabel}>Email</span>
-            <strong style={styles.detailValue}>{profile.email}</strong>
-          </div>
-
-          <div style={styles.detailBox}>
-            <span style={styles.detailLabel}>Phone</span>
-            <strong style={styles.detailValue}>{profile.phone}</strong>
-          </div>
-
-          <div style={styles.detailBox}>
-            <span style={styles.detailLabel}>Department</span>
-            <strong style={styles.detailValue}>{profile.department_name}</strong>
-          </div>
-
-          <div style={styles.detailBox}>
-            <span style={styles.detailLabel}>Designation</span>
-            <strong style={styles.detailValue}>{profile.designation}</strong>
-          </div>
-
-          <div style={styles.detailBox}>
-            <span style={styles.detailLabel}>Employee Code</span>
-            <strong style={styles.detailValue}>{profile.employee_code}</strong>
-          </div>
-
-          <div style={styles.detailBox}>
-            <span style={styles.detailLabel}>Role</span>
-            <strong style={styles.detailValue}>{profile.role_name}</strong>
-          </div>
-
-          <div style={styles.detailBox}>
-            <span style={styles.detailLabel}>User ID</span>
-            <strong style={styles.detailValue}>{profile.user_id || "-"}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section style={styles.skillsCard}>
-        <div style={styles.skillsHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>Skills</h2>
-            <p style={styles.cardSubtitle}>
-              Add skills separated by comma or new line.
-            </p>
-          </div>
-
-          {!editingSkills ? (
-            <button
-              type="button"
-              style={styles.editBtn}
-              onClick={() => {
-                setSkillsText(profile.skills || "");
-                setEditingSkills(true);
-              }}
-            >
-              Edit Skills
-            </button>
-          ) : (
-            <button
-              type="button"
-              style={styles.saveBtn}
-              onClick={saveSkills}
-              disabled={savingSkills}
-            >
-              <Save size={17} />
-              {savingSkills ? "Saving..." : "Save Skills"}
-            </button>
-          )}
-        </div>
-
-        {editingSkills ? (
-          <textarea
-            style={styles.skillsTextarea}
-            value={skillsText}
-            onChange={(event) => setSkillsText(event.target.value)}
-            placeholder="Example: React, Node.js, MySQL, UI Design"
-          />
-        ) : skillsList.length > 0 ? (
-          <div style={styles.skillsList}>
-            {skillsList.map((skill, index) => (
-              <span style={styles.skillPill} key={`${skill}-${index}`}>
-                {skill}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div style={styles.emptySkills}>No skills added yet.</div>
-        )}
-      </section>
-      <section style={styles.skillsCard}>
-
-  <div style={styles.skillsHeader}>
-
-    <div>
-      <h2 style={styles.cardTitle}>
-        Security
-      </h2>
-
-      <p style={styles.cardSubtitle}>
-        Manage your account password.
-      </p>
-    </div>
-
-
-    <button
-      type="button"
-      style={styles.editBtn}
-      onClick={() =>
-        setShowPasswordBox(!showPasswordBox)
-      }
-    >
-      <LockKeyhole size={17}/>
-
-      {
-        showPasswordBox
-        ? "Close"
-        : "Change Password"
-      }
-
-    </button>
-
-  </div>
-
-
-  {
-    showPasswordBox && (
-
-      <div style={styles.passwordContainer}>
-
-
-        <label style={styles.passwordField}>
-
-          <span>
-            Current Password
-          </span>
-
-
-          <div style={styles.passwordInputWrap}>
-
-            <input
-              type={
-                showOldPassword
-                ? "text"
-                : "password"
-              }
-              value={oldPassword}
-              onChange={(e)=>
-                setOldPassword(e.target.value)
-              }
-              placeholder="Enter current password"
-              style={styles.passwordInput}
+          <div className="vnl-profile-details-grid">
+            <ProfileDetail
+              label="Name"
+              value={profile.full_name}
             />
 
-
-            <button
-              type="button"
-              style={styles.eyeBtn}
-              onClick={() =>
-                setShowOldPassword(!showOldPassword)
-              }
-            >
-
-              {
-                showOldPassword
-                ? <EyeOff size={18}/>
-                : <Eye size={18}/>
-              }
-
-            </button>
-
-          </div>
-
-        </label>
-
-
-
-        <label style={styles.passwordField}>
-
-          <span>
-            New Password
-          </span>
-
-
-          <div style={styles.passwordInputWrap}>
-
-            <input
-              type={
-                showNewPassword
-                ? "text"
-                : "password"
-              }
-              value={newPassword}
-              onChange={(e)=>
-                setNewPassword(e.target.value)
-              }
-              placeholder="Enter new password"
-              style={styles.passwordInput}
+            <ProfileDetail
+              label="Email"
+              value={profile.email}
             />
 
-
-            <button
-              type="button"
-              style={styles.eyeBtn}
-              onClick={() =>
-                setShowNewPassword(!showNewPassword)
-              }
-            >
-
-              {
-                showNewPassword
-                ? <EyeOff size={18}/>
-                : <Eye size={18}/>
-              }
-
-            </button>
-
-          </div>
-
-        </label>
-
-
-
-        <label style={styles.passwordField}>
-
-          <span>
-            Confirm New Password
-          </span>
-
-
-          <div style={styles.passwordInputWrap}>
-
-            <input
-              type={
-                showConfirmPassword
-                ? "text"
-                : "password"
-              }
-              value={confirmPassword}
-              onChange={(e)=>
-                setConfirmPassword(e.target.value)
-              }
-              placeholder="Confirm new password"
-              style={styles.passwordInput}
+            <ProfileDetail
+              label="Phone"
+              value={profile.phone}
             />
 
+            <ProfileDetail
+              label="Department"
+              value={profile.department_name}
+            />
 
-            <button
-              type="button"
-              style={styles.eyeBtn}
-              onClick={() =>
-                setShowConfirmPassword(!showConfirmPassword)
-              }
-            >
+            <ProfileDetail
+              label="Designation"
+              value={profile.designation}
+            />
 
-              {
-                showConfirmPassword
-                ? <EyeOff size={18}/>
-                : <Eye size={18}/>
-              }
+            <ProfileDetail
+              label="Employee Code"
+              value={profile.employee_code}
+            />
 
-            </button>
+            <ProfileDetail
+              label="Role"
+              value={profile.role_name}
+            />
 
+            <ProfileDetail
+              label="User ID"
+              value={profile.user_id || "-"}
+            />
           </div>
+        </section>
 
-        </label>
+        {/* RIGHT SIDE */}
 
+        <div className="vnl-profile-side-column">
+          {/* SKILLS */}
 
+          <section className="vnl-profile-panel">
+            <div className="vnl-profile-panel-top">
+              <div className="vnl-profile-section-heading compact">
+                <div className="vnl-section-icon">
+                  <Wrench size={20} />
+                </div>
 
-        <button
-          type="button"
-          style={styles.changePasswordBtn}
-          onClick={changePassword}
-          disabled={changingPassword}
-        >
+                <div>
+                  <h2>Skills</h2>
+                  <p>
+                    Tools, strengths and expertise.
+                  </p>
+                </div>
+              </div>
 
-          {
-            changingPassword
-            ? "Saving..."
-            : "Save Password"
-          }
+              {!editingSkills ? (
+                <button
+                  type="button"
+                  className="vnl-text-action"
+                  onClick={() => {
+                    setSkillsText(
+                      profile.skills || ""
+                    );
 
-        </button>
+                    setEditingSkills(true);
+                  }}
+                >
+                  Edit Skills
+                </button>
+              ) : null}
+            </div>
 
+            {editingSkills ? (
+              <div className="vnl-skills-editor">
+                <textarea
+                  value={skillsText}
+                  onChange={(event) =>
+                    setSkillsText(
+                      event.target.value
+                    )
+                  }
+                  placeholder="React, Node.js, MySQL, UI Design..."
+                />
 
+                <div className="vnl-editor-actions">
+                  <button
+                    type="button"
+                    className="vnl-cancel-small"
+                    onClick={() => {
+                      setEditingSkills(false);
+
+                      setSkillsText(
+                        profile.skills || ""
+                      );
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    className="vnl-save-small"
+                    onClick={saveSkills}
+                    disabled={savingSkills}
+                  >
+                    <Save size={16} />
+
+                    {savingSkills
+                      ? "Saving..."
+                      : "Save Skills"}
+                  </button>
+                </div>
+              </div>
+            ) : skillsList.length ? (
+              <div className="vnl-profile-skills">
+                {skillsList.map(
+                  (skill, index) => (
+                    <span
+                      key={`${skill}-${index}`}
+                    >
+                      {skill}
+                    </span>
+                  )
+                )}
+              </div>
+            ) : (
+              <div className="vnl-profile-empty">
+                No skills added yet.
+              </div>
+            )}
+          </section>
+
+          {/* CUSTOMIZE PREVIEW */}
+
+          <section className="vnl-profile-panel personalization-preview">
+            <div className="vnl-profile-panel-top">
+              <div className="vnl-profile-section-heading compact">
+                <div className="vnl-section-icon">
+                  <Sparkles size={20} />
+                </div>
+
+                <div>
+                  <h2>Make It Yours</h2>
+                  <p>
+                    Personalize your profile without changing RMS.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="vnl-text-action"
+                onClick={openCustomization}
+              >
+                Customize
+              </button>
+            </div>
+
+            <div className="vnl-personalization-row">
+              <div>
+                <span className="vnl-option-title">
+                  Accent
+                </span>
+
+                <div className="vnl-mini-colors">
+                  {Object.entries(
+                    ACCENTS
+                  ).map(([key, value]) => (
+                    <span
+                      key={key}
+                      className={
+                        preferences.accent ===
+                        key
+                          ? "selected"
+                          : ""
+                      }
+                      style={{
+                        background:
+                          value.main,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <span className="vnl-option-title">
+                  Banner
+                </span>
+
+                <strong className="vnl-current-choice">
+                  {preferences.banner}
+                </strong>
+              </div>
+
+              <div>
+                <span className="vnl-option-title">
+                  Avatar
+                </span>
+
+                <strong className="vnl-current-choice">
+                  {preferences.avatar}
+                </strong>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
 
-    )
+      {/* ======================================================
+          SECURITY
+      ====================================================== */}
 
-  }
+      <section className="vnl-profile-panel vnl-security-panel">
+        <div className="vnl-profile-panel-top">
+          <div className="vnl-profile-section-heading compact">
+            <div className="vnl-section-icon">
+              <LockKeyhole size={20} />
+            </div>
 
+            <div>
+              <h2>Security</h2>
+              <p>
+                Manage your account password.
+              </p>
+            </div>
+          </div>
 
-</section>
+          <button
+            type="button"
+            className="vnl-text-action"
+            onClick={() =>
+              setShowPasswordBox(
+                (previous) => !previous
+              )
+            }
+          >
+            {showPasswordBox
+              ? "Close"
+              : "Change Password"}
+          </button>
+        </div>
+
+        {showPasswordBox && (
+          <div className="vnl-password-grid">
+            <PasswordField
+              label="Current Password"
+              value={oldPassword}
+              setValue={setOldPassword}
+              visible={showOldPassword}
+              setVisible={setShowOldPassword}
+            />
+
+            <PasswordField
+              label="New Password"
+              value={newPassword}
+              setValue={setNewPassword}
+              visible={showNewPassword}
+              setVisible={setShowNewPassword}
+            />
+
+            <PasswordField
+              label="Confirm New Password"
+              value={confirmPassword}
+              setValue={setConfirmPassword}
+              visible={showConfirmPassword}
+              setVisible={
+                setShowConfirmPassword
+              }
+            />
+
+            <div className="vnl-password-action">
+              <button
+                type="button"
+                onClick={changePassword}
+                disabled={changingPassword}
+              >
+                {changingPassword
+                  ? "Saving..."
+                  : "Save Password"}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ======================================================
+          CUSTOMIZATION MODAL
+      ====================================================== */}
+
+      {showCustomize && (
+        <div
+          className="vnl-customize-backdrop"
+          onClick={() =>
+            setShowCustomize(false)
+          }
+        >
+          <div
+            className="vnl-customize-modal"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="vnl-customize-modal-header">
+              <div>
+                <span className="vnl-profile-eyebrow">
+                  PROFILE STUDIO
+                </span>
+
+                <h2>Make your profile yours.</h2>
+
+                <p>
+                  A little personality, still completely professional.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="vnl-modal-close"
+                onClick={() =>
+                  setShowCustomize(false)
+                }
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className="vnl-customize-preview">
+              <div
+                className={`vnl-preview-banner banner-${draftPreferences.banner}`}
+              >
+                <div
+                  className={`vnl-preview-avatar avatar-${draftPreferences.avatar}`}
+                >
+                  {initials}
+                </div>
+
+                <div>
+                  <strong>
+                    {profile.full_name}
+                  </strong>
+
+                  <span>
+                    {profile.department_name} ·{" "}
+                    {profile.role_name}
+                  </span>
+
+                  <p>
+                    “{draftPreferences.quote}”
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="vnl-customize-section">
+              <span className="vnl-customize-label">
+                Accent Color
+              </span>
+
+              <div className="vnl-accent-picker">
+                {Object.entries(
+                  ACCENTS
+                ).map(([key, value]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={
+                      draftPreferences.accent ===
+                      key
+                        ? "active"
+                        : ""
+                    }
+                    style={{
+                      "--picker-color":
+                        value.main,
+                    }}
+                    onClick={() =>
+                      setDraftPreferences(
+                        (previous) => ({
+                          ...previous,
+                          accent: key,
+                        })
+                      )
+                    }
+                    aria-label={key}
+                  >
+                    {draftPreferences.accent ===
+                      key && (
+                      <Check size={16} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="vnl-customize-section">
+              <span className="vnl-customize-label">
+                Banner Style
+              </span>
+
+              <div className="vnl-banner-picker">
+                {[
+                  ["paper", "Editorial"],
+                  ["grid", "90s Grid"],
+                  ["soft", "Soft Shapes"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`banner-choice banner-${key} ${
+                      draftPreferences.banner ===
+                      key
+                        ? "active"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setDraftPreferences(
+                        (previous) => ({
+                          ...previous,
+                          banner: key,
+                        })
+                      )
+                    }
+                  >
+                    <span />
+                    <strong>{label}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="vnl-customize-section">
+              <span className="vnl-customize-label">
+                Avatar Style
+              </span>
+
+              <div className="vnl-avatar-picker">
+                {[
+                  ["classic", "Classic"],
+                  ["soft", "Soft"],
+                  ["retro", "Retro"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={
+                      draftPreferences.avatar ===
+                      key
+                        ? "active"
+                        : ""
+                    }
+                    onClick={() =>
+                      setDraftPreferences(
+                        (previous) => ({
+                          ...previous,
+                          avatar: key,
+                        })
+                      )
+                    }
+                  >
+                    <span
+                      className={`picker-avatar avatar-${key}`}
+                    >
+                      {initials}
+                    </span>
+
+                    <strong>{label}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="vnl-customize-section">
+              <label className="vnl-quote-editor">
+                <span className="vnl-customize-label">
+                  Your Work Line
+                </span>
+
+                <input
+                  type="text"
+                  maxLength={90}
+                  value={
+                    draftPreferences.quote
+                  }
+                  onChange={(event) =>
+                    setDraftPreferences(
+                      (previous) => ({
+                        ...previous,
+                        quote:
+                          event.target.value,
+                      })
+                    )
+                  }
+                  placeholder="Write a short work quote..."
+                />
+
+                <small>
+                  {
+                    draftPreferences.quote
+                      .length
+                  }
+                  /90
+                </small>
+              </label>
+            </div>
+
+            <div className="vnl-customize-footer">
+              <button
+                type="button"
+                className="vnl-customize-reset"
+                onClick={() =>
+                  setDraftPreferences(
+                    DEFAULT_PREFS
+                  )
+                }
+              >
+                Reset
+              </button>
+
+              <button
+                type="button"
+                className="vnl-customize-save"
+                onClick={savePreferences}
+              >
+                <Save size={17} />
+                Save Profile Style
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-const styles = {
-  page: {
-    width: "100%",
-    padding: "0",
-  },
+const ProfileDetail = ({ label, value }) => (
+  <div className="vnl-profile-detail">
+    <span>{label}</span>
+    <strong>{value || "-"}</strong>
+  </div>
+);
 
-  profileTopBar: {
-    width: "100%",
-    background: "#ffffff",
-    borderRadius: "28px",
-    padding: "30px 38px",
-    marginBottom: "28px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "24px",
-    boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
-  },
+const PasswordField = ({
+  label,
+  value,
+  setValue,
+  visible,
+  setVisible,
+}) => (
+  <label className="vnl-password-field">
+    <span>{label}</span>
 
-  profileIdentity: {
-    display: "flex",
-    alignItems: "center",
-    gap: "22px",
-    minWidth: 0,
-  },
+    <div>
+      <input
+        type={visible ? "text" : "password"}
+        value={value}
+        onChange={(event) =>
+          setValue(event.target.value)
+        }
+        placeholder={label}
+      />
 
-  avatar: {
-    width: "76px",
-    height: "76px",
-    minWidth: "76px",
-    borderRadius: "22px",
-    background: "#111827",
-    color: "#ffffff",
-    display: "grid",
-    placeItems: "center",
-    fontSize: "28px",
-    fontWeight: 900,
-    letterSpacing: "-0.5px",
-  },
-
-  employeeName: {
-    margin: "0 0 12px",
-    color: "#111827",
-    fontSize: "38px",
-    fontWeight: 900,
-    lineHeight: 1.05,
-    letterSpacing: "-1px",
-  },
-
-  identityMeta: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "10px",
-  },
-
-  metaPill: {
-    background: "#fff1ec",
-    color: "#ff5733",
-    borderRadius: "999px",
-    padding: "8px 14px",
-    fontSize: "14px",
-    fontWeight: 900,
-  },
-
-  rolePill: {
-    background: "#eef2ff",
-    color: "#334155",
-    borderRadius: "999px",
-    padding: "8px 14px",
-    fontSize: "14px",
-    fontWeight: 900,
-    textTransform: "capitalize",
-  },
-
-  refreshBtn: {
-    border: "none",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "18px",
-    padding: "15px 24px",
-    fontSize: "16px",
-    fontWeight: 900,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
-    cursor: "pointer",
-    boxShadow: "0 14px 28px rgba(255, 87, 51, 0.22)",
-    whiteSpace: "nowrap",
-  },
-
-  errorBox: {
-    background: "#fff1f2",
-    border: "1px solid #fecdd3",
-    color: "#b91c1c",
-    borderRadius: "18px",
-    padding: "16px 20px",
-    fontSize: "16px",
-    fontWeight: 800,
-    marginBottom: "22px",
-  },
-
-  successBox: {
-    background: "#dcfce7",
-    border: "1px solid #bbf7d0",
-    color: "#166534",
-    borderRadius: "18px",
-    padding: "16px 20px",
-    fontSize: "16px",
-    fontWeight: 800,
-    marginBottom: "22px",
-  },
-
-  detailsCard: {
-    width: "100%",
-    background: "#ffffff",
-    borderRadius: "28px",
-    padding: "34px",
-    marginBottom: "28px",
-    boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
-  },
-
-  cardHeader: {
-    marginBottom: "26px",
-  },
-
-  cardTitleWrap: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "16px",
-  },
-
-  cardTitle: {
-    margin: "0 0 8px",
-    color: "#111827",
-    fontSize: "32px",
-    fontWeight: 900,
-    lineHeight: 1.1,
-    letterSpacing: "-0.5px",
-  },
-
-  cardSubtitle: {
-    margin: 0,
-    color: "#64748b",
-    fontSize: "16px",
-    lineHeight: 1.45,
-  },
-
-  detailsGrid: {
-    width: "100%",
-    display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "18px",
-  },
-
-  detailBox: {
-    minHeight: "118px",
-    background: "#f8fafc",
-    border: "1px solid #e5e7eb",
-    borderRadius: "18px",
-    padding: "20px",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    gap: "10px",
-    minWidth: 0,
-  },
-
-  detailLabel: {
-    color: "#64748b",
-    fontSize: "14px",
-    fontWeight: 900,
-  },
-
-  detailValue: {
-    color: "#111827",
-    fontSize: "18px",
-    fontWeight: 900,
-    lineHeight: 1.3,
-    wordBreak: "break-word",
-  },
-
-  skillsCard: {
-    width: "100%",
-    background: "#ffffff",
-    borderRadius: "28px",
-    padding: "34px",
-    marginBottom: "28px",
-    boxShadow: "0 16px 40px rgba(15, 23, 42, 0.06)",
-  },
-
-  skillsHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "20px",
-    marginBottom: "24px",
-  },
-
-  editBtn: {
-    border: "none",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "16px",
-    padding: "14px 22px",
-    fontSize: "16px",
-    fontWeight: 900,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-
-  saveBtn: {
-    border: "none",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "16px",
-    padding: "14px 22px",
-    fontSize: "16px",
-    fontWeight: 900,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "9px",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-
-  skillsTextarea: {
-    width: "100%",
-    minHeight: "150px",
-    border: "1px solid #d6dde8",
-    borderRadius: "18px",
-    padding: "16px",
-    fontSize: "16px",
-    fontWeight: 700,
-    outline: "none",
-    resize: "vertical",
-    color: "#111827",
-    background: "#ffffff",
-  },
-
-  skillsList: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "12px",
-  },
-
-  skillPill: {
-    background: "#fff1ec",
-    color: "#ff5733",
-    borderRadius: "999px",
-    padding: "10px 15px",
-    fontSize: "15px",
-    fontWeight: 900,
-  },
-
-  emptySkills: {
-    border: "1px dashed #cbd5e1",
-    borderRadius: "18px",
-    padding: "28px",
-    textAlign: "center",
-    color: "#64748b",
-    fontSize: "16px",
-    fontWeight: 900,
-    background: "#f8fafc",
-  },
-
-
-passwordField: {
-  display: "flex",
-  flexDirection: "column",
-  gap: "9px",
-},
-
-passwordLabel: {
-  color: "#475569",
-  fontSize: "14px",
-  fontWeight: 900,
-},
-
-passwordInput: {
-  width: "100%",
-  height: "54px",
-  border: "1px solid #d6dde8",
-  borderRadius: "16px",
-  padding: "0 16px",
-  fontSize: "15px",
-  fontWeight: 700,
-  outline: "none",
-  color: "#111827",
-  background: "#ffffff",
-},
-
-passwordActionRow: {
-  gridColumn: "1 / -1",
-  display: "flex",
-  justifyContent: "flex-end",
-  marginTop: "4px",
-},
-
-changePasswordBtn: {
-  border: "none",
-  background: "#ff5733",
-  color: "#ffffff",
-  borderRadius: "16px",
-  padding: "14px 22px",
-  fontSize: "16px",
-  fontWeight: 900,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "9px",
-  cursor: "pointer",
-},
-
-disabledPasswordBtn: {
-  opacity: 0.6,
-  cursor: "not-allowed",
-},
-passwordContainer:{
-display:"flex",
-flexDirection:"column",
-gap:"18px",
-},
-
-
-passwordField:{
-display:"flex",
-flexDirection:"column",
-gap:"8px",
-fontWeight:900,
-color:"#475569",
-},
-
-
-passwordInputWrap:{
-position:"relative",
-width:"100%",
-},
-
-
-passwordInput:{
-width:"100%",
-height:"52px",
-border:"1px solid #d6dde8",
-borderRadius:"16px",
-padding:"0 50px 0 16px",
-fontSize:"15px",
-fontWeight:700,
-},
-
-
-eyeBtn:{
-position:"absolute",
-right:"15px",
-top:"50%",
-transform:"translateY(-50%)",
-border:"none",
-background:"transparent",
-cursor:"pointer",
-color:"#64748b",
-},
-
-
-changePasswordBtn:{
-alignSelf:"flex-end",
-border:"none",
-background:"transparent",
-color:"#ff5733",
-fontWeight:900,
-fontSize:"16px",
-cursor:"pointer",
-},
-
-};
+      <button
+        type="button"
+        onClick={() =>
+          setVisible((previous) => !previous)
+        }
+      >
+        {visible ? (
+          <EyeOff size={18} />
+        ) : (
+          <Eye size={18} />
+        )}
+      </button>
+    </div>
+  </label>
+);
 
 export default EmployeeProfile;
