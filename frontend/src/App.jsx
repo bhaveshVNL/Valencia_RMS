@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
 
+/* ================= ADMINISTRATOR ================= */
+
 import AdministratorLayout from "./layouts/Administratorlayout";
 import AdministratorOverview from "./pages/administrator/administratorOverview";
 import AdministratorProjects from "./pages/administrator/administratorProjects";
@@ -12,14 +14,18 @@ import AdministratorUsers from "./pages/administrator/administratorUsers";
 import AdministratorAttendance from "./pages/administrator/administratorAttendance";
 import AdministratorLeaveApplications from "./pages/administrator/administratorLeaveApplications";
 
+/* ================= EMPLOYEE ================= */
+
 import EmployeeLayout from "./layouts/Employeelayout";
 import EmployeeOverview from "./pages/employee/employeeOverview";
 import EmployeeProjects from "./pages/employee/employeeProjects";
 import EmployeeTasks from "./pages/employee/employeeTasks";
+import EmployeeCalendar from "./pages/employee/employeeCalendar";
 import EmployeeProfile from "./pages/employee/employeeProfile";
 import EmployeeAttendance from "./pages/employee/employeeAttendance";
 import EmployeeLeaveApplications from "./pages/employee/employeeLeaveApplications";
-import EmployeeCalendar from "./pages/employee/employeeCalendar.jsx";
+
+/* ================= ADMIN ================= */
 
 import AdminLayout from "./layouts/Adminlayout";
 import AdminOverview from "./pages/admin/adminOverview";
@@ -31,11 +37,17 @@ import AdminUsers from "./pages/admin/adminUsers";
 import AdminAttendance from "./pages/admin/adminAttendance";
 import AdminLeaveApplications from "./pages/admin/adminLeaveApplications";
 
+/* ================= SUPERADMIN ================= */
+
 import SuperadminLayout from "./layouts/Superadminlayout";
 import SuperadminOverview from "./pages/superadmin/superadminOverview";
 import SuperadminUsers from "./pages/superadmin/superadminUsers";
 import SuperadminTasks from "./pages/superadmin/superadminTasks";
 import SuperadminProjects from "./pages/superadmin/superadminProjects";
+
+/* ========================================================
+   AUTH HELPERS
+======================================================== */
 
 const getStoredUser = () => {
   try {
@@ -91,6 +103,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   return children;
 };
+
+/* ========================================================
+   APP
+======================================================== */
 
 const App = () => {
   return (
@@ -213,8 +229,6 @@ const App = () => {
           element={<EmployeeProfile />}
         />
 
-
-
         <Route
           path="attendance"
           element={<EmployeeAttendance />}
@@ -262,6 +276,11 @@ const App = () => {
         />
 
         <Route
+          path="calendar"
+          element={<AdminCalendar />}
+        />
+
+        <Route
           path="profile"
           element={<AdminProfile />}
         />
@@ -279,11 +298,6 @@ const App = () => {
         <Route
           path="leave-applications"
           element={<AdminLeaveApplications />}
-        />
-
-        <Route
-          path="calendar"
-          element={<AdminCalendar />}
         />
       </Route>
 

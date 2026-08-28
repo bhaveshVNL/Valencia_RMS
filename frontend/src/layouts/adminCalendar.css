@@ -2299,15 +2299,7 @@
 }
 
 
-/* DATE NUMBER */
-.admin-main-calendar .admin-cal-day-number {
-  position: absolute !important;
 
-  top: 8px !important;
-  left: 10px !important;
-
-  z-index: 50 !important;
-}
 
 
 /* EVENT LAYER */
@@ -2398,4 +2390,99 @@
 .admin-main-calendar .admin-cal-page::-webkit-scrollbar-thumb {
   background: #c7cbd3;
   border-radius: 10px;
+}
+/* =========================================================
+   FINAL FIX - CALENDAR DATE NUMBERS ABOVE EVENT BARS
+========================================================= */
+
+/* Do NOT trap each date cell in a lower stacking context */
+.admin-main-calendar .admin-cal-day {
+  z-index: auto !important;
+}
+
+/* Do NOT trap the whole day grid either */
+.admin-main-calendar .admin-cal-days-row {
+  z-index: auto !important;
+}
+
+
+
+/* Event layer begins below the number */
+.admin-main-calendar .admin-cal-event-layer {
+  top: 42px !important;
+  z-index: 5 !important;
+}
+
+/* Previous/next month dates */
+.admin-main-calendar
+  .admin-cal-day.outside
+  .admin-cal-day-number {
+  color: #c1c7d0 !important;
+}
+
+/* Today's number */
+.admin-main-calendar
+  .admin-cal-day.today
+  .admin-cal-day-number {
+  color: #111827 !important;
+  background: #fff1eb !important;
+  border-radius: 50% !important;
+}
+/* =========================================================
+   ADMIN CALENDAR - RESTORE DATE NUMBERS
+========================================================= */
+
+.admin-main-calendar .admin-cal-day-number {
+  display: inline-flex !important;
+
+  position: absolute !important;
+  top: 10px !important;
+  left: 12px !important;
+
+  width: 24px !important;
+  height: 24px !important;
+
+  align-items: center !important;
+  justify-content: center !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #344054 !important;
+
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  opacity: 1 !important;
+  visibility: visible !important;
+
+  z-index: 100 !important;
+
+  pointer-events: none !important;
+}
+
+/* previous / next month dates */
+.admin-main-calendar
+  .admin-cal-day.outside
+  .admin-cal-day-number {
+  color: #c1c7d0 !important;
+}
+
+/* today's date */
+.admin-main-calendar
+  .admin-cal-day.today
+  .admin-cal-day-number {
+  color: #ff5733 !important;
+}
+
+/* remove pseudo-number system */
+.admin-main-calendar .admin-cal-day::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* make room above events for date number */
+.admin-main-calendar .admin-cal-event-layer {
+  top: 42px !important;
 }

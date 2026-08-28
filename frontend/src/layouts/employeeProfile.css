@@ -732,21 +732,47 @@
   display: inline-flex;
   align-items: center;
 
-  padding: 0 14px;
+  padding: 0 15px;
 
   border-radius: 12px;
 
-  background:
-    var(--profile-accent-soft);
+  background: #eef3ff;
 
-  border:
-    1px solid var(--profile-accent-line);
+  border: 1px solid #d6e1ff;
 
-  color:
-    var(--profile-accent);
+  color: #3156b8;
 
   font-size: 13px;
   font-weight: 900;
+
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.vnl-profile-skills span:nth-child(2n) {
+  background: #f3efff;
+  border-color: #dfd6ff;
+  color: #704cc7;
+}
+
+.vnl-profile-skills span:nth-child(3n) {
+  background: #eaf8f3;
+  border-color: #cceee2;
+  color: #168467;
+}
+
+.vnl-profile-skills span:nth-child(4n) {
+  background: #fff1ec;
+  border-color: #ffd7cc;
+  color: #e65332;
+}
+
+.vnl-profile-skills span:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 6px 14px rgba(15, 23, 42, 0.08);
 }
 
 .vnl-profile-empty {
@@ -839,81 +865,6 @@
   gap: 7px;
 }
 
-
-/* =========================
-   PERSONALIZATION PREVIEW
-========================= */
-
-.personalization-preview {
-  overflow: hidden;
-}
-
-.vnl-personalization-row {
-  display: grid;
-
-  grid-template-columns:
-    1.2fr 0.9fr 0.9fr;
-
-  gap: 12px;
-}
-
-.vnl-personalization-row > div {
-  min-height: 86px;
-
-  border: 1px solid #e7ebf0;
-
-  border-radius: 15px;
-
-  background: #fafbfc;
-
-  padding: 14px;
-}
-
-.vnl-option-title {
-  display: block;
-
-  color: #8a95a8;
-
-  font-size: 10px;
-  font-weight: 900;
-
-  text-transform: uppercase;
-
-  letter-spacing: 0.6px;
-
-  margin-bottom: 10px;
-}
-
-.vnl-mini-colors {
-  display: flex;
-
-  gap: 6px;
-}
-
-.vnl-mini-colors span {
-  width: 22px;
-  height: 22px;
-
-  border-radius: 50%;
-
-  border: 3px solid #ffffff;
-
-  box-shadow:
-    0 0 0 1px #dde2e9;
-}
-
-.vnl-mini-colors span.selected {
-  box-shadow:
-    0 0 0 2px #111827;
-}
-
-.vnl-current-choice {
-  text-transform: capitalize;
-
-  color: #111827;
-
-  font-size: 14px;
-}
 
 
 /* =========================
@@ -1642,4 +1593,428 @@
   .vnl-customize-modal {
     padding: 20px;
   }
+}
+
+.vnl-profile-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vnl-profile-skills span {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #334155;
+  background: var(--profile-accent-soft);
+  border: 1px solid var(--profile-accent-line);
+}
+
+.vnl-profile-skills span:nth-child(2n) {
+  background: #f2efff;
+  border-color: #ded7ff;
+  color: #6941c6;
+}
+
+.vnl-profile-skills span:nth-child(3n) {
+  background: #eaf8f3;
+  border-color: #cceee2;
+  color: #087f5b;
+}
+
+.vnl-profile-skills span:nth-child(4n) {
+  background: #eef3ff;
+  border-color: #d6e1ff;
+  color: #3158c9;
+}
+
+.vnl-quick-notes-panel {
+  margin-top: 20px;
+}
+
+.quick-notes-icon {
+  background: #fff4dc !important;
+  color: #d97706 !important;
+}
+
+.vnl-quick-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.vnl-quick-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.vnl-quick-note label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+}
+
+.vnl-quick-note input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--profile-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.vnl-quick-note label span {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+
+.vnl-quick-note.completed label span {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.vnl-quick-note > button {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.vnl-quick-note > button:hover {
+  color: #ef4444;
+}
+
+.vnl-quick-notes-empty {
+  padding: 24px;
+  border: 1px dashed #d6dde8;
+  border-radius: 14px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.vnl-clear-notes {
+  margin-top: 12px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.vnl-clear-notes:hover {
+  color: #ef4444;
+}
+/* =========================================================
+   INLINE QUICK NOTE INPUT
+========================================================= */
+
+.vnl-new-note-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.vnl-new-note-input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid #d8dee8;
+  border-radius: 10px;
+  outline: none;
+  background: #fff;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
+  transition: border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.vnl-new-note-input::placeholder {
+  color: #94a3b8;
+}
+
+.vnl-new-note-input:focus {
+  border-color: var(--profile-accent);
+  box-shadow: 0 0 0 3px
+    var(--profile-accent-soft);
+}
+
+.vnl-add-note-button,
+.vnl-cancel-note-button {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.vnl-add-note-button {
+  border: 1px solid var(--profile-accent);
+  background: var(--profile-accent);
+  color: #fff;
+}
+
+.vnl-add-note-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.vnl-cancel-note-button {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+}
+
+.vnl-cancel-note-button:hover {
+  background: #f8fafc;
+}
+/* =========================================================
+   QUICK NOTES / TO-DO
+========================================================= */
+
+
+
+/* Individual task */
+.vnl-quick-note-item {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+
+  padding: 0 16px;
+
+  background: #ffffff;
+  border: 1px solid #e1e7ef;
+  border-radius: 14px;
+
+  box-sizing: border-box;
+}
+
+/* Checkbox + text */
+.vnl-quick-note-check {
+  flex: 1;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  cursor: pointer;
+}
+
+/* Checkbox */
+.vnl-quick-note-check input {
+  width: 19px;
+  height: 19px;
+  min-width: 19px;
+
+  margin: 0;
+
+  cursor: pointer;
+  accent-color: #ff5733;
+}
+
+/* Task text */
+.vnl-quick-note-check span {
+  min-width: 0;
+
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #172033;
+
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Completed task */
+.vnl-quick-note-item.completed
+  .vnl-quick-note-check span {
+  text-decoration: line-through;
+  opacity: 0.45;
+}
+
+/* Delete X */
+.vnl-quick-note-delete {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  margin: 0;
+
+  border: none;
+  background: transparent;
+
+  color: #94a3b8;
+  font-size: 21px;
+  line-height: 1;
+
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.vnl-quick-note-delete:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+
+/* =========================================================
+   ADD NOTE INPUT
+========================================================= */
+
+.vnl-quick-note-input-row {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.vnl-quick-note-input-row input {
+  width: 100%;
+  height: 52px;
+
+  padding: 0 16px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #d9e0ea;
+  border-radius: 14px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #172033;
+
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.vnl-quick-note-input-row input:focus {
+  border-color: #ff5733;
+  box-shadow: 0 0 0 3px rgba(255, 87, 51, 0.08);
+}
+
+.vnl-quick-note-input-row input::placeholder {
+  color: #94a3b8;
+}
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+.vnl-quick-notes-empty {
+  width: 100%;
+  min-height: 74px;
+
+  margin-top: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 16px;
+
+  box-sizing: border-box;
+
+  border: 1px dashed #d7dee8;
+  border-radius: 14px;
+
+  color: #94a3b8;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  text-align: center;
+}
+
+.vnl-quick-notes-panel {
+  width: 100%;
+  height: 100%;
+  max-height: 430px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.vnl-quick-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  margin-top: 16px;
+
+  max-height: 255px;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding-right: 4px;
+}
+
+/* Hide scrollbar */
+.vnl-quick-notes-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.vnl-quick-notes-list {
+  scrollbar-width: none;
+}
+
+/* Each note */
+.vnl-quick-note-item {
+  width: 100%;
+  min-height: 58px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 14px;
+  padding: 0 16px;
+
+  box-sizing: border-box;
+
+  background: #fff;
+  border: 1px solid #e1e7ef;
+  border-radius: 14px;
+
+  flex-shrink: 0;
+}
+.vnl-quick-notes-panel .vnl-profile-panel-header {
+  margin-bottom: 0;
 }

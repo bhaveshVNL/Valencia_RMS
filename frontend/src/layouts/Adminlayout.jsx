@@ -3,7 +3,6 @@ import {
   NavLink,
   Outlet,
   useNavigate,
-  useLocation,
 } from "react-router-dom";
 
 import {
@@ -25,7 +24,9 @@ import "./Adminlayout.css";
 const getStoredUser = () => {
   try {
     return JSON.parse(
-      sessionStorage.getItem("user") || localStorage.getItem("user") || "{}"
+      sessionStorage.getItem("user") ||
+        localStorage.getItem("user") ||
+        "{}"
     );
   } catch {
     return {};
@@ -34,19 +35,19 @@ const getStoredUser = () => {
 
 const AdminLayout = () => {
   const navigate = useNavigate();
-  const location = useLocation();
 
-const isCalendarPage =
-  location.pathname === "/admin/calendar";
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] =
+    useState(false);
 
   const user = getStoredUser();
 
   const logout = () => {
     sessionStorage.removeItem("token");
     sessionStorage.removeItem("user");
+
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+
     navigate("/login", { replace: true });
   };
 
@@ -68,8 +69,14 @@ const isCalendarPage =
         <button
           type="button"
           className="admin-sidebar-toggle"
-          onClick={() => setSidebarCollapsed((previous) => !previous)}
-          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={() =>
+            setSidebarCollapsed((previous) => !previous)
+          }
+          title={
+            sidebarCollapsed
+              ? "Expand sidebar"
+              : "Collapse sidebar"
+          }
         >
           {sidebarCollapsed ? (
             <ChevronRight size={22} />
@@ -89,7 +96,9 @@ const isCalendarPage =
         <nav className="admin-nav">
           <NavLink
             to="/admin/overview"
-            className={({ isActive }) => (isActive ? "active" : "")}
+            className={({ isActive }) =>
+              isActive ? "active" : ""
+            }
             title="Overview"
           >
             <BarChart3 size={20} />
@@ -98,7 +107,9 @@ const isCalendarPage =
 
           <NavLink
             to="/admin/projects"
-            className={({ isActive }) => (isActive ? "active" : "")}
+            className={({ isActive }) =>
+              isActive ? "active" : ""
+            }
             title="Projects"
           >
             <FolderKanban size={20} />
@@ -107,7 +118,9 @@ const isCalendarPage =
 
           <NavLink
             to="/admin/tasks"
-            className={({ isActive }) => (isActive ? "active" : "")}
+            className={({ isActive }) =>
+              isActive ? "active" : ""
+            }
             title="Tasks"
           >
             <ClipboardList size={20} />
@@ -116,7 +129,9 @@ const isCalendarPage =
 
           <NavLink
             to="/admin/calendar"
-            className={({ isActive }) => (isActive ? "active" : "")}
+            className={({ isActive }) =>
+              isActive ? "active" : ""
+            }
             title="Calendar"
           >
             <CalendarDays size={20} />
@@ -125,7 +140,9 @@ const isCalendarPage =
 
           <NavLink
             to="/admin/profile"
-            className={({ isActive }) => (isActive ? "active" : "")}
+            className={({ isActive }) =>
+              isActive ? "active" : ""
+            }
             title="Profile"
           >
             <User size={20} />
@@ -134,7 +151,9 @@ const isCalendarPage =
 
           <NavLink
             to="/admin/users"
-            className={({ isActive }) => (isActive ? "active" : "")}
+            className={({ isActive }) =>
+              isActive ? "active" : ""
+            }
             title="Users"
           >
             <Users size={20} />
@@ -143,7 +162,9 @@ const isCalendarPage =
 
           <NavLink
             to="/admin/attendance"
-            className={({ isActive }) => (isActive ? "active" : "")}
+            className={({ isActive }) =>
+              isActive ? "active" : ""
+            }
             title="Attendance"
           >
             <CalendarCheck size={20} />
@@ -155,6 +176,7 @@ const isCalendarPage =
             className={({ isActive }) =>
               isActive ? "active" : ""
             }
+            title="Leave Applications"
           >
             <CalendarDays size={18} />
             <span>Leave Applications</span>
@@ -163,12 +185,20 @@ const isCalendarPage =
 
         <div className="admin-sidebar-bottom">
           <div className="admin-user-card">
-            <div className="admin-user-avatar">{initials}</div>
+            <div className="admin-user-avatar">
+              {initials}
+            </div>
 
             <div className="admin-user-info">
-              <strong>{user?.full_name || "Admin"}</strong>
+              <strong>
+                {user?.full_name || "Admin"}
+              </strong>
+
               <p>{user?.email || "-"}</p>
-              <span>{user?.role_name || "admin"}</span>
+
+              <span>
+                {user?.role_name || "admin"}
+              </span>
             </div>
           </div>
 
@@ -184,15 +214,9 @@ const isCalendarPage =
         </div>
       </aside>
 
-      <main
-  className={
-    isCalendarPage
-      ? "admin-main admin-main-calendar"
-      : "admin-main"
-  }
->
-  <Outlet />
-</main>
+      <main className="admin-main">
+        <Outlet />
+      </main>
     </div>
   );
 };

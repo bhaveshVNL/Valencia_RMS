@@ -876,36 +876,25 @@ events.mini_tasks.forEach((item) => {
 
                             return (
                               <button
-                                type="button"
-                                key={
-                                  calendarDate.dateString
-                                }
-                                className={[
-                                  "admin-cal-day",
-                                  !calendarDate.currentMonth
-                                    ? "outside"
-                                    : "",
-                                  isToday
-                                    ? "today"
-                                    : "",
-                                  isSelected
-                                    ? "selected"
-                                    : "",
-                                ]
-                                  .filter(Boolean)
-                                  .join(" ")}
-                                onClick={() =>
-                                  handleDateClick(
-                                    calendarDate
-                                  )
-                                }
-                              >
-                                <span className="admin-cal-day-number">
-                                  {
-                                    calendarDate.number
-                                  }
-                                </span>
-                              </button>
+  type="button"
+  key={calendarDate.dateString}
+  data-day-number={calendarDate.number}
+  className={[
+    "admin-cal-day",
+    !calendarDate.currentMonth ? "outside" : "",
+    isToday ? "today" : "",
+    isSelected ? "selected" : "",
+  ]
+    .filter(Boolean)
+    .join(" ")}
+  onClick={() =>
+    handleDateClick(calendarDate)
+  }
+>
+  <span className="admin-cal-day-number">
+    {calendarDate.number}
+  </span>
+</button>
                             );
                           }
                         )}

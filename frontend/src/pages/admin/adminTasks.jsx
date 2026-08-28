@@ -167,6 +167,44 @@ const isSubtaskDone = (subtask) => {
   );
 };
 
+const getAdminSubtaskStatus = (
+  subtask,
+  mainTaskStatus
+) => {
+  // Completed subtask always stays Done
+  if (isSubtaskDone(subtask)) {
+    return "done";
+  }
+
+  const subtaskStatus = normalizeStatus(
+    subtask?.status
+  );
+
+  const parentStatus = normalizeStatus(
+    mainTaskStatus
+  );
+
+  /*
+   * Admin view:
+   * once the Main Task has started moving through workflow,
+   * unfinished shared subtasks should reflect that workflow
+   * instead of incorrectly remaining "To Do".
+   */
+  if (
+    subtaskStatus === "todo" &&
+    [
+      "in_progress",
+      "under_review",
+      "on_hold",
+      "rejected",
+    ].includes(parentStatus)
+  ) {
+    return parentStatus;
+  }
+
+  return subtaskStatus;
+};
+
 const AdminTasks = () => {
   const location =
   useLocation();
@@ -1514,8 +1552,12 @@ useEffect(() => {
                               )}{" "}
                               ·{" "}
                               {getStatusLabel(
-                                subtask.status
-                              )}
+  getAdminSubtaskStatus(
+    subtask,
+    selectedTask.status_group ||
+      selectedTask.status
+  )
+)}
                             </p>
 
                             {(subtask.task_description ||
@@ -1552,10 +1594,14 @@ useEffect(() => {
                             }
                           >
                             {done
-                              ? "Done"
-                              : getStatusLabel(
-                                  subtask.status
-                                )}
+  ? "Done"
+  : getStatusLabel(
+      getAdminSubtaskStatus(
+        subtask,
+        selectedTask.status_group ||
+          selectedTask.status
+      )
+    )}
                           </span>
                         </div>
                       );
@@ -1842,22 +1888,33 @@ const styles = {
 },
 
   taskTile: {
-    width: "100%",
-    minHeight: "142px",
-    boxSizing: "border-box",
-    border: "1px solid #e4e8ee",
-    background: "#ffffff",
-    borderRadius: "18px",
-    padding: "16px 20px",
-    textAlign: "left",
-    cursor: "pointer",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    gap: "10px",
-    boxShadow:
-      "0 4px 12px rgba(15, 23, 42, 0.035)",
-  },
+  width: "100%",
+  minHeight: "174px",
+
+  boxSizing: "border-box",
+
+  border: "1px solid #e4e8ee",
+  background: "#ffffff",
+  borderRadius: "18px",
+
+  padding: "16px 20px",
+
+  textAlign: "left",
+  cursor: "pointer",
+
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "space-between",
+
+  gap: "10px",
+
+  flexShrink: 0,
+
+  overflow: "hidden",
+
+  boxShadow:
+    "0 4px 12px rgba(15, 23, 42, 0.035)",
+},
 
   tileContent: {
     width: "100%",
@@ -1865,13 +1922,19 @@ const styles = {
   },
 
   tileMainTaskTitle: {
-    margin: "0 0 6px",
-    fontSize: "18px",
-    fontWeight: 900,
-    color: "#111827",
-    lineHeight: 1.3,
-    wordBreak: "break-word",
-  },
+  margin: "0 0 6px",
+  fontSize: "18px",
+  fontWeight: 900,
+  color: "#111827",
+  lineHeight: 1.25,
+
+  wordBreak: "break-word",
+
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+},
 
   tileProjectName: {
     margin: 0,
@@ -1894,12 +1957,20 @@ const styles = {
   },
 
   tileBottomRow: {
-    width: "100%",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "10px",
-  },
+  width: "100%",
+
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+
+  gap: "10px",
+
+  minHeight: "28px",
+
+  flexShrink: 0,
+
+  boxSizing: "border-box",
+},
 
   tileAssigneeText: {
     fontSize: "12px",

@@ -1364,11 +1364,6 @@ box-shadow: none !important;
   overflow-x: hidden !important;
 }
 
-/* REMOVE EXTRA HORIZONTAL SCROLL */
-.admin-main *,
-.admin-sidebar * {
-  max-width: 100%;
-}
 
 /* MOBILE */
 @media (max-width: 780px) {
@@ -3293,4 +3288,234 @@ div:has(> svg + input[placeholder="Search mini task, employee, date, designation
 
 .admin-sidebar {
   scrollbar-width: none;
+}
+/* =========================================================
+   FINAL ADMIN GEOMETRY
+   MATCH EMPLOYEE DASHBOARD EXACTLY
+   KEEP THIS AT ABSOLUTE BOTTOM
+========================================================= */
+
+/* =========================
+   OPEN LAYOUT
+========================= */
+
+.admin-dashboard-shell {
+  display: grid !important;
+  grid-template-columns: 280px minmax(0, 1fr) !important;
+
+  width: 100% !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+
+  gap: 0 !important;
+
+  background: #f6f7fb !important;
+  overflow: hidden !important;
+}
+
+/* Sidebar = same width as Employee */
+.admin-sidebar {
+  width: 280px !important;
+  min-width: 280px !important;
+  max-width: 280px !important;
+
+  height: 100vh !important;
+
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  bottom: auto !important;
+
+  margin: 0 !important;
+
+  padding-left: 22px !important;
+  padding-right: 22px !important;
+
+  box-sizing: border-box !important;
+}
+
+/* Main = same spacing as Employee */
+.admin-main {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+
+  height: 100vh !important;
+
+  margin: 0 !important;
+
+  padding: 38px 32px 38px 56px !important;
+
+  box-sizing: border-box !important;
+
+  background: #f6f7fb !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* DO NOT center Admin pages inside artificial 1180/1280 box */
+.admin-main > * {
+  width: 100% !important;
+  max-width: none !important;
+
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+
+  box-sizing: border-box !important;
+}
+
+.admin-overview-page,
+.admin-projects-page,
+.admin-tasks-page,
+.admin-users-page,
+.admin-profile-page,
+.admin-attendance-page {
+  width: 100% !important;
+  max-width: none !important;
+
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+
+/* =========================
+   COLLAPSED SIDEBAR
+========================= */
+
+.admin-dashboard-shell.sidebar-collapsed {
+  grid-template-columns: 92px minmax(0, 1fr) !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+  width: 92px !important;
+  min-width: 92px !important;
+  max-width: 92px !important;
+}
+
+.admin-dashboard-shell.sidebar-collapsed .admin-main {
+  width: 100% !important;
+  margin: 0 !important;
+
+  padding: 38px 32px 38px 56px !important;
+}
+
+
+/* =========================
+   CALENDAR EXCEPTION
+   Keep your full-screen calendar
+========================= */
+
+.admin-main.admin-main-calendar {
+  padding: 4px 8px 4px 4px !important;
+
+  width: 100% !important;
+  height: 100vh !important;
+
+  margin: 0 !important;
+
+  overflow: hidden !important;
+}
+
+.admin-main.admin-main-calendar > * {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 900px) {
+
+  .admin-dashboard-shell,
+  .admin-dashboard-shell.sidebar-collapsed {
+    display: block !important;
+    height: auto !important;
+    min-height: 100vh !important;
+  }
+
+  .admin-sidebar,
+  .admin-dashboard-shell.sidebar-collapsed .admin-sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+
+    height: auto !important;
+  }
+
+  .admin-main,
+  .admin-dashboard-shell.sidebar-collapsed .admin-main {
+    width: 100% !important;
+    height: auto !important;
+
+    margin: 0 !important;
+
+    padding: 24px !important;
+  }
+}
+
+/* =========================================================
+   ADMIN CALENDAR FINAL FIX
+   Keep alignment, restore calendar interaction
+========================================================= */
+
+.admin-main.admin-main-calendar {
+  padding: 18px 12px 18px 24px !important;
+
+  width: 100% !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+
+  margin: 0 !important;
+
+  overflow: auto !important;
+}
+
+.admin-main.admin-main-calendar > * {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+
+  margin: 0 !important;
+}
+
+/* =========================================
+   HIDE SCROLLBAR - KEEP SCROLL WORKING
+========================================= */
+
+.admin-main {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.admin-main::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+
+/* Sidebar menu scrollbar hidden too */
+.admin-nav {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.admin-nav::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+/* =========================================
+   ADMIN CENTERING - SPACING ONLY
+   DOES NOT TOUCH MODALS OR PAGE BEHAVIOR
+========================================= */
+
+.admin-dashboard-shell:not(.sidebar-collapsed) .admin-main {
+  padding-left: 44px !important;
+  padding-right: 44px !important;
 }

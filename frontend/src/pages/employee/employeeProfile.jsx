@@ -16,7 +16,15 @@ import {
 
 import api from "../../api/axios";
 import "../../layouts/employeeProfile.css";
+
 const PROFILE_PREFS_KEY = "employee_profile_preferences";
+const QUICK_NOTES_KEY = `employee_quick_notes_${
+  JSON.parse(
+    sessionStorage.getItem("user") ||
+    localStorage.getItem("user") ||
+    "{}"
+  )?.user_id || "default"
+}`;
 
 const DEFAULT_PREFS = {
   accent: "orange",
@@ -78,6 +86,20 @@ const getStoredPreferences = () => {
   }
 };
 
+const getStoredQuickNotes = () => {
+  try {
+    const saved = localStorage.getItem(QUICK_NOTES_KEY);
+
+    if (!saved) return [];
+
+    const parsed = JSON.parse(saved);
+
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 const getResponseData = (response) => {
   const data = response?.data || {};
   const profile = data.profile || data.data || data;
@@ -118,14 +140,22 @@ const normalizeProfile = (rawProfile, fallbackUser) => {
 
   return {
     user_id: profile.user_id || user.user_id || "",
+
     full_name:
       profile.full_name ||
       profile.name ||
       user.full_name ||
       "Employee",
 
-    email: profile.email || user.email || "-",
-    phone: profile.phone || user.phone || "-",
+    email:
+      profile.email ||
+      user.email ||
+      "-",
+
+    phone:
+      profile.phone ||
+      user.phone ||
+      "-",
 
     department_name:
       profile.department_name ||
@@ -152,7 +182,10 @@ const normalizeProfile = (rawProfile, fallbackUser) => {
       user.role_name ||
       "employee",
 
-    skills: profile.skills || user.skills || "",
+    skills:
+      profile.skills ||
+      user.skills ||
+      "",
   };
 };
 
@@ -167,23 +200,30 @@ const EmployeeProfile = () => {
     getStoredPreferences
   );
 
-  const [draftPreferences, setDraftPreferences] = useState(
-    getStoredPreferences
-  );
+  const [draftPreferences, setDraftPreferences] =
+    useState(getStoredPreferences);
 
   const [skillsText, setSkillsText] = useState("");
-  const [editingSkills, setEditingSkills] = useState(false);
+  const [editingSkills, setEditingSkills] =
+    useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [savingSkills, setSavingSkills] = useState(false);
+  const [savingSkills, setSavingSkills] =
+    useState(false);
 
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] =
+    useState("");
 
-  const [showCustomize, setShowCustomize] = useState(false);
+  const [showCustomize, setShowCustomize] =
+    useState(false);
 
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [oldPassword, setOldPassword] =
+    useState("");
+
+  const [newPassword, setNewPassword] =
+    useState("");
+
   const [confirmPassword, setConfirmPassword] =
     useState("");
 
@@ -202,6 +242,17 @@ const EmployeeProfile = () => {
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
 
+  /* ======================================================
+     QUICK NOTES
+  ====================================================== */
+
+  const [quickNotes, setQuickNotes] = useState(
+    getStoredQuickNotes
+  );
+
+  const [addingNote, setAddingNote] = useState(false);
+  const [newNoteText, setNewNoteText] = useState("");
+
   const initials = useMemo(
     () => getInitials(profile.full_name),
     [profile.full_name]
@@ -215,7 +266,65 @@ const EmployeeProfile = () => {
   }, [profile.skills]);
 
   const activeAccent =
-    ACCENTS[preferences.accent] || ACCENTS.orange;
+    ACCENTS[preferences.accent] ||
+    ACCENTS.orange;
+
+  const saveQuickNotes = (notes) => {
+    setQuickNotes(notes);
+
+    localStorage.setItem(
+      QUICK_NOTES_KEY,
+      JSON.stringify(notes)
+    );
+  };
+
+  const addQuickNote = () => {
+  if (!newNoteText.trim()) return;
+
+  const newNote = {
+    id: Date.now(),
+    text: newNoteText.trim(),
+    completed: false,
+  };
+
+  saveQuickNotes([
+    ...quickNotes,
+    newNote,
+  ]);
+
+  setNewNoteText("");
+  setAddingNote(false);
+};
+
+  const toggleQuickNote = (id) => {
+    const updatedNotes = quickNotes.map(
+      (note) =>
+        note.id === id
+          ? {
+              ...note,
+              completed: !note.completed,
+            }
+          : note
+    );
+
+    saveQuickNotes(updatedNotes);
+  };
+
+  const deleteQuickNote = (id) => {
+    const updatedNotes = quickNotes.filter(
+      (note) => note.id !== id
+    );
+
+    saveQuickNotes(updatedNotes);
+  };
+
+  const clearQuickNotes = () => {
+    saveQuickNotes([]);
+  };
+
+  /* ======================================================
+     PROFILE API
+  ====================================================== */
 
   const fetchProfile = async () => {
     try {
@@ -249,6 +358,10 @@ const EmployeeProfile = () => {
       setLoading(false);
     }
   };
+
+  /* ======================================================
+     SKILLS
+  ====================================================== */
 
   const saveSkills = async () => {
     try {
@@ -300,13 +413,19 @@ const EmployeeProfile = () => {
     }
   };
 
+  /* ======================================================
+     PASSWORD
+  ====================================================== */
+
   const changePassword = async () => {
     try {
       setError("");
       setSuccessMessage("");
 
       if (!oldPassword || !newPassword) {
-        setError("Please enter all password fields.");
+        setError(
+          "Please enter all password fields."
+        );
         return;
       }
 
@@ -345,6 +464,10 @@ const EmployeeProfile = () => {
     }
   };
 
+  /* ======================================================
+     CUSTOMIZATION
+  ====================================================== */
+
   const openCustomization = () => {
     setDraftPreferences(preferences);
     setShowCustomize(true);
@@ -359,6 +482,7 @@ const EmployeeProfile = () => {
     );
 
     setShowCustomize(false);
+
     setSuccessMessage(
       "Profile appearance saved on this device."
     );
@@ -368,13 +492,16 @@ const EmployeeProfile = () => {
     fetchProfile();
   }, []);
 
+
   return (
     <div
       className="vnl-profile-page"
       style={{
         "--profile-accent": activeAccent.main,
-        "--profile-accent-soft": activeAccent.soft,
-        "--profile-accent-line": activeAccent.line,
+        "--profile-accent-soft":
+          activeAccent.soft,
+        "--profile-accent-line":
+          activeAccent.line,
       }}
     >
       {/* ======================================================
@@ -416,9 +543,12 @@ const EmployeeProfile = () => {
 
             <h1>{profile.full_name}</h1>
 
+            {/* ONLY DESIGNATION + ROLE */}
             <div className="vnl-profile-tags">
-              <span>{profile.designation}</span>
-              <span>{profile.department_name}</span>
+              <span>
+                {profile.designation}
+              </span>
+
               <span className="role">
                 {profile.role_name}
               </span>
@@ -427,29 +557,6 @@ const EmployeeProfile = () => {
             <p className="vnl-profile-quote">
               “{preferences.quote}”
             </p>
-
-            <div className="vnl-profile-id-strip">
-              <span>
-                <small>User ID</small>
-                <strong>
-                  {profile.user_id || "-"}
-                </strong>
-              </span>
-
-              <span>
-                <small>Employee Code</small>
-                <strong>
-                  {profile.employee_code}
-                </strong>
-              </span>
-
-              <span>
-                <small>Department</small>
-                <strong>
-                  {profile.department_name}
-                </strong>
-              </span>
-            </div>
           </div>
         </div>
 
@@ -472,7 +579,9 @@ const EmployeeProfile = () => {
             <RefreshCw
               size={18}
               className={
-                loading ? "profile-spin" : ""
+                loading
+                  ? "profile-spin"
+                  : ""
               }
             />
 
@@ -501,7 +610,10 @@ const EmployeeProfile = () => {
       ====================================================== */}
 
       <div className="vnl-profile-main-grid">
-        {/* DETAILS */}
+
+        {/* ====================================================
+            EMPLOYEE DETAILS
+        ==================================================== */}
 
         <section className="vnl-profile-panel details-panel">
           <div className="vnl-profile-section-heading">
@@ -511,13 +623,11 @@ const EmployeeProfile = () => {
 
             <div>
               <h2>Employee Details</h2>
-              <p>
-                Your information as saved in Valencia RMS.
-              </p>
             </div>
           </div>
 
           <div className="vnl-profile-details-grid">
+
             <ProfileDetail
               label="Name"
               value={profile.full_name}
@@ -534,18 +644,8 @@ const EmployeeProfile = () => {
             />
 
             <ProfileDetail
-              label="Department"
-              value={profile.department_name}
-            />
-
-            <ProfileDetail
               label="Designation"
               value={profile.designation}
-            />
-
-            <ProfileDetail
-              label="Employee Code"
-              value={profile.employee_code}
             />
 
             <ProfileDetail
@@ -553,31 +653,36 @@ const EmployeeProfile = () => {
               value={profile.role_name}
             />
 
-            <ProfileDetail
-              label="User ID"
-              value={profile.user_id || "-"}
-            />
           </div>
         </section>
 
-        {/* RIGHT SIDE */}
+        {/* ====================================================
+            RIGHT SIDE
+        ==================================================== */}
 
         <div className="vnl-profile-side-column">
-          {/* SKILLS */}
+
+          {/* ==================================================
+              SKILLS
+          ================================================== */}
 
           <section className="vnl-profile-panel">
             <div className="vnl-profile-panel-top">
+
               <div className="vnl-profile-section-heading compact">
+
                 <div className="vnl-section-icon">
                   <Wrench size={20} />
                 </div>
 
                 <div>
                   <h2>Skills</h2>
+
                   <p>
                     Tools, strengths and expertise.
                   </p>
                 </div>
+
               </div>
 
               {!editingSkills ? (
@@ -595,10 +700,12 @@ const EmployeeProfile = () => {
                   Edit Skills
                 </button>
               ) : null}
+
             </div>
 
             {editingSkills ? (
               <div className="vnl-skills-editor">
+
                 <textarea
                   value={skillsText}
                   onChange={(event) =>
@@ -610,6 +717,7 @@ const EmployeeProfile = () => {
                 />
 
                 <div className="vnl-editor-actions">
+
                   <button
                     type="button"
                     className="vnl-cancel-small"
@@ -636,10 +744,14 @@ const EmployeeProfile = () => {
                       ? "Saving..."
                       : "Save Skills"}
                   </button>
+
                 </div>
               </div>
+
             ) : skillsList.length ? (
+
               <div className="vnl-profile-skills">
+
                 {skillsList.map(
                   (skill, index) => (
                     <span
@@ -649,88 +761,130 @@ const EmployeeProfile = () => {
                     </span>
                   )
                 )}
+
               </div>
+
             ) : (
+
               <div className="vnl-profile-empty">
                 No skills added yet.
               </div>
+
             )}
           </section>
 
-          {/* CUSTOMIZE PREVIEW */}
+          {/* ==================================================
+              QUICK NOTES
+          ================================================== */}
 
-          <section className="vnl-profile-panel personalization-preview">
-            <div className="vnl-profile-panel-top">
-              <div className="vnl-profile-section-heading compact">
-                <div className="vnl-section-icon">
-                  <Sparkles size={20} />
-                </div>
+          <section className="vnl-profile-panel vnl-quick-notes-panel">
 
-                <div>
-                  <h2>Make It Yours</h2>
-                  <p>
-                    Personalize your profile without changing RMS.
-                  </p>
-                </div>
-              </div>
+  <div className="vnl-profile-panel-top">
 
-              <button
-                type="button"
-                className="vnl-text-action"
-                onClick={openCustomization}
-              >
-                Customize
-              </button>
-            </div>
+    <div className="vnl-profile-section-heading compact">
 
-            <div className="vnl-personalization-row">
-              <div>
-                <span className="vnl-option-title">
-                  Accent
-                </span>
+      <div className="vnl-section-icon quick-notes-icon">
+        <Sparkles size={20} />
+      </div>
 
-                <div className="vnl-mini-colors">
-                  {Object.entries(
-                    ACCENTS
-                  ).map(([key, value]) => (
-                    <span
-                      key={key}
-                      className={
-                        preferences.accent ===
-                        key
-                          ? "selected"
-                          : ""
-                      }
-                      style={{
-                        background:
-                          value.main,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
+      <div>
+        <h2>Quick Notes / To-Do</h2>
 
-              <div>
-                <span className="vnl-option-title">
-                  Banner
-                </span>
+        <p>
+          Personal reminders saved on this device.
+        </p>
+      </div>
 
-                <strong className="vnl-current-choice">
-                  {preferences.banner}
-                </strong>
-              </div>
+    </div>
 
-              <div>
-                <span className="vnl-option-title">
-                  Avatar
-                </span>
+    <button
+      type="button"
+      className="vnl-text-action"
+      onClick={() => {
+        setAddingNote(true);
 
-                <strong className="vnl-current-choice">
-                  {preferences.avatar}
-                </strong>
-              </div>
-            </div>
-          </section>
+        setTimeout(() => {
+          document
+            .querySelector(".vnl-new-note-input")
+            ?.focus();
+        }, 50);
+      }}
+    >
+      + Add
+    </button>
+
+  </div>
+
+  {/* INLINE NOTE INPUT */}
+
+ {addingNote && (
+  <div className="vnl-quick-note-input-row">
+    <input
+      autoFocus
+      type="text"
+      value={newNoteText}
+      placeholder="Write a note or reminder..."
+      onChange={(e) => setNewNoteText(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          addQuickNote();
+        }
+
+        if (e.key === "Escape") {
+          setNewNoteText("");
+          setAddingNote(false);
+        }
+      }}
+    />
+  </div>
+)}
+
+  {/* SAVED NOTES */}
+
+  <div className="vnl-quick-notes-list">
+  {quickNotes.map((note) => (
+    <div
+      key={note.id}
+      className={`vnl-quick-note-item ${
+        note.completed ? "completed" : ""
+      }`}
+    >
+      <label className="vnl-quick-note-check">
+        <input
+          type="checkbox"
+          checked={note.completed}
+          onChange={() => toggleQuickNote(note.id)}
+        />
+
+        <span>{note.text}</span>
+      </label>
+
+      <button
+        type="button"
+        className="vnl-quick-note-delete"
+        onClick={() => deleteQuickNote(note.id)}
+      >
+        ×
+      </button>
+    </div>
+  ))}
+</div>
+
+  {quickNotes.length > 0 && (
+
+    <button
+      type="button"
+      className="vnl-clear-notes"
+      onClick={clearQuickNotes}
+    >
+      Clear all
+    </button>
+
+  )}
+
+</section>
+
         </div>
       </div>
 
@@ -739,18 +893,23 @@ const EmployeeProfile = () => {
       ====================================================== */}
 
       <section className="vnl-profile-panel vnl-security-panel">
+
         <div className="vnl-profile-panel-top">
+
           <div className="vnl-profile-section-heading compact">
+
             <div className="vnl-section-icon">
               <LockKeyhole size={20} />
             </div>
 
             <div>
               <h2>Security</h2>
+
               <p>
                 Manage your account password.
               </p>
             </div>
+
           </div>
 
           <button
@@ -766,10 +925,13 @@ const EmployeeProfile = () => {
               ? "Close"
               : "Change Password"}
           </button>
+
         </div>
 
         {showPasswordBox && (
+
           <div className="vnl-password-grid">
+
             <PasswordField
               label="Current Password"
               value={oldPassword}
@@ -797,6 +959,7 @@ const EmployeeProfile = () => {
             />
 
             <div className="vnl-password-action">
+
               <button
                 type="button"
                 onClick={changePassword}
@@ -806,9 +969,13 @@ const EmployeeProfile = () => {
                   ? "Saving..."
                   : "Save Password"}
               </button>
+
             </div>
+
           </div>
+
         )}
+
       </section>
 
       {/* ======================================================
@@ -816,29 +983,37 @@ const EmployeeProfile = () => {
       ====================================================== */}
 
       {showCustomize && (
+
         <div
           className="vnl-customize-backdrop"
           onClick={() =>
             setShowCustomize(false)
           }
         >
+
           <div
             className="vnl-customize-modal"
             onClick={(event) =>
               event.stopPropagation()
             }
           >
+
             <div className="vnl-customize-modal-header">
+
               <div>
+
                 <span className="vnl-profile-eyebrow">
                   PROFILE STUDIO
                 </span>
 
-                <h2>Make your profile yours.</h2>
+                <h2>
+                  Make your profile yours.
+                </h2>
 
                 <p>
                   A little personality, still completely professional.
                 </p>
+
               </div>
 
               <button
@@ -850,12 +1025,15 @@ const EmployeeProfile = () => {
               >
                 <X size={19} />
               </button>
+
             </div>
 
             <div className="vnl-customize-preview">
+
               <div
                 className={`vnl-preview-banner banner-${draftPreferences.banner}`}
               >
+
                 <div
                   className={`vnl-preview-avatar avatar-${draftPreferences.avatar}`}
                 >
@@ -863,31 +1041,37 @@ const EmployeeProfile = () => {
                 </div>
 
                 <div>
+
                   <strong>
                     {profile.full_name}
                   </strong>
 
                   <span>
-                    {profile.department_name} ·{" "}
                     {profile.role_name}
                   </span>
 
                   <p>
                     “{draftPreferences.quote}”
                   </p>
+
                 </div>
+
               </div>
+
             </div>
 
             <div className="vnl-customize-section">
+
               <span className="vnl-customize-label">
                 Accent Color
               </span>
 
               <div className="vnl-accent-picker">
+
                 {Object.entries(
                   ACCENTS
                 ).map(([key, value]) => (
+
                   <button
                     key={key}
                     type="button"
@@ -911,26 +1095,34 @@ const EmployeeProfile = () => {
                     }
                     aria-label={key}
                   >
+
                     {draftPreferences.accent ===
                       key && (
                       <Check size={16} />
                     )}
+
                   </button>
+
                 ))}
+
               </div>
+
             </div>
 
             <div className="vnl-customize-section">
+
               <span className="vnl-customize-label">
                 Banner Style
               </span>
 
               <div className="vnl-banner-picker">
+
                 {[
                   ["paper", "Editorial"],
                   ["grid", "90s Grid"],
                   ["soft", "Soft Shapes"],
                 ].map(([key, label]) => (
+
                   <button
                     key={key}
                     type="button"
@@ -949,24 +1141,35 @@ const EmployeeProfile = () => {
                       )
                     }
                   >
+
                     <span />
-                    <strong>{label}</strong>
+
+                    <strong>
+                      {label}
+                    </strong>
+
                   </button>
+
                 ))}
+
               </div>
+
             </div>
 
             <div className="vnl-customize-section">
+
               <span className="vnl-customize-label">
                 Avatar Style
               </span>
 
               <div className="vnl-avatar-picker">
+
                 {[
                   ["classic", "Classic"],
                   ["soft", "Soft"],
                   ["retro", "Retro"],
                 ].map(([key, label]) => (
+
                   <button
                     key={key}
                     type="button"
@@ -985,20 +1188,29 @@ const EmployeeProfile = () => {
                       )
                     }
                   >
+
                     <span
                       className={`picker-avatar avatar-${key}`}
                     >
                       {initials}
                     </span>
 
-                    <strong>{label}</strong>
+                    <strong>
+                      {label}
+                    </strong>
+
                   </button>
+
                 ))}
+
               </div>
+
             </div>
 
             <div className="vnl-customize-section">
+
               <label className="vnl-quote-editor">
+
                 <span className="vnl-customize-label">
                   Your Work Line
                 </span>
@@ -1028,10 +1240,13 @@ const EmployeeProfile = () => {
                   }
                   /90
                 </small>
+
               </label>
+
             </div>
 
             <div className="vnl-customize-footer">
+
               <button
                 type="button"
                 className="vnl-customize-reset"
@@ -1052,18 +1267,28 @@ const EmployeeProfile = () => {
                 <Save size={17} />
                 Save Profile Style
               </button>
+
             </div>
+
           </div>
+
         </div>
+
       )}
+
     </div>
   );
 };
 
-const ProfileDetail = ({ label, value }) => (
+const ProfileDetail = ({
+  label,
+  value,
+}) => (
   <div className="vnl-profile-detail">
     <span>{label}</span>
-    <strong>{value || "-"}</strong>
+    <strong>
+      {value || "-"}
+    </strong>
   </div>
 );
 
@@ -1075,9 +1300,11 @@ const PasswordField = ({
   setVisible,
 }) => (
   <label className="vnl-password-field">
+
     <span>{label}</span>
 
     <div>
+
       <input
         type={visible ? "text" : "password"}
         value={value}
@@ -1090,16 +1317,22 @@ const PasswordField = ({
       <button
         type="button"
         onClick={() =>
-          setVisible((previous) => !previous)
+          setVisible(
+            (previous) => !previous
+          )
         }
       >
+
         {visible ? (
           <EyeOff size={18} />
         ) : (
           <Eye size={18} />
         )}
+
       </button>
+
     </div>
+
   </label>
 );
 

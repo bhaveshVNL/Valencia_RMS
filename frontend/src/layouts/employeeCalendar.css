@@ -2805,3 +2805,83 @@
     display: none !important;
   }
 }
+/* =========================================================
+   FINAL EMPLOYEE CALENDAR DATE NUMBER FIX
+========================================================= */
+
+.admin-main-calendar .admin-cal-week-row {
+  position: relative !important;
+}
+
+/* Date cells */
+.admin-main-calendar .admin-cal-days-row {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+}
+
+.admin-main-calendar .admin-cal-day {
+  position: relative !important;
+  pointer-events: auto !important;
+  overflow: visible !important;
+}
+
+/* Hide original span - we draw a guaranteed number instead */
+.admin-main-calendar .admin-cal-day-number {
+  display: none !important;
+}
+
+/* Guaranteed calendar number */
+.admin-main-calendar .admin-cal-day::before {
+  content: attr(data-day-number) !important;
+
+  position: absolute !important;
+  top: 10px !important;
+  left: 14px !important;
+
+  z-index: 999 !important;
+
+  display: block !important;
+
+  color: #344054 !important;
+
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  opacity: 1 !important;
+  visibility: visible !important;
+
+  pointer-events: none !important;
+}
+
+/* Previous / next month */
+.admin-main-calendar .admin-cal-day.outside::before {
+  color: #c1c7d0 !important;
+}
+
+/* Today */
+.admin-main-calendar .admin-cal-day.today::before {
+  color: #ff5733 !important;
+}
+
+/* Events must begin BELOW the number strip */
+.admin-main-calendar .admin-cal-event-layer {
+  position: absolute !important;
+
+  left: 0 !important;
+  right: 0 !important;
+
+  top: 43px !important;
+  bottom: 5px !important;
+
+  z-index: 20 !important;
+
+  pointer-events: none !important;
+}
+
+/* But event bars remain clickable */
+.admin-main-calendar .admin-cal-event-bar {
+  pointer-events: auto !important;
+}
