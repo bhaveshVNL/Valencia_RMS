@@ -1,3 +1,4 @@
+import EmployeeTasks from "../employee/employeeTasks";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   useLocation,
@@ -219,6 +220,7 @@ const requestedTaskId =
   );
   const [tasks, setTasks] = useState([]);
   const [admin, setAdmin] = useState(null);
+  const [taskView, setTaskView] = useState("admin");
 
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -744,21 +746,70 @@ useEffect(() => {
         ),
     },
   ];
+const taskModeSwitch = (
+  <div style={styles.taskModeSwitch}>
+    <button
+      type="button"
+      style={{
+        ...styles.taskModeButton,
+        ...(taskView === "admin"
+          ? styles.taskModeButtonActive
+          : {}),
+      }}
+      onClick={() => setTaskView("admin")}
+    >
+      Admin
+    </button>
 
+    <button
+      type="button"
+      style={{
+        ...styles.taskModeButton,
+        ...(taskView === "personal"
+          ? styles.taskModeButtonActive
+          : {}),
+      }}
+      onClick={() => setTaskView("personal")}
+    >
+      Personal
+    </button>
+  </div>
+);
   return (
-    <div style={styles.page}>
-      <div style={styles.topActions}>
-        <button
-          type="button"
-          style={styles.refreshButton}
-          onClick={fetchTasks}
-          disabled={loading}
-        >
-          {loading
-            ? "Refreshing..."
-            : "Refresh"}
-        </button>
-      </div>
+  <div style={styles.page}>
+
+    
+
+   {taskView === "personal" ? (
+  <EmployeeTasks
+    mode="admin-personal"
+    taskModeSwitch={taskModeSwitch}
+  />
+) : (
+  <>
+    <div style={styles.topActions}>
+  <input
+    style={styles.searchInput}
+    type="text"
+    placeholder="Search by project, Main Task, employee, email, status or Subtask..."
+    value={searchTerm}
+    onChange={(event) =>
+      setSearchTerm(event.target.value)
+    }
+  />
+
+  {taskModeSwitch}
+
+  <button
+    type="button"
+    style={styles.refreshButton}
+    onClick={fetchTasks}
+    disabled={loading}
+  >
+    {loading ? "Refreshing..." : "Refresh"}
+  </button>
+</div>
+        
 
       {error && (
         <div style={styles.errorBox}>
@@ -766,17 +817,7 @@ useEffect(() => {
         </div>
       )}
 
-      <input
-        style={styles.searchInput}
-        type="text"
-        placeholder="Search by project, Main Task, employee, email, status or Subtask..."
-        value={searchTerm}
-        onChange={(event) =>
-          setSearchTerm(
-            event.target.value
-          )
-        }
-      />
+    
 
       <section style={styles.kanbanSection}>
         <div style={styles.kanbanHeader}>
@@ -1701,9 +1742,13 @@ useEffect(() => {
 
           </div>
         </div>
-      )}
-    </div>
-  );
+           )}
+
+    </>
+  )}
+
+  </div>
+);
 };
 
 const styles = {
@@ -1712,22 +1757,63 @@ const styles = {
     paddingBottom: "32px",
   },
 
-  topActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    marginBottom: "14px",
-  },
+taskModeSwitch: {
+  display: "flex",
+  alignItems: "center",
+  padding: "4px",
+  background: "#ffffff",
+  border: "1px solid #e2e8f0",
+  borderRadius: "12px",
+  flexShrink: 0,
+},
 
-  refreshButton: {
-    border: "none",
-    borderRadius: "12px",
-    background: "#ff5733",
-    color: "#ffffff",
-    padding: "12px 20px",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
 
+taskModeButton: {
+  height: "38px",
+  minWidth: "92px",
+  padding: "0 16px",
+  border: "none",
+  borderRadius: "9px",
+  background: "transparent",
+  color: "#64748b",
+  fontSize: "13px",
+  fontWeight: 800,
+  cursor: "pointer",
+},
+
+taskModeButtonActive: {
+  background: "#fff0eb",
+  color: "#ff5733",
+},
+
+topActions: {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  flexWrap: "nowrap",
+  gap: "12px",
+  marginBottom: "18px",
+  boxSizing: "border-box",
+},
+
+refreshButton: {
+  height: "54px",
+  minWidth: "142px",
+  flexShrink: 0,
+  boxSizing: "border-box",
+  whiteSpace: "nowrap",
+
+  border: "none",
+  borderRadius: "16px",
+  background: "#ff5733",
+  color: "#ffffff",
+  padding: "0 20px",
+
+  fontSize: "14px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
   errorBox: {
     background: "#fff1f2",
     border: "1px solid #fecdd3",
@@ -1739,17 +1825,18 @@ const styles = {
   },
 
   searchInput: {
-    width: "100%",
-    height: "52px",
-    border: "1px solid #d8dee7",
-    borderRadius: "14px",
-    padding: "0 18px",
-    fontSize: "14px",
-    fontWeight: 700,
-    outline: "none",
-    marginBottom: "20px",
-    boxSizing: "border-box",
-  },
+     flex: 1,
+  minWidth: 0,
+  height: "54px",
+  border: "1px solid #d8dee7",
+  borderRadius: "16px",
+  padding: "0 18px",
+  fontSize: "14px",
+  fontWeight: 700,
+  outline: "none",
+  marginBottom: 0,
+  boxSizing: "border-box",
+},
 
   kanbanSection: {
     width: "100%",

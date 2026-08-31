@@ -134,50 +134,77 @@ const getMeetingEmployees = async (req, res) => {
 
     const [employees] = await db.query(
       `
-        SELECT
-          u.user_id,
-          u.employee_code,
-          u.full_name,
-          u.email,
-          u.designation,
-          u.department_id,
-          d.department_name,
-          LOWER(r.role_name) AS role_name
+      SELECT
+        u.user_id,
+        u.employee_code,
+        u.full_name,
+        u.email,
+        u.designation,
+        u.department_id,
 
-        FROM users u
+        d.department_name,
 
-        LEFT JOIN roles r
-          ON r.role_id = u.role_id
+        LOWER(r.role_name) AS role_name
 
-        LEFT JOIN departments d
-          ON d.department_id =
-          u.department_id
+      FROM users u
 
-        WHERE
-          (
-            (
-              u.department_id = ?
-              AND LOWER(r.role_name) = 'employee'
-            )
+      LEFT JOIN roles r
+        ON r.role_id = u.role_id
 
-            OR LOWER(r.role_name) = 'administrator'
-          )
+      LEFT JOIN departments d
+        ON d.department_id = u.department_id
 
-        AND LOWER(
+      WHERE
+        LOWER(
           COALESCE(
             u.status,
             'active'
           )
         ) != 'deleted'
 
-        ORDER BY
-          CASE
-            WHEN LOWER(r.role_name) = 'administrator'
-            THEN 0
-            ELSE 1
-          END,
+        AND LOWER(
+          COALESCE(
+            r.role_name,
+            ''
+          )
+        ) IN (
+          'employee',
+          'administrator'
+        )
 
-          u.full_name ASC
+      ORDER BY
+
+        /*
+        Logged-in Admin's department employees FIRST
+        */
+
+        CASE
+          WHEN
+            LOWER(r.role_name) = 'employee'
+            AND u.department_id = ?
+          THEN 0
+
+          /*
+          All remaining company employees SECOND
+          */
+
+          WHEN
+            LOWER(r.role_name) = 'employee'
+          THEN 1
+
+          /*
+          Administrator LAST
+          */
+
+          WHEN
+            LOWER(r.role_name) = 'administrator'
+          THEN 2
+
+          ELSE 3
+        END,
+
+        d.department_name ASC,
+        u.full_name ASC
       `,
       [user.department_id]
     );
@@ -201,7 +228,6 @@ const getMeetingEmployees = async (req, res) => {
     });
   }
 };
-
 /*
 ========================================================
 ADMIN - CREATE MEETING
@@ -326,18 +352,15 @@ const createMeeting = async (req, res) => {
         WHERE
           u.user_id IN (${placeholders})
 
-        AND (
-          (
-            u.department_id = ?
-            AND LOWER(
-              r.role_name
-            ) = 'employee'
-          )
-
-          OR LOWER(
-            r.role_name
-          ) = 'administrator'
-        )
+      AND LOWER(
+  COALESCE(
+    r.role_name,
+    ''
+  )
+) IN (
+  'employee',
+  'administrator'
+)
 
         AND LOWER(
           COALESCE(
@@ -348,7 +371,7 @@ const createMeeting = async (req, res) => {
         `,
         [
           ...employeeIds,
-          user.department_id,
+          
         ]
       );
 
@@ -1519,15 +1542,15 @@ WHERE id = ?
       WHERE
         u.user_id IN (${placeholders})
 
-      AND (
-        (
-          u.department_id = ?
-          AND LOWER(r.role_name) = 'employee'
-        )
-
-        OR LOWER(r.role_name) = 'administrator'
-      )
-
+      AND LOWER(
+  COALESCE(
+    r.role_name,
+    ''
+  )
+) IN (
+  'employee',
+  'administrator'
+)
       AND LOWER(
         COALESCE(
           u.status,
@@ -1537,7 +1560,7 @@ WHERE id = ?
     `,
     [
       ...employeeIds,
-      user.department_id,
+      
     ]
   );
 

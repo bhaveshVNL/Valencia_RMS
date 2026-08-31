@@ -3,6 +3,7 @@ import EmployeeMiniTasks from "../../components/MiniTasks/EmployeeMiniTasks";
 import {
   ArrowUpDown,
   CheckCircle2,
+   ChevronDown,
   Filter,
   Pause,
   Play,
@@ -380,8 +381,14 @@ const STATUS_SORT_RANK = {
 };
 
 
-const EmployeeTasks = () => {
+const EmployeeTasks = ({
+  mode = "employee",
+  taskModeSwitch = null,
+}) => {
+  const isAdminPersonal = mode === "admin-personal";
   const [tasks, setTasks] = useState([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+const [sortOpen, setSortOpen] = useState(false);
   const [mainTasks, setMainTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchText, setSearchText] = useState("");
@@ -912,33 +919,156 @@ if (selectedTask) {
         </div>
 
         <div style={styles.controlGroup}>
-          <div style={styles.selectWrap}>
-            <Filter size={17} color="#64748b" />
-            <select
-              style={styles.selectControl}
-              value={taskFilter}
-              onChange={(event) => setTaskFilter(event.target.value)}
-              aria-label="Filter tasks"
-            >
-              <option value="all">All ({filterCounts.all})</option>
-              <option value="rejected">Rejected ({filterCounts.rejected})</option>
-              <option value="on_hold">On Hold ({filterCounts.on_hold})</option>
-            </select>
-          </div>
+  {isAdminPersonal && taskModeSwitch}
 
-          <div style={styles.selectWrap}>
-            <ArrowUpDown size={17} color="#64748b" />
-            <select
-              style={styles.selectControl}
-              value={sortBy}
-              onChange={(event) => setSortBy(event.target.value)}
-              aria-label="Sort tasks"
-            >
-              <option value="deadline">Deadline</option>
-              <option value="recent_assigned">Recently Assigned</option>
-              <option value="recent_updated">Recently Updated</option>
-            </select>
-          </div>
+        <div
+  style={styles.customDropdown}
+  onBlur={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setFilterOpen(false);
+    }
+  }}
+>
+  <button
+    type="button"
+    style={styles.customDropdownButton}
+    onClick={() => {
+      setFilterOpen((previous) => !previous);
+      setSortOpen(false);
+    }}
+  >
+    <Filter size={17} color="#64748b" />
+
+    <span style={styles.customDropdownText}>
+      {taskFilter === "rejected"
+        ? `Rejected (${filterCounts.rejected})`
+        : taskFilter === "on_hold"
+        ? `On Hold (${filterCounts.on_hold})`
+        : `All (${filterCounts.all})`}
+    </span>
+
+    <ChevronDown
+      size={17}
+      style={{
+        ...styles.dropdownChevron,
+        transform: filterOpen
+          ? "rotate(180deg)"
+          : "rotate(0deg)",
+      }}
+    />
+  </button>
+
+  {filterOpen && (
+    <div style={styles.customDropdownMenu}>
+      {[
+        {
+          value: "all",
+          label: `All (${filterCounts.all})`,
+        },
+        {
+          value: "rejected",
+          label: `Rejected (${filterCounts.rejected})`,
+        },
+        {
+          value: "on_hold",
+          label: `On Hold (${filterCounts.on_hold})`,
+        },
+      ].map((option) => (
+        <button
+          type="button"
+          key={option.value}
+          style={{
+            ...styles.customDropdownItem,
+            ...(taskFilter === option.value
+              ? styles.customDropdownItemActive
+              : {}),
+          }}
+          onClick={() => {
+            setTaskFilter(option.value);
+            setFilterOpen(false);
+          }}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+
+<div
+  style={styles.customDropdown}
+  onBlur={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setSortOpen(false);
+    }
+  }}
+>
+  <button
+    type="button"
+    style={styles.customDropdownButton}
+    onClick={() => {
+      setSortOpen((previous) => !previous);
+      setFilterOpen(false);
+    }}
+  >
+    <ArrowUpDown size={17} color="#64748b" />
+
+    <span style={styles.customDropdownText}>
+      {sortBy === "recent_assigned"
+        ? "Recently Assigned"
+        : sortBy === "recent_updated"
+        ? "Recently Updated"
+        : "Deadline"}
+    </span>
+
+    <ChevronDown
+      size={17}
+      style={{
+        ...styles.dropdownChevron,
+        transform: sortOpen
+          ? "rotate(180deg)"
+          : "rotate(0deg)",
+      }}
+    />
+  </button>
+
+  {sortOpen && (
+    <div style={styles.customDropdownMenu}>
+      {[
+        {
+          value: "deadline",
+          label: "Deadline",
+        },
+        {
+          value: "recent_assigned",
+          label: "Recently Assigned",
+        },
+        {
+          value: "recent_updated",
+          label: "Recently Updated",
+        },
+      ].map((option) => (
+        <button
+          type="button"
+          key={option.value}
+          style={{
+            ...styles.customDropdownItem,
+            ...(sortBy === option.value
+              ? styles.customDropdownItemActive
+              : {}),
+          }}
+          onClick={() => {
+            setSortBy(option.value);
+            setSortOpen(false);
+          }}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+    
 
           <button
             type="button"
@@ -1265,7 +1395,10 @@ if (selectedTask) {
         }}
       >
         <CheckCircle2 size={14} />
-        Submit Review
+
+{isAdminPersonal
+  ? "Complete Task"
+  : "Submit Review"}
       </button>
     </div>
   )}
@@ -1286,9 +1419,11 @@ if (selectedTask) {
   ))}
 </section>
 
-      <div style={styles.miniTasksWrapper}>
-  <EmployeeMiniTasks />
-</div>
+      {!isAdminPersonal && (
+  <div style={styles.miniTasksWrapper}>
+    <EmployeeMiniTasks />
+  </div>
+)}
 
       {selectedTask && (
         <div style={styles.modalOverlay} onMouseDown={closeModal}>
@@ -1706,85 +1841,98 @@ const styles = {
   boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
 },
 
-  taskToolbar: {
-    width: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: "12px",
-    marginBottom: "18px",
-  },
+taskToolbar: {
+  width: "100%",
+  maxWidth: "100%",
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "nowrap",
+  gap: "12px",
+  marginBottom: "18px",
+  boxSizing: "border-box",
+  overflow: "visible",
+},
 
-  kanbanSearchBox: {
-    flex: "1 1 420px",
-    minWidth: "280px",
-    maxWidth: "720px",
-    height: "54px",
-    border: "1px solid #d1d5db",
-    borderRadius: "16px",
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "0 18px",
-    background: "#ffffff",
-  },
+kanbanSearchBox: {
+  flex: "1 1 0",
+  minWidth: 0,
+  height: "54px",
+  border: "1px solid #d8dee7",
+  borderRadius: "16px",
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  padding: "0 18px",
+  background: "#ffffff",
+  boxSizing: "border-box",
+},
 
   searchInput: {
-    width: "100%",
-    border: "none",
-    outline: "none",
-    color: "#111827",
-    fontSize: "14px",
-    fontWeight: 700,
-    background: "transparent",
-  },
+  width: "100%",
+  border: "none",
+  outline: "none",
+  color: "#111827",
+  fontSize: "14px",
+  fontWeight: 700,
+  background: "transparent",
+},
 
-  controlGroup: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "10px",
-  },
+ controlGroup: {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "nowrap",
+  gap: "12px",
+  flexShrink: 0,
+},
+selectWrap: {
+  width: "180px",
+  minWidth: "180px",
+  height: "54px",
+  border: "1px solid #d8dee7",
+  borderRadius: "16px",
+  background: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "0 14px",
+  boxSizing: "border-box",
+},
+selectControl: {
+  width: "100%",
+  height: "100%",
+  border: "none",
+  outline: "none",
+  background: "transparent",
+  color: "#111827",
+  fontSize: "14px",
+  fontWeight: 800,
+  cursor: "pointer",
+},
 
-  selectWrap: {
-    height: "54px",
-    border: "1px solid #d1d5db",
-    borderRadius: "16px",
-    background: "#ffffff",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "0 12px 0 14px",
-  },
+refreshBtn: {
+  height: "54px",
+  width: "138px",
+  minWidth: "138px",
+  flexShrink: 0,
 
-  selectControl: {
-    height: "100%",
-    border: "none",
-    outline: "none",
-    background: "transparent",
-    color: "#111827",
-    fontSize: "13px",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
+  border: "none",
+  background: "#ff5733",
+  color: "#ffffff",
+  borderRadius: "16px",
+  padding: "0 16px",
 
-  refreshBtn: {
-    height: "54px",
-    border: "none",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "16px",
-    padding: "0 20px",
-    fontSize: "14px",
-    fontWeight: 900,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "9px",
-    cursor: "pointer",
-    boxShadow: "0 8px 20px rgba(255, 87, 51, 0.18)",
-  },
+  fontSize: "14px",
+  fontWeight: 900,
+
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+
+  whiteSpace: "nowrap",
+  boxSizing: "border-box",
+  cursor: "pointer",
+},
 
   errorBox: {
     background: "#fff1f2",
@@ -2692,6 +2840,100 @@ cancelModalButton: {
   fontSize: "15px",
   fontWeight: 900,
   cursor: "pointer",
+},
+
+customDropdown: {
+  position: "relative",
+  width: "180px",
+  minWidth: "180px",
+  height: "54px",
+  flexShrink: 0,
+},
+
+customDropdownButton: {
+  width: "100%",
+  height: "54px",
+  boxSizing: "border-box",
+
+  border: "1px solid #d8dee7",
+  borderRadius: "16px",
+  background: "#ffffff",
+
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+
+  padding: "0 14px",
+
+  color: "#111827",
+  cursor: "pointer",
+  outline: "none",
+},
+
+customDropdownText: {
+  flex: 1,
+  minWidth: 0,
+
+  textAlign: "left",
+
+  color: "#111827",
+  fontSize: "14px",
+  fontWeight: 800,
+
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+},
+
+dropdownChevron: {
+  color: "#111827",
+  flexShrink: 0,
+  transition: "transform 0.18s ease",
+},
+
+customDropdownMenu: {
+  position: "absolute",
+  top: "calc(100% + 8px)",
+  left: 0,
+
+  width: "100%",
+  boxSizing: "border-box",
+
+  padding: "6px",
+
+  background: "#ffffff",
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+
+  boxShadow:
+    "0 14px 35px rgba(15, 23, 42, 0.14)",
+
+  zIndex: 5000,
+},
+
+customDropdownItem: {
+  width: "100%",
+  minHeight: "42px",
+
+  border: "none",
+  borderRadius: "10px",
+
+  padding: "0 12px",
+
+  background: "#ffffff",
+  color: "#475569",
+
+  textAlign: "left",
+
+  fontSize: "13px",
+  fontWeight: 800,
+
+  cursor: "pointer",
+},
+
+customDropdownItemActive: {
+  background: "#fff0eb",
+  color: "#ff5733",
 },
 };     
 
