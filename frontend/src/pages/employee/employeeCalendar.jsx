@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Plus,
   X,
   CalendarDays,
 } from "lucide-react";
@@ -124,6 +125,33 @@ const EmployeeCalendar = () => {
 
   const [activeFilter, setActiveFilter] = useState("all");
 
+const [employees, setEmployees] =
+  useState([]);
+
+const [showMeeting, setShowMeeting] =
+  useState(false);
+
+const [
+  selectedEmployees,
+  setSelectedEmployees,
+] = useState([]);
+
+const [
+  savingMeeting,
+  setSavingMeeting,
+] = useState(false);
+const [successMessage, setSuccessMessage] =
+  useState("");
+const [
+  meetingForm,
+  setMeetingForm,
+] = useState({
+  title: "",
+  description: "",
+  date: "",
+  start_time: "",
+  end_time: "",
+});
 
   
 
@@ -162,9 +190,42 @@ const EmployeeCalendar = () => {
     }
   };
 
+  const loadEmployees = async () => {
+  try {
+    const response =
+      await fetch(
+        `${API}/calendar/employees`,
+        {
+          headers:
+            getAuthHeaders(),
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (data.success) {
+      setEmployees(
+        data.employees || []
+      );
+    } else {
+      console.error(
+        "Meeting employees error:",
+        data.message
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Employee loading error:",
+      error
+    );
+  }
+};
+
 
 useEffect(() => {
   loadCalendar();
+  loadEmployees();
 }, []);
 
   /* =========================================================
@@ -600,8 +661,232 @@ events.mini_tasks.forEach((item) => {
       new Date(year, month + 1, 1)
     );
   };
+  /* =========================================================
+   EMPLOYEE SCHEDULE MEETING
+========================================================= */
 
- 
+const openMeeting = (
+  date = ""
+) => {
+  setMeetingForm({
+    title: "",
+    description: "",
+
+    date:
+      date ||
+      selectedDate ||
+      todayString,
+
+    start_time: "",
+    end_time: "",
+  });
+
+  setSelectedEmployees([]);
+
+  setShowMeeting(true);
+};
+
+const closeMeeting = () => {
+  if (savingMeeting) {
+    return;
+  }
+
+  setShowMeeting(false);
+
+  setSelectedEmployees([]);
+};
+
+const toggleEmployee = (
+  employeeId
+) => {
+  setSelectedEmployees(
+    (previous) =>
+      previous.includes(
+        employeeId
+      )
+        ? previous.filter(
+            (id) =>
+              id !== employeeId
+          )
+        : [
+            ...previous,
+            employeeId,
+          ]
+  );
+};
+
+const allSelectableIds =
+  employees
+    .map((employee) =>
+      Number(
+        employee.user_id ??
+          employee.id
+      )
+    )
+    .filter(
+      (id) =>
+        !Number.isNaN(id)
+    );
+
+const allSelected =
+  allSelectableIds.length > 0 &&
+  allSelectableIds.every(
+    (id) =>
+      selectedEmployees.includes(
+        id
+      )
+  );
+
+const toggleAllEmployees =
+  () => {
+    if (allSelected) {
+      setSelectedEmployees([]);
+    } else {
+      setSelectedEmployees(
+        allSelectableIds
+      );
+    }
+  };
+
+const createMeeting =
+  async () => {
+    if (
+      !meetingForm.title.trim()
+    ) {
+      alert(
+        "Please enter the meeting title."
+      );
+
+      return;
+    }
+
+    if (!meetingForm.date) {
+      alert(
+        "Please select the meeting date."
+      );
+
+      return;
+    }
+
+    if (
+      !meetingForm.start_time
+    ) {
+      alert(
+        "Please select start time."
+      );
+
+      return;
+    }
+
+    if (
+      !meetingForm.end_time
+    ) {
+      alert(
+        "Please select end time."
+      );
+
+      return;
+    }
+
+    if (
+      meetingForm.end_time <=
+      meetingForm.start_time
+    ) {
+      alert(
+        "End time must be later than start time."
+      );
+
+      return;
+    }
+
+    if (
+      selectedEmployees.length ===
+      0
+    ) {
+      alert(
+        "Please select at least one employee."
+      );
+
+      return;
+    }
+
+    try {
+      setSavingMeeting(true);
+
+      const response =
+        await fetch(
+          `${API}/calendar/meetings`,
+          {
+            method: "POST",
+
+            headers:
+              getAuthHeaders(),
+
+            body:
+              JSON.stringify({
+                title:
+                  meetingForm.title.trim(),
+
+                description:
+                  meetingForm.description.trim(),
+
+                meeting_date:
+                  meetingForm.date,
+
+                start_time:
+                  meetingForm.start_time,
+
+                end_time:
+                  meetingForm.end_time,
+
+                employee_ids:
+                  selectedEmployees,
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!data.success) {
+        alert(
+          data.message ||
+            "Unable to schedule meeting."
+        );
+
+        return;
+      }
+
+      setShowMeeting(false);
+
+      setSelectedEmployees(
+        []
+      );
+
+      await loadCalendar();
+
+setSuccessMessage(
+  "Meeting scheduled successfully."
+);
+
+setTimeout(() => {
+  setSuccessMessage("");
+}, 3000);
+    } catch (error) {
+      console.error(
+        "Create meeting error:",
+        error
+      );
+
+      alert(
+        "Something went wrong while scheduling the meeting."
+      );
+    } finally {
+      setSavingMeeting(
+        false
+      );
+    }
+  };
 
   const renderDetailSection = (
     title,
@@ -705,6 +990,28 @@ events.mini_tasks.forEach((item) => {
 
   return (
   <div className="admin-main-calendar">
+    {successMessage && (
+  <div className="calendar-success-toast">
+    <div className="calendar-success-icon">
+      ✓
+    </div>
+
+    <div className="calendar-success-content">
+      <strong>Meeting Scheduled</strong>
+      <p>{successMessage}</p>
+    </div>
+
+    <button
+      type="button"
+      className="calendar-success-close"
+      onClick={() =>
+        setSuccessMessage("")
+      }
+    >
+      ×
+    </button>
+  </div>
+)}
     <div
       className="admin-cal-page"
       style={{
@@ -814,9 +1121,19 @@ events.mini_tasks.forEach((item) => {
                 year: "numeric",
               })}
             </span>
-          </div>
-
           
+          </div>
+          <button
+  type="button"
+  className="admin-cal-schedule-main"
+  onClick={() =>
+    openMeeting()
+  }
+>
+  <Plus size={17} />
+
+  Schedule Meeting
+</button>
         </div>
 
         {/* =============== CALENDAR LAYOUT =============== */}
@@ -1084,7 +1401,241 @@ events.mini_tasks.forEach((item) => {
           )}
         </div>
       </div>
+{showMeeting && (
+  <div
+    className="admin-cal-modal-overlay"
+    onMouseDown={(event) => {
+      if (
+        event.target ===
+        event.currentTarget
+      ) {
+        closeMeeting();
+      }
+    }}
+  >
+    <div className="admin-cal-modal">
+      <div className="admin-cal-modal-header">
+        <h2>
+          Schedule Meeting
+        </h2>
 
+        <button
+          type="button"
+          onClick={closeMeeting}
+        >
+          <X size={19} />
+        </button>
+      </div>
+
+      <div className="admin-cal-modal-content">
+        <div className="admin-cal-form-field">
+          <label>
+            Meeting Title
+            <span>*</span>
+          </label>
+
+          <input
+            type="text"
+            placeholder="Project Review Meeting"
+            value={
+              meetingForm.title
+            }
+            onChange={(event) =>
+              setMeetingForm({
+                ...meetingForm,
+
+                title:
+                  event.target
+                    .value,
+              })
+            }
+          />
+        </div>
+
+        <div className="admin-cal-form-field">
+          <label>
+            Description / Notes
+          </label>
+
+          <textarea
+            placeholder="Meeting notes..."
+            value={
+              meetingForm.description
+            }
+            onChange={(event) =>
+              setMeetingForm({
+                ...meetingForm,
+
+                description:
+                  event.target
+                    .value,
+              })
+            }
+          />
+        </div>
+
+        <div className="admin-cal-form-field admin-cal-date-field">
+          <label>
+            Date
+            <span>*</span>
+          </label>
+
+          <input
+            type="date"
+            value={
+              meetingForm.date
+            }
+            onChange={(event) =>
+              setMeetingForm({
+                ...meetingForm,
+
+                date:
+                  event.target
+                    .value,
+              })
+            }
+          />
+        </div>
+
+        <div className="admin-cal-time-row">
+          <div className="admin-cal-form-field">
+            <label>
+              Start Time
+              <span>*</span>
+            </label>
+
+            <input
+              type="time"
+              value={
+                meetingForm.start_time
+              }
+              onChange={(event) =>
+                setMeetingForm({
+                  ...meetingForm,
+
+                  start_time:
+                    event.target
+                      .value,
+                })
+              }
+            />
+          </div>
+
+          <div className="admin-cal-form-field">
+            <label>
+              End Time
+              <span>*</span>
+            </label>
+
+            <input
+              type="time"
+              value={
+                meetingForm.end_time
+              }
+              onChange={(event) =>
+                setMeetingForm({
+                  ...meetingForm,
+
+                  end_time:
+                    event.target
+                      .value,
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="admin-cal-employee-block">
+          <div className="admin-cal-employee-heading">
+            <label>
+              Select Employees
+              <span>*</span>
+            </label>
+
+            <button
+              type="button"
+              onClick={
+                toggleAllEmployees
+              }
+            >
+              {allSelected
+                ? "Clear All"
+                : "Select All"}
+            </button>
+          </div>
+
+          <div className="admin-cal-employee-list">
+            {employees.map(
+              (employee) => {
+                const employeeId =
+                  Number(
+                    employee.user_id ??
+                      employee.id
+                  );
+
+                return (
+                  <label
+                    className="admin-cal-employee-option"
+                    key={
+                      employeeId
+                    }
+                  >
+                    <input
+                      type="checkbox"
+
+                      checked={selectedEmployees.includes(
+                        employeeId
+                      )}
+
+                      onChange={() =>
+                        toggleEmployee(
+                          employeeId
+                        )
+                      }
+                    />
+
+                    <span>
+                      {employee.full_name ||
+                        employee.name ||
+                        employee.email}
+                    </span>
+                  </label>
+                );
+              }
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="admin-cal-modal-footer">
+        <button
+          type="button"
+          className="admin-cal-modal-cancel"
+          onClick={
+            closeMeeting
+          }
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          className="admin-cal-modal-save"
+          disabled={
+            savingMeeting
+          }
+          onClick={
+            createMeeting
+          }
+        >
+          {savingMeeting
+            ? "Scheduling..."
+            : "Schedule Meeting"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
       </div>

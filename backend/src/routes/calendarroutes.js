@@ -42,14 +42,20 @@ router.get(
 router.get(
   "/employees",
   authMiddleware,
-  requireRole("admin"),
+  requireRole(
+    "admin",
+    "employee"
+  ),
   getMeetingEmployees
 );
 
 router.post(
   "/meetings",
   authMiddleware,
-  requireRole("admin"),
+  requireRole(
+    "admin",
+    "employee"
+  ),
   createMeeting
 );
 

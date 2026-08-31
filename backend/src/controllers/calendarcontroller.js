@@ -122,15 +122,24 @@ const getMeetingEmployees = async (req, res) => {
         });
     }
 
-    if (
-      String(user.role_name).toLowerCase() !==
-      "admin"
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Admin access required.",
-      });
-    }
+    const roleName =
+  String(
+    user.role_name || ""
+  ).toLowerCase();
+
+if (
+  ![
+    "admin",
+    "employee",
+  ].includes(roleName)
+) {
+  return res.status(403).json({
+    success: false,
+    message:
+      "Calendar meeting access denied.",
+  });
+}
+
 
     const [employees] = await db.query(
       `
@@ -251,17 +260,24 @@ const createMeeting = async (req, res) => {
         });
     }
 
-    if (
-      String(
-        user.role_name
-      ).toLowerCase() !== "admin"
-    ) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Admin access required.",
-      });
-    }
+    const roleName =
+  String(
+    user.role_name || ""
+  ).toLowerCase();
+
+if (
+  ![
+    "admin",
+    "employee",
+  ].includes(roleName)
+) {
+  return res.status(403).json({
+    success: false,
+    message:
+      "You do not have permission to schedule meetings.",
+  });
+}
+
 
     const {
       title,
@@ -1222,68 +1238,79 @@ const getEmployeeCalendar = async (req, res) => {
     */
 
     const [meetings] = await db.query(
-      `
-      SELECT
-        m.id AS id,
+  `
+  SELECT
+    m.id AS id,
 
-        m.title,
+    m.title,
 
-        m.description,
+    m.description,
 
-        DATE_FORMAT(
-          m.meeting_date,
-          '%Y-%m-%d'
-        ) AS meeting_date,
+    m.created_by,
 
-        TIME_FORMAT(
-          m.start_time,
-          '%H:%i'
-        ) AS start_time,
+    DATE_FORMAT(
+      m.meeting_date,
+      '%Y-%m-%d'
+    ) AS meeting_date,
 
-        TIME_FORMAT(
-          m.end_time,
-          '%H:%i'
-        ) AS end_time,
+    TIME_FORMAT(
+      m.start_time,
+      '%H:%i'
+    ) AS start_time,
 
-        m.status,
+    TIME_FORMAT(
+      m.end_time,
+      '%H:%i'
+    ) AS end_time,
 
-        creator.full_name
-          AS created_by_name,
+    m.status,
 
-        GROUP_CONCAT(
-          DISTINCT participant.full_name
-          ORDER BY participant.full_name
-          SEPARATOR ', '
-        ) AS participants
+    creator.full_name
+      AS created_by_name,
 
-      FROM meetings m
+    GROUP_CONCAT(
+      DISTINCT participant.full_name
+      ORDER BY participant.full_name
+      SEPARATOR ', '
+    ) AS participants
 
-      INNER JOIN meeting_employees mine
-        ON mine.meeting_id = m.id
+  FROM meetings m
 
-      LEFT JOIN users creator
-        ON creator.user_id =
-           m.created_by
+  LEFT JOIN meeting_employees mine
+    ON mine.meeting_id = m.id
 
-      LEFT JOIN meeting_employees all_me
-        ON all_me.meeting_id = m.id
+    AND mine.employee_id = ?
 
-      LEFT JOIN users participant
-        ON participant.user_id =
-           all_me.employee_id
+  LEFT JOIN users creator
+    ON creator.user_id =
+       m.created_by
 
-      WHERE
-        mine.employee_id = ?
+  LEFT JOIN meeting_employees all_me
+    ON all_me.meeting_id = m.id
 
-      GROUP BY
-        m.id
+  LEFT JOIN users participant
+    ON participant.user_id =
+       all_me.employee_id
 
-      ORDER BY
-        m.meeting_date ASC,
-        m.start_time ASC
-      `,
-      [employeeId]
-    );
+  WHERE
+    (
+      mine.employee_id IS NOT NULL
+
+      OR m.created_by = ?
+    )
+
+  GROUP BY
+    m.id
+
+  ORDER BY
+    m.meeting_date ASC,
+    m.start_time ASC
+  `,
+  [
+    employeeId,
+    employeeId,
+  ]
+);
 
     /*
     ========================================================

@@ -49,7 +49,26 @@ const AdminAttendance = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [fieldVisitMode, setFieldVisitMode] = useState("team");
+const [teamVisits, setTeamVisits] = useState([]);
+const [myVisits, setMyVisits] = useState([]);
+const [visitSearch, setVisitSearch] = useState("");
+const [visitStatus, setVisitStatus] = useState("all");
+const [visitLoading, setVisitLoading] = useState(false);
+const [visitError, setVisitError] = useState("");
+const [visitMessage, setVisitMessage] = useState("");
 
+const [showVisitModal, setShowVisitModal] = useState(false);
+const [savingVisit, setSavingVisit] = useState(false);
+
+const [visitForm, setVisitForm] = useState({
+  visit_type: "Sales Visit",
+  visit_date: "",
+  start_time: "",
+  end_time: "",
+  location: "",
+  comment: "",
+});
   const fetchAttendance = async () => {
     try {
       setLoading(true);
@@ -73,7 +92,175 @@ const AdminAttendance = () => {
       setLoading(false);
     }
   };
+const fetchTeamVisits = async () => {
+  try {
+    setVisitLoading(true);
+    setVisitError("");
 
+    const response = await api.get(
+      "/admin-attendance/field-visits"
+    );
+
+    let visits = Array.isArray(response.data?.visits)
+      ? response.data.visits
+      : [];
+
+    // Do not show Admin's own visit under Team Visits.
+    const adminId = Number(myAttendance?.user_id || 0);
+
+    if (adminId) {
+      visits = visits.filter(
+        (visit) => Number(visit.employee_id) !== adminId
+      );
+    }
+
+    setTeamVisits(visits);
+  } catch (err) {
+    console.error("Fetch team field visits error:", err);
+
+    setVisitError(
+      err?.response?.data?.message ||
+        "Failed to fetch team field visits."
+    );
+  } finally {
+    setVisitLoading(false);
+  }
+};
+
+const fetchMyVisits = async () => {
+  try {
+    setVisitLoading(true);
+    setVisitError("");
+
+    const response = await api.get(
+      "/admin-attendance/field-visits/my"
+    );
+
+    setMyVisits(
+      Array.isArray(response.data?.visits)
+        ? response.data.visits
+        : []
+    );
+  } catch (err) {
+    console.error("Fetch Admin field visits error:", err);
+
+    setVisitError(
+      err?.response?.data?.message ||
+        "Failed to fetch your field visits."
+    );
+  } finally {
+    setVisitLoading(false);
+  }
+};
+
+const fetchFieldVisits = async () => {
+  await Promise.all([
+    fetchTeamVisits(),
+    fetchMyVisits(),
+  ]);
+};
+
+const submitAdminVisit = async () => {
+  setVisitError("");
+  setVisitMessage("");
+
+  if (
+    !visitForm.visit_date ||
+    !visitForm.start_time ||
+    !visitForm.end_time ||
+    !visitForm.location.trim() ||
+    !visitForm.comment.trim()
+  ) {
+    setVisitError("Please fill all required fields.");
+    return;
+  }
+
+  if (visitForm.end_time <= visitForm.start_time) {
+    setVisitError("End time must be later than start time.");
+    return;
+  }
+
+  try {
+    setSavingVisit(true);
+
+    await api.post(
+      "/admin-attendance/field-visits",
+      {
+        visit_type: visitForm.visit_type,
+        visit_date: visitForm.visit_date,
+        start_time: visitForm.start_time,
+        end_time: visitForm.end_time,
+        location: visitForm.location.trim(),
+        comment: visitForm.comment.trim(),
+      }
+    );
+
+    setVisitForm({
+      visit_type: "Sales Visit",
+      visit_date: "",
+      start_time: "",
+      end_time: "",
+      location: "",
+      comment: "",
+    });
+
+    setShowVisitModal(false);
+    setFieldVisitMode("my");
+    setVisitMessage("Field visit added successfully.");
+
+    await fetchMyVisits();
+  } catch (err) {
+    setVisitError(
+      err?.response?.data?.message ||
+        "Failed to add field visit."
+    );
+  } finally {
+    setSavingVisit(false);
+  }
+};
+
+const reviewVisit = async (visit, status) => {
+  let remark = "";
+
+  if (status === "rejected") {
+    remark = window.prompt(
+      `Reason for rejecting ${visit.full_name || "employee"}'s visit:`
+    );
+
+    if (remark === null) return;
+
+    if (!remark.trim()) {
+      setVisitError("Rejection remark is required.");
+      return;
+    }
+  }
+
+  try {
+    setVisitError("");
+    setVisitMessage("");
+
+    await api.post(
+      `/admin-attendance/field-visits/${visit.visit_id}/review`,
+      {
+        status,
+        review_remark: remark.trim(),
+      }
+    );
+
+    setVisitMessage(
+      status === "approved"
+        ? "Field visit approved successfully."
+        : "Field visit rejected."
+    );
+
+    await fetchTeamVisits();
+  } catch (err) {
+    setVisitError(
+      err?.response?.data?.message ||
+        "Failed to review field visit."
+    );
+  }
+};
   useEffect(() => {
     fetchAttendance();
   }, []);
@@ -95,6 +282,101 @@ const AdminAttendance = () => {
   const myRecords = useMemo(() => {
     return Array.isArray(myAttendance?.records) ? myAttendance.records : [];
   }, [myAttendance]);
+  const currentVisits =
+  fieldVisitMode === "team" ? teamVisits : myVisits;
+
+const visitSummary = useMemo(() => {
+  return {
+    total: currentVisits.length,
+
+    approved: currentVisits.filter(
+      (visit) => String(visit.status).toLowerCase() === "approved"
+    ).length,
+
+    pending: currentVisits.filter(
+      (visit) => String(visit.status).toLowerCase() === "pending"
+    ).length,
+
+    rejected: currentVisits.filter(
+      (visit) => String(visit.status).toLowerCase() === "rejected"
+    ).length,
+  };
+}, [currentVisits]);
+
+const filteredVisits = useMemo(() => {
+  const query = visitSearch.trim().toLowerCase();
+
+  return currentVisits.filter((visit) => {
+    const status = String(visit.status || "").toLowerCase();
+
+    const matchesStatus =
+      visitStatus === "all" || status === visitStatus;
+
+    const searchable = [
+      visit.full_name,
+      visit.employee_code,
+      visit.visit_type,
+      visit.visit_date,
+      visit.start_time,
+      visit.end_time,
+      visit.location,
+      visit.comment,
+      visit.status,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return (
+      matchesStatus &&
+      (!query || searchable.includes(query))
+    );
+  });
+}, [currentVisits, visitSearch, visitStatus]);
+
+const employeeVisitSummary = useMemo(() => {
+  const map = {};
+
+  teamVisits.forEach((visit) => {
+    const id = visit.employee_id;
+
+    if (!map[id]) {
+      map[id] = {
+        employee_id: id,
+        full_name: visit.full_name || "Employee",
+        employee_code: visit.employee_code || "-",
+        total: 0,
+        approved: 0,
+        pending: 0,
+        rejected: 0,
+      };
+    }
+
+    map[id].total += 1;
+
+    const status = String(visit.status || "").toLowerCase();
+
+    if (status === "approved") map[id].approved += 1;
+    if (status === "pending") map[id].pending += 1;
+    if (status === "rejected") map[id].rejected += 1;
+  });
+
+  return Object.values(map);
+}, [teamVisits]);
+const pendingTeamVisits = useMemo(() => {
+  return teamVisits.filter(
+    (visit) =>
+      String(visit.status || "").toLowerCase() === "pending"
+  );
+}, [teamVisits]);
+useEffect(() => {
+  if (!visitMessage) return;
+
+  const timer = setTimeout(() => {
+    setVisitMessage("");
+  }, 3000);
+
+  return () => clearTimeout(timer);
+}, [visitMessage]);
 
   const EmployeeCard = ({ employee }) => {
     return (
@@ -155,6 +437,21 @@ const AdminAttendance = () => {
         >
           Employee Summary
         </button>
+
+        <button
+  type="button"
+  style={
+    activeTab === "fieldVisits"
+      ? styles.activeTabButton
+      : styles.tabButton
+  }
+  onClick={() => {
+    setActiveTab("fieldVisits");
+    fetchFieldVisits();
+  }}
+>
+  Field Visits
+</button>
       </section>
 
       {activeTab === "myAttendance" && (
@@ -290,6 +587,733 @@ const AdminAttendance = () => {
           )}
         </section>
       )}
+     {activeTab === "fieldVisits" && (
+  <section style={styles.contentBlock}>
+    {/* HEADER */}
+    <div style={styles.visitHeader}>
+      <div>
+        <h2 style={styles.sectionTitle}>Field Visits</h2>
+
+        <p style={styles.sectionSubtitle}>
+          Manage your department field visits and your own visits.
+        </p>
+      </div>
+
+    <div style={styles.visitHeaderActions}>
+  {fieldVisitMode === "my" && (
+    <button
+      type="button"
+      style={styles.outlineVisitButton}
+      onClick={() => {
+        setVisitError("");
+        setVisitMessage("");
+        setShowVisitModal(true);
+      }}
+    >
+      + Add Visit
+    </button>
+  )}
+
+  <button
+    type="button"
+    style={styles.refreshButton}
+    onClick={fetchFieldVisits}
+  >
+    Refresh
+  </button>
+</div>
+    </div>
+
+    {/* TEAM / MY */}
+    <div style={styles.visitSwitch}>
+      <button
+        type="button"
+        style={{
+          ...styles.visitSwitchButton,
+          ...(fieldVisitMode === "team"
+            ? styles.visitSwitchActive
+            : {}),
+        }}
+        onClick={() => {
+          setFieldVisitMode("team");
+          setVisitSearch("");
+          setVisitStatus("all");
+          fetchTeamVisits();
+        }}
+      >
+        Team Visits
+      </button>
+
+      <button
+        type="button"
+        style={{
+          ...styles.visitSwitchButton,
+          ...(fieldVisitMode === "my"
+            ? styles.visitSwitchActive
+            : {}),
+        }}
+        onClick={() => {
+          setFieldVisitMode("my");
+          setVisitSearch("");
+          setVisitStatus("all");
+          fetchMyVisits();
+        }}
+      >
+        My Visits
+      </button>
+    </div>
+
+    {visitError && (
+      <div style={styles.errorBox}>
+        {visitError}
+      </div>
+    )}
+
+    {visitMessage && (
+      <div style={styles.visitSuccessBox}>
+        {visitMessage}
+      </div>
+    )}
+
+    {/* =====================================================
+        TEAM VISITS
+    ===================================================== */}
+
+    {fieldVisitMode === "team" && (
+      <>
+        {/* 1. ACTION REQUIRED FIRST */}
+        <div style={styles.actionSection}>
+          <div style={styles.actionSectionHeader}>
+            <div>
+              <h3 style={styles.actionSectionTitle}>
+                Action Required
+              </h3>
+
+              <p style={styles.sectionSubtitle}>
+                Pending field visits waiting for your review.
+              </p>
+            </div>
+
+            <span style={styles.actionCount}>
+              {pendingTeamVisits.length} Pending
+            </span>
+          </div>
+
+          <div style={styles.visitTableBox}>
+            {visitLoading ? (
+              <div style={styles.emptyBox}>
+                Loading pending visits...
+              </div>
+            ) : pendingTeamVisits.length === 0 ? (
+              <div style={styles.noActionBox}>
+                No pending field visits. You're all caught up.
+              </div>
+            ) : (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Employee</th>
+                    <th style={styles.th}>Date</th>
+                    <th style={styles.th}>Visit Details</th>
+                    <th style={styles.actionTh}>Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {pendingTeamVisits.map((visit) => (
+                    <tr key={visit.visit_id}>
+                      <td style={styles.td}>
+                        <strong>
+                          {visit.full_name || "-"}
+                        </strong>
+
+                        {visit.employee_code && (
+                          <div style={styles.visitSecondaryText}>
+                            Code: {visit.employee_code}
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={styles.td}>
+                        <strong>
+                          {visit.visit_date || "-"}
+                        </strong>
+                      </td>
+
+                      <td style={styles.visitDetailsTd}>
+                        <strong style={styles.visitTypeText}>
+                          {visit.visit_type || "-"}
+                        </strong>
+
+                        <div style={styles.visitDetailLine}>
+                          {visit.start_time || "-"} -{" "}
+                          {visit.end_time || "-"}
+                        </div>
+
+                        <div style={styles.visitDetailLine}>
+                          {visit.location || "-"}
+                        </div>
+
+                        <div style={styles.visitReasonText}>
+                          {visit.comment || "-"}
+                        </div>
+                      </td>
+
+                      <td style={styles.actionTd}>
+                        <div style={styles.visitActionButtons}>
+                          <button
+                            type="button"
+                            style={styles.approveVisitButton}
+                            onClick={() =>
+                              reviewVisit(visit, "approved")
+                            }
+                          >
+                            Approve
+                          </button>
+
+                          <button
+                            type="button"
+                            style={styles.rejectVisitButton}
+                            onClick={() =>
+                              reviewVisit(visit, "rejected")
+                            }
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* 2. TOTAL SUMMARY */}
+        <div style={styles.visitStatsGrid}>
+          <SummaryBox
+            label="Total Visits"
+            value={visitSummary.total}
+          />
+
+          <SummaryBox
+            label="Approved"
+            value={visitSummary.approved}
+          />
+
+          <SummaryBox
+            label="Pending"
+            value={visitSummary.pending}
+          />
+
+          <SummaryBox
+            label="Rejected"
+            value={visitSummary.rejected}
+          />
+        </div>
+
+        {/* 3. ALL FIELD VISITS */}
+        <div style={styles.allVisitsHeader}>
+          <div>
+            <h3 style={styles.visitSubTitle}>
+              All Field Visits
+            </h3>
+
+            <p style={styles.sectionSubtitle}>
+              Complete history of your department field visits.
+            </p>
+          </div>
+        </div>
+
+        <div style={styles.visitFilterRow}>
+          <input
+            type="text"
+            style={styles.visitSearchInput}
+            placeholder="Search employee, location, reason..."
+            value={visitSearch}
+            onChange={(event) =>
+              setVisitSearch(event.target.value)
+            }
+          />
+
+          <select
+            style={styles.visitStatusSelect}
+            value={visitStatus}
+            onChange={(event) =>
+              setVisitStatus(event.target.value)
+            }
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <div style={styles.visitTableBox}>
+          {visitLoading ? (
+            <div style={styles.emptyBox}>
+              Loading field visits...
+            </div>
+          ) : filteredVisits.length === 0 ? (
+            <div style={styles.emptyBox}>
+              No field visits found.
+            </div>
+          ) : (
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Employee</th>
+                  <th style={styles.th}>Date</th>
+                  <th style={styles.th}>Visit Details</th>
+                  <th style={styles.th}>Status</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredVisits.map((visit) => {
+                  const status = String(
+                    visit.status || "pending"
+                  ).toLowerCase();
+
+                  return (
+                    <tr key={visit.visit_id}>
+                      <td style={styles.td}>
+                        <strong>
+                          {visit.full_name || "-"}
+                        </strong>
+
+                        {visit.employee_code && (
+                          <div style={styles.visitSecondaryText}>
+                            Code: {visit.employee_code}
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={styles.td}>
+                        <strong>
+                          {visit.visit_date || "-"}
+                        </strong>
+                      </td>
+
+                      <td style={styles.visitDetailsTd}>
+                        <strong style={styles.visitTypeText}>
+                          {visit.visit_type || "-"}
+                        </strong>
+
+                        <div style={styles.visitDetailLine}>
+                          {visit.start_time || "-"} -{" "}
+                          {visit.end_time || "-"}
+                        </div>
+
+                        <div style={styles.visitDetailLine}>
+                          {visit.location || "-"}
+                        </div>
+
+                        <div style={styles.visitReasonText}>
+                          {visit.comment || "-"}
+                        </div>
+
+                        {visit.review_remark && (
+                          <div style={styles.reviewRemark}>
+                            Remark: {visit.review_remark}
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={styles.td}>
+                        <span
+                          style={{
+                            ...styles.visitStatusBadge,
+
+                            ...(status === "approved"
+                              ? styles.visitApproved
+                              : status === "rejected"
+                              ? styles.visitRejected
+                              : styles.visitPending),
+                          }}
+                        >
+                          {status.charAt(0).toUpperCase() +
+                            status.slice(1)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* 4. EMPLOYEE SUMMARY LAST */}
+        <div style={styles.employeeVisitSummarySection}>
+          <div style={styles.visitSubHeader}>
+            <h3 style={styles.visitSubTitle}>
+              Employee Visit Summary
+            </h3>
+
+            <p style={styles.sectionSubtitle}>
+              Employee-wise totals for your department.
+            </p>
+          </div>
+
+          <div style={styles.visitTableBox}>
+            {employeeVisitSummary.length === 0 ? (
+              <div style={styles.emptyBox}>
+                No employee field visits found.
+              </div>
+            ) : (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Employee</th>
+                    <th style={styles.th}>Code</th>
+                    <th style={styles.th}>Total</th>
+                    <th style={styles.th}>Approved</th>
+                    <th style={styles.th}>Pending</th>
+                    <th style={styles.th}>Rejected</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {employeeVisitSummary.map((employee) => (
+                    <tr key={employee.employee_id}>
+                      <td style={styles.td}>
+                        <strong>
+                          {employee.full_name}
+                        </strong>
+                      </td>
+
+                      <td style={styles.td}>
+                        {employee.employee_code}
+                      </td>
+
+                      <td style={styles.td}>
+                        {employee.total}
+                      </td>
+
+                      <td style={styles.td}>
+                        {employee.approved}
+                      </td>
+
+                      <td style={styles.td}>
+                        {employee.pending}
+                      </td>
+
+                      <td style={styles.td}>
+                        {employee.rejected}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </>
+    )}
+
+    {/* =====================================================
+        MY VISITS
+    ===================================================== */}
+
+    {fieldVisitMode === "my" && (
+  <>
+    <div style={styles.myVisitOverview}>
+      <div>
+        <h3 style={styles.myVisitTitle}>
+          My Visit History
+        </h3>
+
+        <p style={styles.sectionSubtitle}>
+          Your recorded field, sales and business visits.
+        </p>
+      </div>
+
+      <div style={styles.myVisitCount}>
+        <strong
+          style={{
+            fontSize: "24px",
+            color: "#111827",
+          }}
+        >
+          {myVisits.length}
+        </strong>
+
+        <span
+          style={{
+            color: "#64748b",
+            fontSize: "12px",
+            fontWeight: 800,
+          }}
+        >
+          Recorded Visits
+        </span>
+      </div>
+    </div>
+
+    <div style={styles.myVisitSearchRow}>
+      <input
+        type="text"
+        style={styles.myVisitSearchInput}
+        placeholder="Search by visit type, location or reason..."
+        value={visitSearch}
+        onChange={(event) =>
+          setVisitSearch(event.target.value)
+        }
+      />
+    </div>
+
+    <div style={styles.myVisitTableCard}>
+      {visitLoading ? (
+        <div style={styles.myVisitEmpty}>
+          Loading your visits...
+        </div>
+      ) : filteredVisits.length === 0 ? (
+        <div style={styles.myVisitEmpty}>
+          <div style={styles.myVisitEmptyIcon}>
+            ↗
+          </div>
+
+          <h3 style={styles.myVisitEmptyTitle}>
+            No field visits yet
+          </h3>
+
+          <p style={styles.myVisitEmptyText}>
+            Add your first field visit to start building your visit history.
+          </p>
+
+          <button
+            type="button"
+            style={styles.myVisitEmptyButton}
+            onClick={() => {
+              setVisitError("");
+              setVisitMessage("");
+              setShowVisitModal(true);
+            }}
+          >
+            + Add First Visit
+          </button>
+        </div>
+      ) : (
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Date</th>
+              <th style={styles.th}>Visit Details</th>
+              <th style={styles.th}>Status</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filteredVisits.map((visit) => (
+              <tr key={visit.visit_id}>
+                <td style={styles.myVisitDateTd}>
+                  <strong>
+                    {visit.visit_date || "-"}
+                  </strong>
+                </td>
+
+                <td style={styles.myVisitDetailsTd}>
+                  <div style={styles.myVisitType}>
+                    {visit.visit_type || "-"}
+                  </div>
+
+                  <div style={styles.myVisitMeta}>
+                    {visit.start_time || "-"}
+                    {" • "}
+                    {visit.end_time || "-"}
+                  </div>
+
+                  <div style={styles.myVisitLocation}>
+                    {visit.location || "-"}
+                  </div>
+
+                  <div style={styles.myVisitReason}>
+                    {visit.comment || "-"}
+                  </div>
+                </td>
+
+                <td style={styles.td}>
+                  <span style={styles.recordedBadge}>
+                    Recorded
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </>
+)}
+  </section>
+)}
+{showVisitModal && (
+  <div
+    style={styles.visitModalOverlay}
+    onMouseDown={(event) => {
+      if (event.target === event.currentTarget) {
+        setShowVisitModal(false);
+      }
+    }}
+  >
+    <div style={styles.visitModal}>
+      <div style={styles.visitModalHeader}>
+        <div>
+          <h2 style={styles.visitModalTitle}>
+            Add Field Visit
+          </h2>
+
+          <p style={styles.sectionSubtitle}>
+            Add your sales, client or business visit.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          style={styles.visitCloseButton}
+          onClick={() => setShowVisitModal(false)}
+        >
+          ×
+        </button>
+      </div>
+
+      {visitError && (
+        <div style={styles.errorBox}>{visitError}</div>
+      )}
+
+      <div style={styles.visitFormGrid}>
+        <label style={styles.visitFormGroup}>
+          <span>Visit Type *</span>
+
+          <select
+            style={styles.visitFormInput}
+            value={visitForm.visit_type}
+            onChange={(event) =>
+              setVisitForm((previous) => ({
+                ...previous,
+                visit_type: event.target.value,
+              }))
+            }
+          >
+            <option value="Sales Visit">Sales Visit</option>
+            <option value="Client Visit">Client Visit</option>
+            <option value="Market Visit">Market Visit</option>
+            <option value="Vendor Visit">Vendor Visit</option>
+            <option value="Distributor Visit">
+              Distributor Visit
+            </option>
+            <option value="Business Meeting">
+              Business Meeting
+            </option>
+          </select>
+        </label>
+
+        <label style={styles.visitFormGroup}>
+          <span>Date *</span>
+
+          <input
+            type="date"
+            style={styles.visitFormInput}
+            value={visitForm.visit_date}
+            onChange={(event) =>
+              setVisitForm((previous) => ({
+                ...previous,
+                visit_date: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label style={styles.visitFormGroup}>
+          <span>Start Time *</span>
+
+          <input
+            type="time"
+            style={styles.visitFormInput}
+            value={visitForm.start_time}
+            onChange={(event) =>
+              setVisitForm((previous) => ({
+                ...previous,
+                start_time: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label style={styles.visitFormGroup}>
+          <span>End Time *</span>
+
+          <input
+            type="time"
+            style={styles.visitFormInput}
+            value={visitForm.end_time}
+            onChange={(event) =>
+              setVisitForm((previous) => ({
+                ...previous,
+                end_time: event.target.value,
+              }))
+            }
+          />
+        </label>
+      </div>
+
+      <label style={styles.visitFormGroup}>
+        <span>Location *</span>
+
+        <input
+          type="text"
+          style={styles.visitFormInput}
+          placeholder="Example: Vashi, Navi Mumbai"
+          value={visitForm.location}
+          onChange={(event) =>
+            setVisitForm((previous) => ({
+              ...previous,
+              location: event.target.value,
+            }))
+          }
+        />
+      </label>
+
+      <label style={styles.visitFormGroup}>
+        <span>Comment / Reason *</span>
+
+        <textarea
+          style={styles.visitTextarea}
+          placeholder="Purpose of visit..."
+          value={visitForm.comment}
+          onChange={(event) =>
+            setVisitForm((previous) => ({
+              ...previous,
+              comment: event.target.value,
+            }))
+          }
+        />
+      </label>
+
+      <div style={styles.visitModalFooter}>
+        <button
+          type="button"
+          style={styles.visitCancelButton}
+          onClick={() => setShowVisitModal(false)}
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          style={styles.visitSubmitButton}
+          disabled={savingVisit}
+          onClick={submitAdminVisit}
+        >
+          {savingVisit ? "Adding..." : "Add Visit"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };
@@ -317,39 +1341,54 @@ const styles = {
     marginBottom: "22px",
   },
 
-  tabBlock: {
-    background: "#ffffff",
-    borderRadius: "24px",
-    padding: "22px",
-    boxShadow: "0 14px 36px rgba(15, 23, 42, 0.06)",
-    display: "flex",
-    alignItems: "center",
-    gap: "14px",
-    marginBottom: "26px",
-  },
+tabBlock: {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
+  padding: "5px",
+  marginBottom: "26px",
 
-  tabButton: {
-    border: "1px solid #cbd5e1",
-    background: "#ffffff",
-    color: "#111827",
-    borderRadius: "16px",
-    padding: "16px 28px",
-    fontSize: "17px",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "16px",
 
-  activeTabButton: {
-    border: "1px solid #ff5733",
-    background: "#ff5733",
-    color: "#ffffff",
-    borderRadius: "16px",
-    padding: "16px 28px",
-    fontSize: "17px",
-    fontWeight: 900,
-    cursor: "pointer",
-    boxShadow: "0 12px 26px rgba(255, 87, 51, 0.22)",
-  },
+  boxShadow: "0 8px 22px rgba(15, 23, 42, 0.05)",
+},
+
+tabButton: {
+  border: "none",
+  background: "transparent",
+  color: "#64748b",
+
+  borderRadius: "11px",
+  padding: "13px 22px",
+
+  fontSize: "14px",
+  fontWeight: 900,
+
+  cursor: "pointer",
+  transition: "all 0.2s ease",
+
+  minWidth: "155px",
+},
+
+activeTabButton: {
+  border: "none",
+  background: "#ff5733",
+  color: "#ffffff",
+
+  borderRadius: "11px",
+  padding: "13px 22px",
+
+  fontSize: "14px",
+  fontWeight: 900,
+
+  cursor: "pointer",
+
+  minWidth: "155px",
+
+  boxShadow: "0 7px 16px rgba(255, 87, 51, 0.22)",
+},
 
   contentBlock: {
   width: "100%",
@@ -723,6 +1762,573 @@ flex: 1,
     fontWeight: 900,
     background: "#f8fafc",
   },
+  visitHeader: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "18px",
+  marginBottom: "22px",
+},
+
+visitHeaderActions: {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+},
+
+outlineVisitButton: {
+  border: "1px solid #ff5733",
+  background: "#ffffff",
+  color: "#ff5733",
+  borderRadius: "14px",
+  padding: "12px 20px",
+  fontSize: "14px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+
+visitSwitch: {
+  display: "inline-flex",
+  gap: "4px",
+  padding: "4px",
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  marginBottom: "24px",
+},
+
+visitSwitchButton: {
+  border: "none",
+  background: "transparent",
+  color: "#64748b",
+  borderRadius: "10px",
+  padding: "11px 20px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+
+visitSwitchActive: {
+  background: "#ffffff",
+  color: "#ff5733",
+  boxShadow: "0 5px 14px rgba(15, 23, 42, 0.08)",
+},
+
+visitSuccessBox: {
+  background: "#dcfce7",
+  color: "#166534",
+  border: "1px solid #bbf7d0",
+  borderRadius: "14px",
+  padding: "13px 16px",
+  fontWeight: 800,
+  marginBottom: "20px",
+},
+
+visitStatsGrid: {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "14px",
+  marginBottom: "26px",
+},
+
+visitSubHeader: {
+  marginBottom: "14px",
+},
+
+visitSubTitle: {
+  margin: "0 0 5px",
+  color: "#111827",
+  fontSize: "20px",
+  fontWeight: 900,
+},
+
+visitTableBox: {
+  border: "1px solid #e5e7eb",
+  borderRadius: "18px",
+  overflowX: "auto",
+  marginBottom: "24px",
+},
+
+visitFilterRow: {
+  display: "grid",
+  gridTemplateColumns: "1fr 220px",
+  gap: "14px",
+  marginBottom: "20px",
+},
+
+visitSearchInput: {
+  height: "54px",
+  border: "1px solid #d6dde8",
+  borderRadius: "14px",
+  padding: "0 16px",
+  outline: "none",
+  fontSize: "14px",
+  fontWeight: 700,
+},
+
+visitStatusSelect: {
+  height: "54px",
+  border: "1px solid #d6dde8",
+  borderRadius: "14px",
+  padding: "0 14px",
+  background: "#ffffff",
+  outline: "none",
+  fontWeight: 800,
+},
+
+visitTextTd: {
+  borderTop: "1px solid #eef2f7",
+  padding: "16px",
+  color: "#111827",
+  fontSize: "14px",
+  fontWeight: 700,
+  whiteSpace: "normal",
+  minWidth: "150px",
+  maxWidth: "260px",
+},
+
+visitStatusBadge: {
+  display: "inline-flex",
+  borderRadius: "999px",
+  padding: "7px 12px",
+  fontSize: "12px",
+  fontWeight: 900,
+},
+
+visitApproved: {
+  background: "#dcfce7",
+  color: "#166534",
+},
+
+visitPending: {
+  background: "#fef3c7",
+  color: "#92400e",
+},
+
+visitRejected: {
+  background: "#fee2e2",
+  color: "#b91c1c",
+},
+
+visitActionButtons: {
+  display: "flex",
+  justifyContent: "flex-end",
+  alignItems: "center",
+  gap: "7px",
+  whiteSpace: "nowrap",
+},
+
+approveVisitButton: {
+  border: "none",
+  background: "#16a34a",
+  color: "#ffffff",
+  borderRadius: "9px",
+  padding: "8px 11px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+
+rejectVisitButton: {
+  border: "none",
+  background: "#ef4444",
+  color: "#ffffff",
+  borderRadius: "9px",
+  padding: "8px 11px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+
+reviewedVisitText: {
+  color: "#64748b",
+  fontSize: "12px",
+  fontWeight: 800,
+},
+
+visitModalOverlay: {
+  position: "fixed",
+  inset: 0,
+  zIndex: 9999,
+  background: "rgba(15, 23, 42, 0.55)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "22px",
+},
+
+visitModal: {
+  width: "min(620px, 95vw)",
+  maxHeight: "90vh",
+  overflowY: "auto",
+  background: "#ffffff",
+  borderRadius: "24px",
+  padding: "26px",
+  boxShadow: "0 30px 80px rgba(15, 23, 42, 0.25)",
+},
+
+visitModalHeader: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "16px",
+  marginBottom: "20px",
+},
+
+visitModalTitle: {
+  margin: "0 0 6px",
+  color: "#111827",
+  fontSize: "25px",
+  fontWeight: 900,
+},
+
+visitCloseButton: {
+  width: "40px",
+  height: "40px",
+  border: "none",
+  borderRadius: "11px",
+  background: "#f1f5f9",
+  color: "#111827",
+  fontSize: "24px",
+  cursor: "pointer",
+},
+
+visitFormGrid: {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "14px",
+},
+
+visitFormGroup: {
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+  marginBottom: "15px",
+  color: "#111827",
+  fontSize: "13px",
+  fontWeight: 900,
+},
+
+visitFormInput: {
+  width: "100%",
+  height: "48px",
+  boxSizing: "border-box",
+  border: "1px solid #d6dde8",
+  borderRadius: "12px",
+  padding: "0 13px",
+  background: "#ffffff",
+  outline: "none",
+},
+
+visitTextarea: {
+  width: "100%",
+  minHeight: "105px",
+  boxSizing: "border-box",
+  border: "1px solid #d6dde8",
+  borderRadius: "12px",
+  padding: "13px",
+  outline: "none",
+  resize: "vertical",
+  fontFamily: "inherit",
+},
+
+visitModalFooter: {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "10px",
+  paddingTop: "16px",
+  borderTop: "1px solid #e5e7eb",
+},
+
+visitCancelButton: {
+  height: "44px",
+  padding: "0 20px",
+  border: "1px solid #d1d5db",
+  borderRadius: "11px",
+  background: "#ffffff",
+  color: "#111827",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+
+visitSubmitButton: {
+  height: "44px",
+  padding: "0 22px",
+  border: "none",
+  borderRadius: "11px",
+  background: "#ff5733",
+  color: "#ffffff",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+actionSection: {
+  marginBottom: "28px",
+},
+
+actionSectionHeader: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "16px",
+  marginBottom: "14px",
+},
+
+actionSectionTitle: {
+  margin: "0 0 5px",
+  color: "#111827",
+  fontSize: "22px",
+  fontWeight: 900,
+},
+
+actionCount: {
+  background: "#fff7ed",
+  color: "#ea580c",
+  border: "1px solid #fed7aa",
+  borderRadius: "999px",
+  padding: "8px 14px",
+  fontSize: "13px",
+  fontWeight: 900,
+  whiteSpace: "nowrap",
+},
+
+noActionBox: {
+  padding: "24px",
+  textAlign: "center",
+  color: "#15803d",
+  background: "#f0fdf4",
+  fontSize: "14px",
+  fontWeight: 900,
+},
+
+actionTh: {
+  textAlign: "right",
+  color: "#64748b",
+  background: "#f8fafc",
+  padding: "16px",
+  fontSize: "13px",
+  fontWeight: 900,
+  whiteSpace: "nowrap",
+  width: "190px",
+},
+
+actionTd: {
+  borderTop: "1px solid #eef2f7",
+  padding: "16px",
+  textAlign: "right",
+  width: "190px",
+  verticalAlign: "middle",
+},
+
+visitDetailsTd: {
+  borderTop: "1px solid #eef2f7",
+  padding: "16px",
+  color: "#111827",
+  verticalAlign: "middle",
+  width: "48%",
+},
+
+visitTypeText: {
+  display: "block",
+  color: "#111827",
+  fontSize: "14px",
+  fontWeight: 900,
+  marginBottom: "6px",
+},
+
+visitDetailLine: {
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+  lineHeight: 1.5,
+},
+
+visitReasonText: {
+  color: "#111827",
+  fontSize: "13px",
+  fontWeight: 800,
+  marginTop: "5px",
+  lineHeight: 1.45,
+},
+
+visitSecondaryText: {
+  marginTop: "4px",
+  color: "#94a3b8",
+  fontSize: "11px",
+  fontWeight: 700,
+},
+
+reviewRemark: {
+  marginTop: "7px",
+  padding: "7px 9px",
+  background: "#f8fafc",
+  borderRadius: "8px",
+  color: "#64748b",
+  fontSize: "12px",
+  fontWeight: 700,
+},
+
+allVisitsHeader: {
+  marginBottom: "14px",
+},
+
+employeeVisitSummarySection: {
+  marginTop: "30px",
+},
+myVisitOverview: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "20px",
+  padding: "20px 22px",
+  marginBottom: "18px",
+  background: "#f8fafc",
+  border: "1px solid #e5e7eb",
+  borderRadius: "18px",
+},
+
+myVisitTitle: {
+  margin: "0 0 5px",
+  color: "#111827",
+  fontSize: "20px",
+  fontWeight: 900,
+},
+
+myVisitCount: {
+  minWidth: "145px",
+  padding: "12px 18px",
+  borderRadius: "14px",
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+  gap: "4px",
+},
+
+myVisitSearchRow: {
+  marginBottom: "18px",
+},
+
+myVisitSearchInput: {
+  width: "100%",
+  height: "52px",
+  boxSizing: "border-box",
+  border: "1px solid #d6dde8",
+  borderRadius: "14px",
+  padding: "0 18px",
+  background: "#ffffff",
+  color: "#111827",
+  outline: "none",
+  fontSize: "14px",
+  fontWeight: 700,
+},
+
+myVisitTableCard: {
+  border: "1px solid #e5e7eb",
+  borderRadius: "18px",
+  overflow: "hidden",
+  background: "#ffffff",
+},
+
+myVisitEmpty: {
+  minHeight: "220px",
+  padding: "34px 20px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  background: "#fbfcfe",
+},
+
+myVisitEmptyIcon: {
+  width: "46px",
+  height: "46px",
+  borderRadius: "14px",
+  display: "grid",
+  placeItems: "center",
+  marginBottom: "12px",
+  background: "#fff1ed",
+  color: "#ff5733",
+  fontSize: "23px",
+  fontWeight: 900,
+},
+
+myVisitEmptyTitle: {
+  margin: "0 0 6px",
+  color: "#111827",
+  fontSize: "17px",
+  fontWeight: 900,
+},
+
+myVisitEmptyText: {
+  margin: "0 0 18px",
+  color: "#64748b",
+  fontSize: "13px",
+  fontWeight: 700,
+},
+
+myVisitEmptyButton: {
+  height: "42px",
+  padding: "0 18px",
+  border: "none",
+  borderRadius: "11px",
+  background: "#ff5733",
+  color: "#ffffff",
+  fontSize: "13px",
+  fontWeight: 900,
+  cursor: "pointer",
+},
+
+myVisitDateTd: {
+  borderTop: "1px solid #eef2f7",
+  padding: "18px",
+  color: "#111827",
+  fontSize: "14px",
+  width: "180px",
+  verticalAlign: "top",
+},
+
+myVisitDetailsTd: {
+  borderTop: "1px solid #eef2f7",
+  padding: "18px",
+  color: "#111827",
+  verticalAlign: "top",
+},
+
+myVisitType: {
+  fontSize: "15px",
+  fontWeight: 900,
+  color: "#111827",
+  marginBottom: "5px",
+},
+
+myVisitMeta: {
+  color: "#64748b",
+  fontSize: "13px",
+  fontWeight: 800,
+  marginBottom: "4px",
+},
+
+myVisitLocation: {
+  color: "#334155",
+  fontSize: "13px",
+  fontWeight: 800,
+  marginBottom: "5px",
+},
+
+myVisitReason: {
+  color: "#64748b",
+  fontSize: "13px",
+  fontWeight: 700,
+},
+
+recordedBadge: {
+  display: "inline-flex",
+  padding: "7px 13px",
+  borderRadius: "999px",
+  background: "#e8f7ee",
+  color: "#15803d",
+  fontSize: "12px",
+  fontWeight: 900,
+},
 };
 
 export default AdminAttendance;

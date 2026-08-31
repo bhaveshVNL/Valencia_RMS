@@ -32,4 +32,21 @@ router.get(
   employeeAttendanceController.getEmployeeAttendance
 );
 
+/* =========================================================
+   FIELD VISITS
+========================================================= */
+
+router.get(
+  "/field-visits",
+  authMiddleware,
+  onlyEmployee,
+  employeeAttendanceController.getEmployeeFieldVisits
+);
+
+router.post(
+  "/field-visits",
+  authMiddleware,
+  onlyEmployee,
+  employeeAttendanceController.createEmployeeFieldVisit
+);
 module.exports = router;
