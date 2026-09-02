@@ -198,7 +198,10 @@ const [savingVisit, setSavingVisit] =
 const [visitError, setVisitError] = useState("");
 const [visitSuccess, setVisitSuccess] =
   useState("");
-
+const [employees, setEmployees] = useState([]);
+const [selectedVisitors, setSelectedVisitors] = useState([]);
+const [visitorSearch, setVisitorSearch] = useState("");
+const [showVisitorList, setShowVisitorList] = useState(false);
 const [visitForm, setVisitForm] = useState({
   visit_type: "Sales Visit",
   visit_date: "",
@@ -326,6 +329,7 @@ const submitFieldVisit = async () => {
         end_time: visitForm.end_time,
         location: visitForm.location.trim(),
         comment: visitForm.comment.trim(),
+visitor_ids: selectedVisitors,
       }
     );
 
@@ -358,7 +362,24 @@ const submitFieldVisit = async () => {
     fetchAttendance();
     fetchFieldVisits();
   }, []);
+const fetchEmployees = async () => {
+  try {
+    const response = await api.get(
+      "/employee-attendance/employees"
+    );
 
+    const data =
+      response.data?.employees || [];
+
+    setEmployees(data);
+
+  } catch (error) {
+    console.error(
+      "Employee fetch error:",
+      error
+    );
+  }
+};
   const filteredAttendance = useMemo(() => {
     const query = searchText.trim().toLowerCase();
     const weekRange = getCurrentWeekRange();
@@ -504,10 +525,12 @@ const submitFieldVisit = async () => {
     <button
       type="button"
       style={styles.addVisitBtn}
-      onClick={() => {
-        setVisitError("");
-        setShowVisitModal(true);
-      }}
+     onClick={() => {
+  setVisitError("");
+  setSelectedVisitors([]);
+  fetchEmployees();
+  setShowVisitModal(true);
+}}
     >
       <Plus size={18} />
       Add Visit
@@ -1022,6 +1045,29 @@ const submitFieldVisit = async () => {
             <option value="Vendor Visit">
               Vendor Visit
             </option>
+            <option value="Distributor Visit">
+  Distributor Visit
+</option>
+
+<option value="Business Meeting">
+  Business Meeting
+</option>
+
+<option value="Exhibition Visit">
+  Exhibition Visit
+</option>
+
+<option value="Manufacturer Visit">
+  Manufacturer Visit
+</option>
+
+<option value="Document Visit">
+  Document Visit
+</option>
+
+<option value="Procurement Visit">
+  Procurement Visit
+</option>
           </select>
         </label>
 
@@ -1108,6 +1154,137 @@ const submitFieldVisit = async () => {
           }
         />
       </label>
+     <label style={styles.formGroup}>
+  <span>
+    Visitors / Team Members
+  </span>
+
+  <input
+    type="text"
+    style={styles.formInput}
+    placeholder="Search employee..."
+    value={visitorSearch}
+    onChange={(event) =>
+      setVisitorSearch(event.target.value)
+    }
+  />
+
+  <div
+    style={{
+      border: "1px solid #d6dde8",
+      borderRadius: "12px",
+      maxHeight: "150px",
+      overflowY: "auto",
+      background: "#fff",
+    }}
+  >
+    {employees
+      .filter((employee) =>
+        employee.full_name
+          .toLowerCase()
+          .includes(
+            visitorSearch.toLowerCase()
+          )
+      )
+      .map((employee) => (
+        <label
+          key={employee.user_id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: "10px 12px",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={
+              selectedVisitors.includes(
+                employee.user_id
+              )
+            }
+            onChange={() => {
+              setSelectedVisitors((prev) => {
+                if (
+                  prev.includes(
+                    employee.user_id
+                  )
+                ) {
+                  return prev.filter(
+                    (id) =>
+                      id !== employee.user_id
+                  );
+                }
+
+                return [
+                  ...prev,
+                  employee.user_id,
+                ];
+              });
+            }}
+          />
+
+          {employee.full_name}
+        </label>
+      ))}
+  </div>
+
+  <div
+    style={{
+      display: "flex",
+      flexWrap: "wrap",
+      gap: "8px",
+      marginTop: "10px",
+    }}
+  >
+    {selectedVisitors.map((id) => {
+      const employee = employees.find(
+        (item) =>
+          item.user_id === id
+      );
+
+      if (!employee) return null;
+
+      return (
+        <span
+          key={id}
+          style={{
+            background:"#fff0eb",
+            color:"#ff5733",
+            padding:"6px 12px",
+            borderRadius:"20px",
+            fontSize:"13px",
+            fontWeight:800,
+          }}
+        >
+          {employee.full_name}
+
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedVisitors(
+                selectedVisitors.filter(
+                  (x) => x !== id
+                )
+              )
+            }
+            style={{
+              border:"none",
+              background:"transparent",
+              marginLeft:"8px",
+              cursor:"pointer",
+              fontWeight:900,
+            }}
+          >
+            ×
+          </button>
+
+        </span>
+      );
+    })}
+  </div>
+</label>
 
       <label style={styles.formGroup}>
         <span>

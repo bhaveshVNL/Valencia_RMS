@@ -21,116 +21,77 @@ const LEAVE_APPLICATION_RECIPIENTS = [
 */
 
 const HOLIDAYS_2026 = [
+
+  // ==========================
+  // FIXED COMPANY HOLIDAYS
+  // ==========================
+
   {
     date: "2026-01-26",
     name: "Republic Day",
     type: "fixed",
   },
-  {
-    date: "2026-02-15",
-    name: "Mahashivratri",
-    type: "optional",
-  },
-  {
-    date: "2026-02-19",
-    name: "Chhatrapati Shivaji Maharaj Jayanti",
-    type: "optional",
-  },
-  {
-    date: "2026-03-03",
-    name: "Holi",
-    type: "optional",
-  },
-  {
-    date: "2026-03-19",
-    name: "Gudhi Padwa",
-    type: "optional",
-  },
-  {
-    date: "2026-03-21",
-    name: "Ramzan Eid",
-    type: "optional",
-  },
-  {
-    date: "2026-03-26",
-    name: "Ram Navami",
-    type: "optional",
-  },
-  {
-    date: "2026-03-31",
-    name: "Mahavir Jayanti",
-    type: "optional",
-  },
-  {
-    date: "2026-04-03",
-    name: "Good Friday",
-    type: "optional",
-  },
-  {
-    date: "2026-04-14",
-    name: "Dr. Babasaheb Ambedkar Jayanti",
-    type: "optional",
-  },
+
   {
     date: "2026-05-01",
     name: "Maharashtra Day / Buddha Pournima",
     type: "fixed",
   },
-  {
-    date: "2026-05-28",
-    name: "Bakri Eid",
-    type: "optional",
-  },
-  {
-    date: "2026-06-26",
-    name: "Moharram",
-    type: "optional",
-  },
+
   {
     date: "2026-08-15",
     name: "Independence Day / Parsi New Year",
     type: "fixed",
   },
-  {
-    date: "2026-08-26",
-    name: "Eid-e-Milad",
-    type: "optional",
-  },
-  {
-    date: "2026-09-14",
-    name: "Ganesh Chaturthi",
-    type: "optional",
-  },
+
   {
     date: "2026-10-02",
     name: "Gandhi Jayanti",
     type: "fixed",
   },
+
+
+  // ==========================
+  // FESTIVAL LEAVE OPTIONS
+  // Employee can select any 4 out of 6
+  // ==========================
+
   {
-    date: "2026-10-20",
-    name: "Dasara",
+    date: "2026-03-03",
+    name: "Holi",
     type: "optional",
   },
+
   {
-    date: "2026-11-08",
-    name: "Diwali - Laxmi Pujan",
+    date: "2026-03-19",
+    name: "Gudi Padwa",
     type: "optional",
   },
+
   {
-    date: "2026-11-10",
-    name: "Diwali - Bali Pratipada",
+    date: "2026-03-21",
+    name: "Eid",
     type: "optional",
   },
+
   {
-    date: "2026-11-24",
-    name: "Guru Nanak Jayanti",
+    date: "2026-09-14",
+    name: "Ganesh Chaturthi",
     type: "optional",
   },
+
+  {
+  date: "2026-11-09",
+  name: "Diwali",
+  type: "optional",
+},
+
   {
     date: "2026-12-25",
     name: "Christmas",
     type: "optional",
   },
+
 ];
 
 /*
@@ -194,7 +155,7 @@ const getLeaveLabel = (type) => {
   }
 
   if (type === "festival") {
-    return "Holiday Leave";
+    return "Festival Leave";
   }
 
   return "Leave";

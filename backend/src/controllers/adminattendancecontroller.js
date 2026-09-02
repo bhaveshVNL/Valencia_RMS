@@ -277,9 +277,8 @@ const getLateRemark = (
 
   const automaticRemark =
     minutesLate > 0
-      ? `Late by ${minutesLate} minute${
-          minutesLate === 1 ? "" : "s"
-        }`
+      ? `Late by ${minutesLate} minute${minutesLate === 1 ? "" : "s"
+      }`
       : "Late";
 
   if (!originalRemark) {
@@ -511,7 +510,7 @@ const buildUserAttendanceSummary = ({
         total_minutes:
           Number(
             record.total_minutes ||
-              0
+            0
           ),
 
         working_hours:
@@ -745,8 +744,8 @@ const getDepartmentAttendance = async (
 
           WHERE a.employee_id IN (
             ${userIds
-              .map(() => "?")
-              .join(",")}
+          .map(() => "?")
+          .join(",")}
           )
         `,
         userIds
@@ -792,8 +791,8 @@ const getDepartmentAttendance = async (
             WHERE
               a.employee_id IN (
                 ${userIds
-                  .map(() => "?")
-                  .join(",")}
+            .map(() => "?")
+            .join(",")}
               )
 
             AND a.attendance_date
@@ -972,163 +971,112 @@ const getDepartmentAttendance = async (
    ADMIN - GET DEPARTMENT FIELD VISITS
 ========================================================= */
 
-const getDepartmentFieldVisits = async (req, res) => {
+const getDepartmentFieldVisits = async (req,res)=>{
   try {
+
     const { admin, error } =
       await getLoggedInAdmin(req);
 
-    if (error) {
-      return res
-        .status(error.status)
-        .json({
-          success: false,
-          message: error.message,
-        });
+    if(error){
+      return res.status(error.status).json({
+        success:false,
+        message:error.message
+      });
     }
 
-    const [visits] = await db.query(
-      `
-      SELECT
-        fv.visit_id,
-        fv.employee_id,
-        fv.visit_type,
 
-        DATE_FORMAT(
-          fv.visit_date,
-          '%Y-%m-%d'
-        ) AS visit_date,
+    const [visits] = await db.query(`
+   SELECT
 
-        TIME_FORMAT(
-          fv.start_time,
-          '%H:%i'
-        ) AS start_time,
+fv.*,
 
-        TIME_FORMAT(
-          fv.end_time,
-          '%H:%i'
-        ) AS end_time,
+creator.full_name AS full_name,
 
-        fv.location,
-        fv.comment,
-        fv.status,
+creator.employee_code,
 
-        fv.reviewed_by,
+GROUP_CONCAT(
+ DISTINCT members.full_name
+ SEPARATOR ', '
+) AS team_members,
 
-        DATE_FORMAT(
-          fv.reviewed_at,
-          '%Y-%m-%d %H:%i:%s'
-        ) AS reviewed_at,
+GROUP_CONCAT(
+ DISTINCT members.user_id
+ SEPARATOR ','
+) AS team_member_ids
 
-        fv.review_remark,
+FROM employee_field_visits fv
 
-        employee.full_name,
-        employee.email,
-        employee.employee_code,
-        employee.designation,
-        employee.department_id,
+      LEFT JOIN users creator
+      ON creator.user_id = fv.employee_id
 
-        department.department_name,
 
-        reviewer.full_name
-          AS reviewed_by_name
+      LEFT JOIN field_visit_members fvm
+      ON fvm.visit_id = fv.visit_id
 
-      FROM employee_field_visits fv
 
-      INNER JOIN users employee
-        ON employee.user_id =
-           fv.employee_id
+      LEFT JOIN users members
+      ON members.user_id = fvm.employee_id
 
-      LEFT JOIN departments department
-        ON department.department_id =
-           employee.department_id
 
-      LEFT JOIN users reviewer
-        ON reviewer.user_id =
-           fv.reviewed_by
+      GROUP BY fv.visit_id
 
-      WHERE
-        employee.department_id = ?
 
-        AND LOWER(
-          COALESCE(
-            employee.status,
-            'active'
-          )
-        ) != 'deleted'
+      ORDER BY fv.visit_date DESC
 
-      ORDER BY
-        CASE
-          WHEN fv.status = 'pending'
-          THEN 0
-          ELSE 1
-        END,
+    `);
 
-        fv.visit_date DESC,
-        fv.start_time DESC,
-        fv.visit_id DESC
-      `,
-      [admin.department_id]
-    );
 
     const summary = {
+      
       total: visits.length,
 
-      approved: visits.filter(
-        (visit) =>
-          String(
-            visit.status || ""
-          ).toLowerCase() ===
-          "approved"
+      approved:
+      visits.filter(v =>
+        v.status === "approved"
       ).length,
 
-      pending: visits.filter(
-        (visit) =>
-          String(
-            visit.status || ""
-          ).toLowerCase() ===
-          "pending"
+      pending:
+      visits.filter(v =>
+        v.status === "pending"
       ).length,
 
-      rejected: visits.filter(
-        (visit) =>
-          String(
-            visit.status || ""
-          ).toLowerCase() ===
-          "rejected"
+      rejected:
+      visits.filter(v =>
+        v.status === "rejected"
       ).length,
     };
+visits.forEach((visit)=>{
+
+  visit.all_people = [
+    visit.full_name,
+    ...(visit.team_members
+      ? visit.team_members.split(", ")
+      : [])
+  ];
+
+});
 
     return res.json({
-      success: true,
-
-      department_id:
-        admin.department_id,
-
-      department_name:
-        admin.department_name,
+      success:true,
 
       summary,
 
-      visits,
+      visits
     });
-  } catch (error) {
+
+
+  } catch(error){
+
     console.error(
-      "Get department field visits error:",
+      "Department field visits error",
       error
     );
 
     return res.status(500).json({
-      success: false,
-
-      message:
-        "Failed to fetch field visits.",
-
-      error:
-        error.message,
-
-      sqlMessage:
-        error.sqlMessage || null,
+      success:false,
+      message:"Failed to fetch field visits"
     });
+
   }
 };
 
@@ -1172,8 +1120,8 @@ const reviewFieldVisit = async (req, res) => {
     const reviewRemark =
       String(
         req.body?.review_remark ||
-          req.body?.remark ||
-          ""
+        req.body?.remark ||
+        ""
       ).trim();
 
     if (
@@ -1223,6 +1171,7 @@ const reviewFieldVisit = async (req, res) => {
           admin.department_id,
         ]
       );
+
 
     if (!visitRows.length) {
       return res.status(404).json({
@@ -1365,138 +1314,124 @@ const createAdminFieldVisit = async (
   res
 ) => {
   try {
+
     const {
       admin,
       error,
     } =
-      await getLoggedInAdmin(
-        req
-      );
+      await getLoggedInAdmin(req);
 
     if (error) {
       return res
         .status(error.status)
         .json({
-          success: false,
-          message:
-            error.message,
+          success:false,
+          message:error.message,
         });
     }
+
 
     const visitType =
       String(
         req.body?.visit_type ||
-          "Sales Visit"
-      ).trim() ||
-      "Sales Visit";
+        "Sales Visit"
+      ).trim();
+
 
     const visitDate =
       String(
         req.body?.visit_date ||
-          ""
+        ""
       ).trim();
+
 
     const startTime =
       String(
         req.body?.start_time ||
-          ""
+        ""
       ).trim();
+
 
     const endTime =
       String(
         req.body?.end_time ||
-          ""
+        ""
       ).trim();
+
 
     const location =
       String(
         req.body?.location ||
-          ""
+        ""
       ).trim();
+
 
     const comment =
       String(
         req.body?.comment ||
-          ""
+        ""
       ).trim();
 
-    /*
-    --------------------------------
-    VALIDATION
-    --------------------------------
-    */
 
-    if (!visitDate) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "Visit date is required.",
-        });
+    const visitorIds =
+      Array.isArray(
+        req.body?.visitor_ids
+      )
+        ? req.body.visitor_ids
+        : [];
+
+
+
+    if(!visitDate){
+      return res.status(400).json({
+        success:false,
+        message:"Visit date is required."
+      });
     }
 
-    if (
-      !startTime ||
-      !endTime
-    ) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "Start time and end time are required.",
-        });
+
+    if(!startTime || !endTime){
+      return res.status(400).json({
+        success:false,
+        message:"Start time and end time are required."
+      });
     }
 
-    if (
-      endTime <= startTime
-    ) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "End time must be later than start time.",
-        });
+
+    if(endTime <= startTime){
+      return res.status(400).json({
+        success:false,
+        message:"End time must be later than start time."
+      });
     }
 
-    if (!location) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "Location is required.",
-        });
+
+    if(!location){
+      return res.status(400).json({
+        success:false,
+        message:"Location is required."
+      });
     }
 
-    if (!comment) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "Comment / reason is required.",
-        });
+
+    if(!comment){
+      return res.status(400).json({
+        success:false,
+        message:"Comment / reason is required."
+      });
     }
+
+
 
     /*
-    --------------------------------
-    SAVE ADMIN VISIT
-
-    Admin cannot approve themselves,
-    so Admin's own visit is recorded
-    directly as approved.
-
-    HR still receives notification.
-    --------------------------------
+      CREATE MAIN VISIT
     */
 
     const [result] =
       await db.query(
         `
-        INSERT INTO employee_field_visits (
+        INSERT INTO employee_field_visits
+        (
           employee_id,
           visit_type,
           visit_date,
@@ -1507,8 +1442,15 @@ const createAdminFieldVisit = async (
           status
         )
 
-        VALUES (
-          ?, ?, ?, ?, ?, ?, ?,
+        VALUES
+        (
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
           'approved'
         )
         `,
@@ -1519,333 +1461,257 @@ const createAdminFieldVisit = async (
           startTime,
           endTime,
           location,
-          comment,
+          comment
         ]
       );
 
+
+
     /*
-    --------------------------------
-    GET SAVED VISIT
-    --------------------------------
+      SAVE TEAM MEMBERS
     */
+
+    if(visitorIds.length){
+
+      const memberValues =
+        visitorIds
+        .filter(
+          id =>
+            Number(id) !== Number(admin.user_id)
+        )
+        .map(id=>[
+          result.insertId,
+          Number(id)
+        ]);
+
+
+      if(memberValues.length){
+
+        await db.query(
+          `
+          INSERT INTO field_visit_members
+          (
+            visit_id,
+            employee_id
+          )
+
+          VALUES ?
+          `,
+          [
+            memberValues
+          ]
+        );
+
+      }
+
+    }
+
+
 
     const [visitRows] =
       await db.query(
         `
         SELECT
-          fv.visit_id,
-          fv.employee_id,
-          fv.visit_type,
 
-          DATE_FORMAT(
-            fv.visit_date,
-            '%Y-%m-%d'
-          ) AS visit_date,
+        fv.*,
 
-          TIME_FORMAT(
-            fv.start_time,
-            '%H:%i'
-          ) AS start_time,
+        creator.full_name,
 
-          TIME_FORMAT(
-            fv.end_time,
-            '%H:%i'
-          ) AS end_time,
+        GROUP_CONCAT(
+          DISTINCT members.full_name
+          SEPARATOR ', '
+        ) AS team_members
 
-          fv.location,
-          fv.comment,
-          fv.status,
-          fv.created_at
 
         FROM employee_field_visits fv
 
-        WHERE
-          fv.visit_id = ?
+
+        LEFT JOIN users creator
+        ON creator.user_id =
+        fv.employee_id
+
+
+        LEFT JOIN field_visit_members fvm
+        ON fvm.visit_id =
+        fv.visit_id
+
+
+        LEFT JOIN users members
+        ON members.user_id =
+        fvm.employee_id
+
+
+        WHERE fv.visit_id = ?
+
+
+        GROUP BY fv.visit_id
 
         LIMIT 1
         `,
         [
-          result.insertId,
+          result.insertId
         ]
       );
 
-    /*
-    --------------------------------
-    EMAIL HR ONLY
+    
+// ===============================
+// SEND FIELD VISIT CONFIRMATION MAIL
+// ADMIN + TEAM MEMBERS + HR
+// ===============================
 
-    NO SUPERADMIN EMAIL.
-    --------------------------------
-    */
+try {
 
-    let emailResult = {
-      sent: false,
-      skipped: true,
-    };
+  const teamIds = visitorIds.filter(
+    id =>
+      Number(id) !== Number(admin.user_id)
+  );
 
-    try {
-      const subject =
-        `Admin Field Visit - ${
-          admin.full_name ||
-          "Admin"
-        }`;
 
-      const text = `
-A Field Visit has been added through Valencia RMS.
+ let recipientEmails = [];
 
-Name: ${admin.full_name || "-"}
-Email: ${admin.email || "-"}
-Department: ${admin.department_name || "-"}
-Role: Admin
+if(admin.email){
+  recipientEmails.push(admin.email);
+}
 
-Visit Type: ${visitType}
-Date: ${visitDate}
-Time: ${startTime} - ${endTime}
-Location: ${location}
 
-Reason:
-${comment}
+  if(teamIds.length){
 
-Status: Recorded
-
-Regards,
-Valencia RMS
-`;
-
-      const html = `
-        <div style="
-          font-family: Arial, sans-serif;
-          line-height: 1.6;
-          color: #111827;
-        ">
-          <h2 style="
-            color:#ff5733;
-          ">
-            Admin Field Visit
-          </h2>
-
-          <p>
-            A Field Visit has been added
-            through Valencia RMS.
-          </p>
-
-          <table style="
-            border-collapse: collapse;
-            width: 100%;
-            max-width: 650px;
-          ">
-
-            <tr>
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                <strong>Name</strong>
-              </td>
-
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                ${admin.full_name || "-"}
-              </td>
-            </tr>
-
-            <tr>
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                <strong>Department</strong>
-              </td>
-
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                ${
-                  admin.department_name ||
-                  "-"
-                }
-              </td>
-            </tr>
-
-            <tr>
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                <strong>Visit Type</strong>
-              </td>
-
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                ${visitType}
-              </td>
-            </tr>
-
-            <tr>
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                <strong>Date</strong>
-              </td>
-
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                ${visitDate}
-              </td>
-            </tr>
-
-            <tr>
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                <strong>Time</strong>
-              </td>
-
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                ${startTime}
-                -
-                ${endTime}
-              </td>
-            </tr>
-
-            <tr>
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                <strong>Location</strong>
-              </td>
-
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                ${location}
-              </td>
-            </tr>
-
-            <tr>
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                <strong>Reason</strong>
-              </td>
-
-              <td style="
-                padding:8px;
-                border:1px solid #ddd;
-              ">
-                ${comment}
-              </td>
-            </tr>
-
-          </table>
-
-          <p>
-            Regards,<br />
-            Valencia RMS
-          </p>
-        </div>
-      `;
-
-      const mailResponse =
-        await sendMail({
-          to:
-            HR_FIELD_VISIT_EMAIL,
-
-          subject,
-          text,
-          html,
-
-          replyTo:
-            admin.email ||
-            undefined,
-        });
-
-      emailResult = {
-        sent:
-          !mailResponse?.skipped,
-
-        skipped:
-          Boolean(
-            mailResponse?.skipped
-          ),
-
-        messageId:
-          mailResponse
-            ?.messageId ||
-          null,
-      };
-    } catch (
-      emailError
-    ) {
-      console.error(
-        "Admin field visit HR email failed:",
-        emailError
+    const [memberEmails] =
+      await db.query(
+        `
+        SELECT email
+        FROM users
+        WHERE user_id IN (?)
+        AND email IS NOT NULL
+        `,
+        [
+          teamIds
+        ]
       );
 
-      /*
-      IMPORTANT:
-      Email failure must not
-      delete the Field Visit.
-      */
 
-      emailResult = {
-        sent: false,
-        skipped: false,
-        error:
-          emailError.message,
-      };
-    }
+    recipientEmails.push(
+      ...memberEmails.map(
+        user => user.email
+      )
+    );
 
-    return res
-      .status(201)
-      .json({
-        success: true,
+  }
 
-        message:
-          "Field visit added successfully.",
 
-        visit:
-          visitRows[0] ||
-          null,
+  // Add HR
+  recipientEmails.push(
+    HR_FIELD_VISIT_EMAIL
+  );
 
-        email:
-          emailResult,
-      });
-  } catch (error) {
+
+  // Remove duplicates
+  recipientEmails =
+    [
+      ...new Set(recipientEmails)
+    ];
+
+
+
+  await sendMail({
+
+    to: recipientEmails.join(","),
+
+    subject:
+      "Field Visit Confirmation",
+
+
+    html: `
+
+    <h3>Field Visit Recorded</h3>
+
+    <p>Hello,</p>
+
+    <p>
+      A field visit has been recorded successfully.
+    </p>
+
+
+    <p>
+      <b>Created By:</b>
+      ${admin.full_name}
+      <br/>
+
+      <b>Date:</b>
+      ${visitDate}
+      <br/>
+
+      <b>Time:</b>
+      ${startTime} - ${endTime}
+      <br/>
+
+      <b>Location:</b>
+      ${location}
+      <br/>
+
+      <b>Visit Type:</b>
+      ${visitType}
+      <br/>
+
+      <b>Purpose:</b>
+      ${comment}
+    </p>
+
+
+    <p>
+      This is a confirmation notification.
+    </p>
+
+    `
+
+  });
+
+
+} catch(mailError){
+
+  console.error(
+    "Field visit confirmation email failed:",
+    mailError
+  );
+
+}
+
+    return res.status(201).json({
+
+      
+
+      success:true,
+
+      message:
+      "Field visit added successfully.",
+
+      visit:
+      visitRows[0] || null
+
+    });
+
+
+
+  } catch(error){
+
     console.error(
       "Create Admin field visit error:",
       error
     );
 
-    return res
-      .status(500)
-      .json({
-        success: false,
 
-        message:
-          "Failed to add field visit.",
+    return res.status(500).json({
 
-        error:
-          error.message,
+      success:false,
 
-        sqlMessage:
-          error.sqlMessage ||
-          null,
-      });
+      message:
+      "Failed to add field visit.",
+
+      error:
+      error.message
+
+    });
+
   }
 };
 /* =========================================================
@@ -1856,145 +1722,212 @@ const getAdminFieldVisits = async (
   req,
   res
 ) => {
+
   try {
+
     const {
       admin,
-      error,
+      error
     } =
-      await getLoggedInAdmin(
-        req
-      );
+    await getLoggedInAdmin(req);
 
-    if (error) {
+
+    if(error){
+
       return res
-        .status(error.status)
-        .json({
-          success: false,
-          message:
-            error.message,
-        });
+      .status(error.status)
+      .json({
+        success:false,
+        message:error.message
+      });
+
     }
 
+
+
     const [visits] =
-      await db.query(
-        `
-        SELECT
-          fv.visit_id,
-          fv.employee_id,
-          fv.visit_type,
+    await db.query(
+      `
+      SELECT
 
-          DATE_FORMAT(
-            fv.visit_date,
-            '%Y-%m-%d'
-          ) AS visit_date,
 
-          TIME_FORMAT(
-            fv.start_time,
-            '%H:%i'
-          ) AS start_time,
+      fv.visit_id,
 
-          TIME_FORMAT(
-            fv.end_time,
-            '%H:%i'
-          ) AS end_time,
+      fv.employee_id,
 
-          fv.location,
-          fv.comment,
-          fv.status,
-          fv.review_remark,
-          fv.created_at,
-          fv.updated_at
 
-        FROM employee_field_visits fv
+      creator.full_name,
 
-        WHERE
-          fv.employee_id = ?
 
-        ORDER BY
-          fv.visit_date DESC,
-          fv.start_time DESC,
-          fv.visit_id DESC
-        `,
-        [
-          admin.user_id,
-        ]
-      );
+      fv.visit_type,
 
-    const summary = {
-      total:
-        visits.length,
 
-      approved:
-        visits.filter(
-          (visit) =>
-            String(
-              visit.status
-            ).toLowerCase() ===
-            "approved"
-        ).length,
+      DATE_FORMAT(
+        fv.visit_date,
+        '%Y-%m-%d'
+      ) AS visit_date,
 
-      pending:
-        visits.filter(
-          (visit) =>
-            String(
-              visit.status
-            ).toLowerCase() ===
-            "pending"
-        ).length,
 
-      rejected:
-        visits.filter(
-          (visit) =>
-            String(
-              visit.status
-            ).toLowerCase() ===
-            "rejected"
-        ).length,
-    };
+      TIME_FORMAT(
+        fv.start_time,
+        '%H:%i'
+      ) AS start_time,
+
+
+      TIME_FORMAT(
+        fv.end_time,
+        '%H:%i'
+      ) AS end_time,
+
+
+      fv.location,
+
+      fv.comment,
+
+      fv.status,
+
+
+      GROUP_CONCAT(
+        DISTINCT members.full_name
+        SEPARATOR ', '
+      ) AS team_members
+
+
+
+      FROM employee_field_visits fv
+
+
+
+      LEFT JOIN users creator
+
+      ON creator.user_id =
+      fv.employee_id
+
+
+
+      LEFT JOIN field_visit_members fvm
+
+      ON fvm.visit_id =
+      fv.visit_id
+
+
+
+      LEFT JOIN users members
+
+      ON members.user_id =
+      fvm.employee_id
+
+
+
+      WHERE fv.employee_id = ?
+
+
+
+      GROUP BY fv.visit_id
+
+
+
+      ORDER BY fv.visit_date DESC
+
+      `,
+      [
+        admin.user_id
+      ]
+    );
+
+
+
+
+    visits.forEach((visit)=>{
+
+      visit.all_people = [
+
+        visit.full_name,
+
+        ...(visit.team_members
+        ? visit.team_members.split(", ")
+        : [])
+
+      ];
+
+    });
+
+
 
     return res.json({
-      success: true,
 
-      admin: {
-        user_id:
-          admin.user_id,
+      success:true,
 
-        full_name:
-          admin.full_name,
+      visits
 
-        department_id:
-          admin.department_id,
-
-        department_name:
-          admin.department_name,
-      },
-
-      summary,
-      visits,
     });
-  } catch (error) {
+
+
+
+  } catch(error){
+
+
     console.error(
       "Get Admin field visits error:",
       error
     );
 
-    return res
-      .status(500)
-      .json({
-        success: false,
 
-        message:
-          "Failed to fetch Admin field visits.",
+    return res.status(500).json({
 
-        error:
-          error.message,
-      });
+      success:false,
+
+      message:
+      "Failed to fetch Admin field visits.",
+
+      error:
+      error.message
+
+    });
+
+  }
+
+};
+
+const getEmployeesForFieldVisit = async (req,res)=>{
+  try {
+
+    const [employees] = await db.query(`
+      SELECT
+        u.user_id,
+        u.full_name,
+        u.employee_code
+      FROM users u
+      INNER JOIN roles r
+        ON r.role_id = u.role_id
+      WHERE LOWER(r.role_name) IN ('employee','admin','administrator')
+      ORDER BY u.full_name ASC
+    `);
+
+    return res.json({
+      success:true,
+      employees
+    });
+
+  } catch(error){
+
+    console.error(
+      "Get employees field visit error:",
+      error
+    );
+
+    return res.status(500).json({
+      success:false,
+      message:"Failed to fetch employees"
+    });
   }
 };
 module.exports = {
+
   getDepartmentAttendance,
 
   getDepartmentFieldVisits,
+
   reviewFieldVisit,
 
   getAdminDepartmentAttendance:
@@ -2002,6 +1935,11 @@ module.exports = {
 
   getAdminAttendance:
     getDepartmentAttendance,
-    createAdminFieldVisit,
-getAdminFieldVisits,
+
+  createAdminFieldVisit,
+
+  getAdminFieldVisits,
+
+  getEmployeesForFieldVisit,
+
 };

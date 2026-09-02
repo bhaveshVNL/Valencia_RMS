@@ -338,64 +338,72 @@ const getEmployeeFieldVisits = async (req, res) => {
       });
     }
 
-    const [visits] = await db.query(
-      `
-      SELECT
-        fv.visit_id,
-        fv.employee_id,
-        fv.visit_type,
+   const [visits] = await db.query(
+`
+SELECT
+  fv.visit_id,
+  fv.employee_id,
+  fv.visit_type,
 
-        DATE_FORMAT(
-          fv.visit_date,
-          '%Y-%m-%d'
-        ) AS visit_date,
+  DATE_FORMAT(
+    fv.visit_date,
+    '%Y-%m-%d'
+  ) AS visit_date,
 
-        TIME_FORMAT(
-          fv.start_time,
-          '%H:%i'
-        ) AS start_time,
+  TIME_FORMAT(
+    fv.start_time,
+    '%H:%i'
+  ) AS start_time,
 
-        TIME_FORMAT(
-          fv.end_time,
-          '%H:%i'
-        ) AS end_time,
+  TIME_FORMAT(
+    fv.end_time,
+    '%H:%i'
+  ) AS end_time,
 
-        fv.location,
-        fv.comment,
-        fv.status,
+  fv.location,
+  fv.comment,
+  fv.status,
 
-        fv.reviewed_by,
+  GROUP_CONCAT(
+    DISTINCT member.full_name
+    SEPARATOR ', '
+  ) AS team_members
 
-        reviewer.full_name
-          AS reviewed_by_name,
+FROM employee_field_visits fv
 
-        DATE_FORMAT(
-          fv.reviewed_at,
-          '%Y-%m-%d %H:%i:%s'
-        ) AS reviewed_at,
+LEFT JOIN field_visit_members fvm
+ON fvm.visit_id = fv.visit_id
 
-        fv.review_remark,
+LEFT JOIN users member
+ON member.user_id = fvm.employee_id
 
-        fv.created_at,
-        fv.updated_at
+WHERE 
+(
+  fv.employee_id = ?
 
-      FROM employee_field_visits fv
+  OR EXISTS
+  (
+    SELECT 1
+    FROM field_visit_members members_check
 
-      LEFT JOIN users reviewer
-        ON reviewer.user_id =
-           fv.reviewed_by
+    WHERE
+      members_check.visit_id = fv.visit_id
 
-      WHERE
-        fv.employee_id = ?
+      AND members_check.employee_id = ?
+  )
+)
 
-      ORDER BY
-        fv.visit_date DESC,
-        fv.start_time DESC,
-        fv.visit_id DESC
-      `,
-      [employeeId]
-    );
+GROUP BY fv.visit_id
 
+ORDER BY
+  fv.visit_date DESC,
+  fv.start_time DESC
+`,
+[
+ employeeId,
+ employeeId
+]
+);
     const summary = {
       total: visits.length,
 
@@ -493,6 +501,14 @@ const createEmployeeFieldVisit = async (
       String(
         req.body?.comment || ""
       ).trim();
+
+      const visitorIds = Array.isArray(
+  req.body?.visitor_ids
+)
+  ? req.body.visitor_ids
+      .map(Number)
+      .filter(Boolean)
+  : [];
 
     /* =========================
        VALIDATION
@@ -617,6 +633,55 @@ const createEmployeeFieldVisit = async (
           comment,
         ]
       );
+
+      const visitId = result.insertId;
+
+console.log(
+  "FIELD VISIT CREATED:",
+  visitId,
+  employeeId,
+  visitorIds
+);
+// Add creator
+await db.query(
+`
+INSERT INTO field_visit_members
+(
+ visit_id,
+ employee_id
+)
+VALUES (?,?)
+`,
+[
+ visitId,
+ employeeId
+]
+);
+
+
+// Add selected visitors
+for (const visitorId of visitorIds) {
+
+  if (visitorId !== employeeId) {
+
+    await db.query(
+    `
+    INSERT INTO field_visit_members
+    (
+      visit_id,
+      employee_id
+    )
+    VALUES (?,?)
+    `,
+    [
+      visitId,
+      visitorId
+    ]
+    );
+
+  }
+
+}
 
     /* =========================
        GET SAVED VISIT
@@ -1107,9 +1172,47 @@ Valencia RMS
   }
 };
 
+const getEmployeesForFieldVisit = async (req, res) => {
+  try {
 
+    const [employees] = await db.query(
+      `
+      SELECT
+        user_id,
+        full_name,
+        employee_code
+
+      FROM users
+
+      WHERE
+        LOWER(status) != 'deleted'
+
+      ORDER BY
+        full_name ASC
+      `
+    );
+
+    return res.json({
+      success: true,
+      employees,
+    });
+
+  } catch (error) {
+
+    console.error(
+      "Fetch employees error:",
+      error
+    );
+
+    return res.status(500).json({
+      success:false,
+      message:"Failed to fetch employees"
+    });
+  }
+};
 module.exports = {
   getEmployeeAttendance,
   getEmployeeFieldVisits,
   createEmployeeFieldVisit,
+  getEmployeesForFieldVisit,
 };

@@ -49,15 +49,15 @@ const DEFAULT_BALANCES = {
     remaining: 0,
   },
 
-  festival: {
-    label: "Holiday Leave",
-    total: 4,
-    earned: 4,
-    used: 0,
-    pending: 0,
-    available: 4,
-    remaining: 4,
-  },
+ festival: {
+  label: "Festival Leave",
+  total: 4,
+  earned: 4,
+  used: 0,
+  pending: 0,
+  available: 4,
+  remaining: 4,
+},
 };
 
 const LEAVE_CARDS = [
@@ -77,10 +77,10 @@ const LEAVE_CARDS = [
     description: "1.5 days credited monthly",
   },
   {
-    key: "festival",
-    title: "Holiday Leave",
-    description: "1 Holiday Leave in 2026 - Christmas",
-  },
+  key: "festival",
+  title: "Festival Leave",
+  description: "Choose any festivals from available options",
+},
 ];
 
 const HISTORY_FILTERS = [

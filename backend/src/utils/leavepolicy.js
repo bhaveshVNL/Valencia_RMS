@@ -74,7 +74,7 @@ const getAnnualEntitlements = (
     return {
       sick: 2,
       casual: 2,
-      festival: 1,
+      festival: 4,
     };
   }
 
@@ -572,7 +572,7 @@ const buildLeaveBalances =
 
       festival: {
         label:
-          "Holiday Leave",
+          "Festival Leave",
 
         total:
           entitlements.festival,

@@ -1,5 +1,7 @@
 const express = require("express");
+
 const authMiddleware = require("../middleware/authmiddleware");
+
 const { requireRole } = require("../middleware/rolemiddleware");
 
 const {
@@ -7,10 +9,16 @@ const {
   getDepartmentFieldVisits,
   reviewFieldVisit,
   createAdminFieldVisit,
-getAdminFieldVisits,
+  getAdminFieldVisits,
+  getEmployeesForFieldVisit,
 } = require("../controllers/adminattendancecontroller");
 
 const router = express.Router();
+
+
+/* =========================
+   ADMIN OWN FIELD VISITS
+========================= */
 
 router.get(
   "/field-visits/my",
@@ -19,12 +27,22 @@ router.get(
   getAdminFieldVisits
 );
 
+
+/* =========================
+   CREATE FIELD VISIT
+========================= */
+
 router.post(
   "/field-visits",
   authMiddleware,
   requireRole("admin"),
   createAdminFieldVisit
 );
+
+
+/* =========================
+   DEPARTMENT ATTENDANCE
+========================= */
 
 router.get(
   "/department-attendance",
@@ -33,15 +51,18 @@ router.get(
   getDepartmentAttendance
 );
 
+
 router.get(
   "/",
   authMiddleware,
   requireRole("admin"),
   getDepartmentAttendance
 );
-/* =========================================================
-   FIELD VISITS
-========================================================= */
+
+
+/* =========================
+   FIELD VISITS REVIEW
+========================= */
 
 router.get(
   "/field-visits",
@@ -50,10 +71,25 @@ router.get(
   getDepartmentFieldVisits
 );
 
+
 router.post(
   "/field-visits/:visitId/review",
   authMiddleware,
   requireRole("admin"),
   reviewFieldVisit
 );
+
+
+/* =========================
+   EMPLOYEE SEARCH LIST
+========================= */
+
+router.get(
+  "/employees",
+  authMiddleware,
+  requireRole("admin"),
+  getEmployeesForFieldVisit
+);
+
+
 module.exports = router;
